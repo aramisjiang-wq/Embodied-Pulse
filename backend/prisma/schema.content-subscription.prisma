@@ -1,0 +1,23 @@
+/**
+ * 内容订阅表
+ * 用于用户订阅具体的GitHub仓库、论文、HuggingFace模型等
+ */
+
+model ContentSubscription {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  contentType   String    @map("content_type") // repo, paper, huggingface
+  contentId     String    @map("content_id") // 具体内容的ID
+  notifyEnabled Boolean   @default(true) @map("notify_enabled") // 是否开启更新通知
+  lastNotified  DateTime? @map("last_notified") // 最后一次通知时间
+  lastChecked   DateTime? @map("last_checked") // 最后一次检查更新时间
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId])
+  @@index([contentType, contentId])
+  @@map("content_subscriptions")
+}

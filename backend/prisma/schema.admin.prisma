@@ -1,0 +1,512 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-admin"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("ADMIN_DATABASE_URL")
+}
+
+model admins {
+  id            String    @id
+  username      String    @unique
+  email         String    @unique
+  password_hash String
+  avatar_url    String?
+  role          String    @default("admin")
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime
+  last_login_at DateTime?
+  tags          String?
+  admin_number  String    @unique
+
+  permissions   admin_permissions[]
+
+  @@index([is_active])
+}
+
+model admin_permissions {
+  id            String    @id
+  admin_id      String
+  module        String
+  can_view      Boolean   @default(false)
+  can_create    Boolean   @default(false)
+  can_update    Boolean   @default(false)
+  can_delete    Boolean   @default(false)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime
+
+  admin         admins    @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@unique([admin_id, module])
+  @@index([admin_id])
+}
+
+model announcements {
+  id         String   @id
+  title      String
+  content    String
+  type       String   @default("info")
+  link_url   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime
+
+  @@index([is_active])
+}
+
+model banners {
+  id          String   @id
+  title       String
+  description String?
+  image_url   String
+  link_url    String?
+  order       Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime
+
+  @@index([order])
+}
+
+model bilibili_uploaders {
+  id           String    @id
+  mid          String    @unique
+  name         String
+  avatar       String?
+  description  String?
+  tags         String?
+  is_active    Boolean   @default(true)
+  last_sync_at DateTime?
+  video_count  Int       @default(0)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime
+}
+
+model comments {
+  id         String   @id
+  user_id    String
+  post_id    String
+  parent_id  String?
+  content    String
+  like_count Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime
+  posts      posts    @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at(sort: Desc)])
+  @@index([post_id])
+  @@index([user_id])
+}
+
+model favorites {
+  id           String   @id
+  user_id      String
+  content_type String
+  content_id   String
+  folder_id    String?
+  created_at   DateTime @default(now())
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, content_type, content_id])
+  @@index([content_type, content_id])
+  @@index([user_id])
+}
+
+model github_repos {
+  id             String    @id
+  repo_id        Int
+  name           String
+  full_name      String    @unique
+  owner          String?
+  description    String?
+  html_url       String?
+  language       String?
+  stars_count    Int       @default(0)
+  forks_count    Int       @default(0)
+  issues_count   Int       @default(0)
+  topics         String?
+  created_date   DateTime?
+  updated_date   DateTime?
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([updated_date(sort: Desc)])
+  @@index([stars_count(sort: Desc)])
+  @@index([repo_id])
+}
+
+model home_modules {
+  id          String   @id
+  name        String   @unique
+  title       String
+  description String?
+  config      String?
+  is_active   Boolean  @default(true)
+  order       Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime
+
+  @@index([order])
+}
+
+model huggingface_models {
+  id             String    @id
+  full_name      String    @unique
+  description    String?
+  task           String?
+  downloads      Int       @default(0)
+  likes          Int       @default(0)
+  last_modified  DateTime?
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  share_count    Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([last_modified(sort: Desc)])
+  @@index([downloads(sort: Desc)])
+}
+
+model jobs {
+  id             String   @id
+  title          String
+  company        String
+  location       String?
+  salary_min     Int?
+  salary_max     Int?
+  description    String?
+  requirements   String?
+  status         String   @default("open")
+  view_count     Int      @default(0)
+  favorite_count Int      @default(0)
+  tags           String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime
+
+  @@index([created_at(sort: Desc)])
+  @@index([status])
+}
+
+model bilibili_search_keywords {
+  id          String    @id
+  keyword     String    @unique
+  category    String?
+  is_active   Boolean   @default(true)
+  priority    Int       @default(0)
+  description String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime
+
+  @@index([priority(sort: Desc)])
+  @@index([is_active])
+  @@index([category])
+}
+
+model paper_search_keywords {
+  id          String    @id
+  keyword     String    @unique
+  category    String?
+  source_type String    @default("admin")
+  is_active   Boolean   @default(true)
+  priority    Int       @default(0)
+  description String?
+  tags        String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime
+
+  @@index([priority(sort: Desc)])
+  @@index([is_active])
+  @@index([category])
+}
+
+model news {
+  id             String    @id
+  platform       String
+  title          String
+  url            String    @unique
+  score          String?
+  description    String?
+  published_date DateTime?
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  share_count    Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([created_at(sort: Desc)])
+  @@index([view_count(sort: Desc)])
+  @@index([published_date(sort: Desc)])
+  @@index([platform])
+}
+
+model news_search_keywords {
+  id          String    @id
+  keyword     String    @unique
+  category    String?
+  source_type String    @default("admin")
+  is_active   Boolean   @default(true)
+  priority    Int       @default(0)
+  description String?
+  tags        String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime
+
+  @@index([priority(sort: Desc)])
+  @@index([is_active])
+  @@index([category])
+}
+
+model news_keyword_filters {
+  id                String   @id
+  name              String   @unique
+  description       String?
+  keywords          String?
+  exclude_keywords  String?
+  match_type        String   @default("all")
+  case_sensitive    Boolean  @default(false)
+  is_active         Boolean  @default(true)
+  priority          Int      @default(0)
+  apply_to_platform String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime
+
+  @@index([priority(sort: Desc)])
+  @@index([is_active])
+}
+
+model news_source_configs {
+  id              String    @id
+  platform        String    @unique
+  name            String
+  base_url        String
+  search_url      String?
+  list_url        String?
+  headers         String?
+  params          String?
+  is_active       Boolean   @default(true)
+  sync_enabled    Boolean   @default(true)
+  sync_interval   Int       @default(3600)
+  last_sync_at    DateTime?
+  last_success_at DateTime?
+  total_items     Int       @default(0)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime
+
+  @@index([sync_enabled])
+  @@index([is_active])
+}
+
+model papers {
+  id             String    @id
+  arxiv_id       String?   @unique
+  title          String
+  authors        String
+  abstract       String?
+  pdf_url        String?
+  published_date DateTime?
+  citation_count Int       @default(0)
+  venue          String?
+  categories     String?
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  share_count    Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([favorite_count(sort: Desc)])
+  @@index([view_count(sort: Desc)])
+  @@index([published_date(sort: Desc)])
+}
+
+model point_records {
+  id          String   @id
+  user_id     String
+  points      Int
+  action_type String
+  description String?
+  created_at  DateTime @default(now())
+  users       users    @relation(fields: [user_id], references: [id])
+
+  @@index([created_at(sort: Desc)])
+  @@index([user_id])
+}
+
+model posts {
+  id            String     @id
+  user_id       String
+  content_type  String
+  content_id    String
+  title         String?
+  content       String
+  view_count    Int        @default(0)
+  like_count    Int        @default(0)
+  comment_count Int        @default(0)
+  status        String     @default("active")
+  created_at    DateTime   @default(now())
+  updated_at    DateTime
+  comments      comments[]
+  users         users      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([status, created_at(sort: Desc)])
+  @@index([content_type, content_id])
+  @@index([user_id])
+}
+
+model subscription_history {
+  id              String        @id
+  subscription_id String
+  sync_type       String
+  matched_count   Int           @default(0)
+  new_count       Int           @default(0)
+  status          String        @default("success")
+  error_message   String?
+  duration        Int?
+  metadata        String?
+  created_at      DateTime      @default(now())
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at(sort: Desc)])
+  @@index([subscription_id])
+}
+
+model subscriptions {
+  id                   String                 @id
+  user_id              String
+  content_type         String
+  keywords             String?
+  tags                 String?
+  authors              String?
+  uploaders            String?
+  platform             String?
+  is_public            Boolean                @default(false)
+  is_active            Boolean                @default(true)
+  notify_enabled       Boolean                @default(true)
+  sync_enabled         Boolean                @default(true)
+  new_count            Int                    @default(0)
+  total_matched        Int                    @default(0)
+  last_notified        DateTime?
+  last_checked         DateTime?
+  last_sync_at         DateTime?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  subscription_history subscription_history[]
+  users                users                  @relation(fields: [user_id], references: [id])
+
+  @@index([sync_enabled])
+  @@index([is_public])
+  @@index([is_active])
+  @@index([content_type])
+  @@index([user_id])
+}
+
+model user_actions {
+  id           String   @id
+  user_id      String
+  action_type  String
+  content_type String
+  content_id   String
+  metadata     String?
+  created_at   DateTime @default(now())
+  users        users    @relation(fields: [user_id], references: [id])
+
+  @@index([created_at(sort: Desc)])
+  @@index([content_type, content_id])
+  @@index([user_id, action_type])
+}
+
+model users {
+  id            String          @id
+  user_number   String          @unique
+  username      String          @unique
+  email         String?         @unique
+  password_hash String?
+  avatar_url    String?
+  bio           String?
+  github_id     String?         @unique
+  level         Int             @default(1)
+  points        Int             @default(0)
+  is_vip        Boolean         @default(false)
+  is_active     Boolean         @default(true)
+  last_login_at DateTime?
+  tags          String?
+  created_at    DateTime        @default(now())
+  updated_at    DateTime
+  comments      comments[]
+  favorites     favorites[]
+  point_records point_records[]
+  posts         posts[]
+  subscriptions subscriptions[]
+  user_actions  user_actions[]
+}
+
+model videos {
+  id             String    @id
+  platform       String
+  video_id       String
+  bvid           String?   @unique
+  title          String
+  description    String?
+  cover_url      String?
+  duration       Int?
+  uploader       String?
+  uploader_id    String?
+  published_date DateTime?
+  play_count     Int       @default(0)
+  like_count     Int       @default(0)
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  tags           String?
+  metadata       String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([platform])
+  @@index([view_count(sort: Desc)])
+  @@index([published_date(sort: Desc)])
+}
+
+model data_sources {
+  id               String    @id
+  name             String    @unique
+  display_name     String
+  enabled          Boolean   @default(true)
+  tags             String?
+  api_base_url     String
+  config           String
+  health_status    String    @default("unknown")
+  last_health_check DateTime?
+  last_sync_status String?   @map("last_sync_status")
+  last_sync_result String?   @map("last_sync_result")
+  last_sync_at     DateTime? @map("last_sync_at")
+  created_at       DateTime  @default(now()) @map("created_at")
+  updated_at       DateTime  @updatedAt @map("updated_at")
+
+  @@index([enabled])
+  @@index([health_status])
+}
+
+model data_source_logs {
+  id             String    @id
+  data_source_id String    @map("data_source_id")
+  type           String
+  status         String
+  request_url    String?   @map("request_url")
+  request_method String?   @map("request_method")
+  request_body   String?   @map("request_body")
+  response_code  Int?      @map("response_code")
+  response_body  String?   @map("response_body")
+  error_message  String?   @map("error_message")
+  duration       Int?
+  synced_count   Int?      @map("synced_count")
+  error_count    Int?      @map("error_count")
+  created_at     DateTime  @default(now()) @map("created_at")
+
+  @@index([data_source_id])
+  @@index([created_at(sort: Desc)])
+}

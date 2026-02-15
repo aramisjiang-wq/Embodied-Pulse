@@ -1,0 +1,136 @@
+import { apiCache } from './cache';
+
+export interface CacheStrategy {
+  enabled: boolean;
+  ttl: number;
+  staleWhileRevalidate: boolean;
+  maxAge: number;
+}
+
+const DEFAULT_STRATEGY: CacheStrategy = {
+  enabled: true,
+  ttl: 5 * 60 * 1000, // 5分钟
+  staleWhileRevalidate: false,
+  maxAge: 10 * 60 * 1000, // 10分钟
+};
+
+const CACHE_STRATEGIES: Record<string, CacheStrategy> = {
+  // 论文列表：缓存5分钟
+  'papers': {
+    enabled: true,
+    ttl: 5 * 60 * 1000,
+    staleWhileRevalidate: true,
+    maxAge: 10 * 60 * 1000,
+  },
+  // 视频列表：缓存3分钟
+  'videos': {
+    enabled: true,
+    ttl: 3 * 60 * 1000,
+    staleWhileRevalidate: true,
+    maxAge: 6 * 60 * 1000,
+  },
+  // GitHub项目：缓存5分钟
+  'repos': {
+    enabled: true,
+    ttl: 5 * 60 * 1000,
+    staleWhileRevalidate: true,
+    maxAge: 10 * 60 * 1000,
+  },
+  // 信息流：缓存3分钟
+  'feed': {
+    enabled: true,
+    ttl: 3 * 60 * 1000,
+    staleWhileRevalidate: true,
+    maxAge: 6 * 60 * 1000,
+  },
+  // 用户信息：缓存10分钟
+  'user': {
+    enabled: true,
+    ttl: 10 * 60 * 1000,
+    staleWhileRevalidate: false,
+    maxAge: 15 * 60 * 1000,
+  },
+  // 搜索结果：缓存2分钟
+  'search': {
+    enabled: true,
+    ttl: 2 * 60 * 1000,
+    staleWhileRevalidate: false,
+    maxAge: 4 * 60 * 1000,
+  },
+  // 统计数据：缓存10分钟
+  'stats': {
+    enabled: true,
+    ttl: 10 * 60 * 1000,
+    staleWhileRevalidate: true,
+    maxAge: 20 * 60 * 1000,
+  },
+};
+
+export class CacheStrategyManager {
+  /**
+   * 获取缓存策略
+   */
+  getStrategy(url: string): CacheStrategy {
+    for (const [key, strategy] of Object.entries(CACHE_STRATEGIES)) {
+      if (url.includes(key)) {
+        return strategy;
+      }
+    }
+    return DEFAULT_STRATEGY;
+  }
+
+  /**
+   * 检查是否应该缓存
+   */
+  shouldCache(url: string, method: string = 'GET'): boolean {
+    if (method !== 'GET') {
+      return false;
+    }
+
+    const strategy = this.getStrategy(url);
+    return strategy.enabled;
+  }
+
+  /**
+   * 获取缓存TTL
+   */
+  getTTL(url: string): number {
+    const strategy = this.getStrategy(url);
+    return strategy.ttl;
+  }
+
+  /**
+   * 检查是否应该使用stale-while-revalidate
+   */
+  shouldStaleWhileRevalidate(url: string): boolean {
+    const strategy = this.getStrategy(url);
+    return strategy.staleWhileRevalidate;
+  }
+
+  /**
+   * 获取最大缓存时间
+   */
+  getMaxAge(url: string): number {
+    const strategy = this.getStrategy(url);
+    return strategy.maxAge;
+  }
+
+  /**
+   * 清除特定类型的缓存
+   */
+  clearByType(type: string): void {
+    const url = `/${type}`;
+    apiCache.clear(url);
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  clearAll(): void {
+    apiCache.clear();
+  }
+}
+
+export const cacheStrategyManager = new CacheStrategyManager();
+
+export default cacheStrategyManager;

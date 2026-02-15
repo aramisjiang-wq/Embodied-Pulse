@@ -1,0 +1,502 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-user"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(uuid())
+  userNumber    String          @unique @map("user_number")
+  username      String          @unique
+  email         String?         @unique
+  passwordHash  String?         @map("password_hash")
+  avatarUrl     String?         @map("avatar_url")
+  bio           String?
+  githubId      String?         @unique @map("github_id")
+  githubUrl     String?         @map("github_url")
+  linkedinUrl   String?         @map("linkedin_url")
+  twitterUrl    String?         @map("twitter_url")
+  websiteUrl    String?         @map("website_url")
+  location      String?
+  skills        String?
+  interests     String?
+  level         Int             @default(1)
+  points        Int             @default(0)
+  isVip         Boolean         @default(false) @map("is_vip")
+  isActive      Boolean         @default(true) @map("is_active")
+  lastLoginAt   DateTime?       @map("last_login_at")
+  tags          String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  role          String?         @default("user")
+  comments      Comment[]
+  favorites     Favorite[]
+  notifications notifications[] @ignore
+  pointRecords  PointRecord[]
+  posts         Post[]
+  subscriptions Subscription[]
+  userActions   UserAction[]
+
+  @@map("users")
+}
+
+model Paper {
+  id            String    @id @default(uuid())
+  arxivId       String?   @unique @map("arxiv_id")
+  title         String
+  authors       String
+  abstract      String?
+  pdfUrl        String?   @map("pdf_url")
+  publishedDate DateTime? @map("published_date")
+  citationCount Int       @default(0) @map("citation_count")
+  venue         String?
+  categories    String?
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  shareCount    Int       @default(0) @map("share_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishedDate(sort: Desc)])
+  @@index([viewCount(sort: Desc)])
+  @@index([favoriteCount(sort: Desc)])
+  @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
+  @@map("papers")
+}
+
+model Video {
+  id            String    @id @default(uuid())
+  platform      String
+  videoId       String    @map("video_id")
+  bvid          String?   @unique
+  title         String
+  description   String?
+  coverUrl      String?   @map("cover_url")
+  duration      Int?
+  uploader      String?
+  uploaderId    String?   @map("uploader_id")
+  publishedDate DateTime? @map("published_date")
+  playCount     Int       @default(0) @map("play_count")
+  likeCount     Int       @default(0) @map("like_count")
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  tags          String?
+  metadata      String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishedDate(sort: Desc)])
+  @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
+  @@index([platform])
+  @@index([viewCount(sort: Desc)])
+  @@map("videos")
+}
+
+model GithubRepo {
+  id             String    @id @default(uuid())
+  repoId         Int       @map("repo_id")
+  name           String
+  fullName       String    @unique @map("full_name")
+  owner          String?
+  description    String?
+  html_url       String?
+  language       String?
+  starsCount     Int       @default(0) @map("stars_count")
+  forksCount     Int       @default(0) @map("forks_count")
+  issuesCount    Int       @default(0) @map("issues_count")
+  topics         String?
+  createdDate    DateTime? @map("created_date")
+  updatedDate    DateTime? @map("updated_date")
+  viewCount      Int       @default(0) @map("view_count")
+  favoriteCount  Int       @default(0) @map("favorite_count")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  added_by       String?
+  notify_enabled Int?      @default(1)
+  last_notified  String?
+
+  @@index([starsCount(sort: Desc)])
+  @@index([updatedDate(sort: Desc)])
+  @@index([updatedDate(sort: Desc), starsCount(sort: Desc)])
+  @@index([repoId])
+  @@map("github_repos")
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  imageUrl    String   @map("image_url")
+  linkUrl     String?  @map("link_url")
+  order       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([order])
+  @@map("banners")
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   @default("info")
+  linkUrl   String?  @map("link_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("announcements")
+}
+
+model HomeModule {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  title       String
+  description String?
+  config      String?
+  isActive    Boolean  @default(true) @map("is_active")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([order])
+  @@map("home_modules")
+}
+
+model HuggingFaceModel {
+  id            String    @id @default(uuid())
+  fullName      String    @unique @map("full_name")
+  description   String?
+  task          String?
+  downloads     Int       @default(0)
+  likes         Int       @default(0)
+  lastModified  DateTime? @map("last_modified")
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  shareCount    Int       @default(0) @map("share_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  hfId          String?   @map("hf_id")
+  name          String?
+  author        String?
+  license       String?
+  tags          String?
+
+  @@index([downloads(sort: Desc)])
+  @@index([lastModified(sort: Desc)])
+  @@map("huggingface_models")
+}
+
+model Job {
+  id            String   @id @default(uuid())
+  title         String
+  company       String
+  location      String?
+  salaryMin     Int?     @map("salary_min")
+  salaryMax     Int?     @map("salary_max")
+  description   String?
+  requirements  String?
+  status        String   @default("open")
+  viewCount     Int      @default(0) @map("view_count")
+  favoriteCount Int      @default(0) @map("favorite_count")
+  tags          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  externalId    String?  @map("external_id")
+  companyLogo   String?  @map("company_logo")
+  experience    String?
+  education     String?
+  benefits      String?
+  applyUrl      String?  @map("apply_url")
+  applyCount    Int?     @default(0) @map("apply_count")
+
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("jobs")
+}
+
+model Post {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  contentType  String    @map("content_type")
+  contentId    String    @map("content_id")
+  title        String?
+  content      String
+  viewCount    Int       @default(0) @map("view_count")
+  likeCount    Int       @default(0) @map("like_count")
+  commentCount Int       @default(0) @map("comment_count")
+  status       String    @default("active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  images       String?
+  tags         String?
+  topicId      String?   @map("topic_id")
+  shareCount   Int?      @default(0) @map("share_count")
+  isFeatured   Boolean?  @default(false) @map("is_featured")
+  isTop        Boolean?  @default(false) @map("is_top")
+  comments     Comment[]
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([contentType, contentId])
+  @@map("posts")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  parentId  String?  @map("parent_id")
+  content   String
+  likeCount Int      @default(0) @map("like_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+model Favorite {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  contentType String   @map("content_type")
+  contentId   String   @map("content_id")
+  folderId    String?  @map("folder_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId])
+  @@index([contentType, contentId])
+  @@map("favorites")
+}
+
+model UserAction {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  actionType  String   @map("action_type")
+  contentType String   @map("content_type")
+  contentId   String   @map("content_id")
+  metadata    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, actionType])
+  @@index([contentType, contentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("user_actions")
+}
+
+model PointRecord {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  points      Int
+  actionType  String   @map("action_type")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("point_records")
+}
+
+model Subscription {
+  id            String                @id @default(uuid())
+  userId        String                @map("user_id")
+  contentType   String                @map("content_type")
+  keywords      String?
+  tags          String?
+  authors       String?
+  uploaders     String?
+  platform      String?
+  isPublic      Boolean               @default(false) @map("is_public")
+  isActive      Boolean               @default(true) @map("is_active")
+  notifyEnabled Boolean               @default(true) @map("notify_enabled")
+  syncEnabled   Boolean               @default(true) @map("sync_enabled")
+  newCount      Int                   @default(0) @map("new_count")
+  totalMatched  Int                   @default(0) @map("total_matched")
+  lastNotified  DateTime?             @map("last_notified")
+  lastChecked   DateTime?             @map("last_checked")
+  lastSyncAt    DateTime?             @map("last_sync_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  history       SubscriptionHistory[]
+  user          User                  @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([contentType])
+  @@index([isActive])
+  @@index([isPublic])
+  @@index([syncEnabled])
+  @@map("subscriptions")
+}
+
+model SubscriptionHistory {
+  id             String       @id @default(uuid())
+  subscriptionId String       @map("subscription_id")
+  syncType       String       @map("sync_type")
+  matchedCount   Int          @default(0) @map("matched_count")
+  newCount       Int          @default(0) @map("new_count")
+  status         String       @default("success")
+  errorMessage   String?      @map("error_message")
+  duration       Int?
+  metadata       String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([createdAt(sort: Desc)])
+  @@map("subscription_history")
+}
+
+model bilibili_uploaders {
+  id           String    @id
+  mid          String    @unique
+  name         String
+  avatar       String?
+  description  String?
+  tags         String?
+  is_active    Boolean   @default(true)
+  last_sync_at DateTime?
+  video_count  Int       @default(0)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime
+}
+
+model news {
+  id             String    @id
+  platform       String
+  title          String
+  url            String    @unique
+  score          String?
+  description    String?
+  published_date DateTime?
+  view_count     Int       @default(0)
+  favorite_count Int       @default(0)
+  share_count    Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@index([created_at(sort: Desc)])
+  @@index([view_count(sort: Desc)])
+  @@index([published_date(sort: Desc)])
+  @@index([platform])
+}
+
+model news_keyword_filters {
+  id                String   @id
+  name              String   @unique
+  description       String?
+  keywords          String?
+  exclude_keywords  String?
+  match_type        String   @default("all")
+  case_sensitive    Boolean  @default(false)
+  is_active         Boolean  @default(true)
+  priority          Int      @default(0)
+  apply_to_platform String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime
+
+  @@index([priority(sort: Desc)])
+  @@index([is_active])
+}
+
+model news_source_configs {
+  id              String    @id
+  platform        String    @unique
+  name            String
+  base_url        String
+  search_url      String?
+  list_url        String?
+  headers         String?
+  params          String?
+  is_active       Boolean   @default(true)
+  sync_enabled    Boolean   @default(true)
+  sync_interval   Int       @default(3600)
+  last_sync_at    DateTime?
+  last_success_at DateTime?
+  total_items     Int       @default(0)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime
+
+  @@index([sync_enabled])
+  @@index([is_active])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model notifications {
+  id           String? @id
+  user_id      String
+  type         String
+  title        String
+  content      String?
+  content_type String?
+  content_id   String?
+  metadata     String?
+  is_read      Int?    @default(0)
+  read_at      String?
+  created_at   String  @default("CURRENT_TIMESTAMP")
+  users        User    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)])
+  @@index([is_read])
+  @@index([type])
+  @@index([user_id])
+  @@ignore
+}
+
+model CustomPage {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  content     String
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("custom_pages")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("password_resets")
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  type      String
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([code])
+  @@map("email_verifications")
+}

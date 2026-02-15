@@ -1,0 +1,110 @@
+import apiClient from './client';
+import { apiCache } from './cache';
+import { cacheStrategyManager } from './cacheStrategy';
+
+interface CachedRequestOptions {
+  forceRefresh?: boolean;
+  skipCache?: boolean;
+}
+
+/**
+ * 带缓存的API请求
+ */
+export async function cachedGet<T>(
+  url: string,
+  params?: any,
+  options: CachedRequestOptions = {}
+): Promise<T> {
+  const { forceRefresh = false, skipCache = false } = options;
+
+  // 如果强制刷新或跳过缓存，直接请求
+  if (forceRefresh || skipCache) {
+    return apiClient.get(url, { params, headers: { 'X-No-Cache': 'true' } });
+  }
+
+  // 检查是否应该缓存
+  if (!cacheStrategyManager.shouldCache(url, 'GET')) {
+    return apiClient.get(url, { params });
+  }
+
+  // 检查缓存
+  const cachedData = apiCache.get(url, params);
+  if (cachedData) {
+    console.log(`[Cache Hit] ${url}`, params);
+    return cachedData;
+  }
+
+  // 检查是否有正在进行的请求（去重）
+  const pendingRequest = apiCache.getPendingRequest(url, params);
+  if (pendingRequest) {
+    console.log(`[Dedup] ${url}`, params);
+    return pendingRequest;
+  }
+
+  // 发起新请求
+  const requestPromise = apiClient.get(url, { params });
+  apiCache.setPendingRequest(url, requestPromise, params);
+
+  try {
+    const data = await requestPromise;
+    console.log(`[Cache Miss] ${url}`, params);
+    return data;
+  } catch (error) {
+    console.error(`[API Error] ${url}`, error);
+    throw error;
+  }
+}
+
+/**
+ * 带stale-while-revalidate的API请求
+ */
+export async function staleWhileRevalidate<T>(
+  url: string,
+  params?: any
+): Promise<T> {
+  // 先返回缓存数据（如果有）
+  const cachedData = apiCache.get(url, params);
+  if (cachedData) {
+    console.log(`[Stale] ${url}`, params);
+
+    // 后台刷新缓存
+    apiClient.get(url, { params }).then((freshData) => {
+      apiCache.set(url, freshData, params);
+      console.log(`[Refreshed] ${url}`, params);
+    });
+
+    return cachedData;
+  }
+
+  // 没有缓存，直接请求
+  return cachedGet(url, params);
+}
+
+/**
+ * 清除缓存
+ */
+export function clearCache(url?: string, params?: any): void {
+  apiCache.clear(url, params);
+}
+
+/**
+ * 清除特定类型的缓存
+ */
+export function clearCacheByType(type: string): void {
+  cacheStrategyManager.clearByType(type);
+}
+
+/**
+ * 清除所有缓存
+ */
+export function clearAllCache(): void {
+  cacheStrategyManager.clearAll();
+}
+
+export default {
+  cachedGet,
+  staleWhileRevalidate,
+  clearCache,
+  clearCacheByType,
+  clearAllCache,
+};

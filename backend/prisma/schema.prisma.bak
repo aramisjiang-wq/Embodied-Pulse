@@ -1,0 +1,281 @@
+// Prisma Schema - Embodied Pulse
+// 数据库模型定义
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String?   @unique
+  passwordHash  String?   @map("password_hash")
+  avatarUrl     String?   @map("avatar_url")
+  bio           String?
+  githubId      String?   @unique @map("github_id")
+  level         Int       @default(1)
+  points        Int       @default(0)
+  isVip         Boolean   @default(false) @map("is_vip")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // 关系
+  posts         Post[]
+  comments      Comment[]
+  favorites     Favorite[]
+  pointRecords  PointRecord[]
+  userActions   UserAction[]
+
+  @@map("users")
+}
+
+// 论文表
+model Paper {
+  id            String    @id @default(uuid())
+  arxivId       String?   @unique @map("arxiv_id")
+  title         String
+  authors       Json
+  abstract      String?
+  pdfUrl        String?   @map("pdf_url")
+  publishedDate DateTime? @map("published_date")
+  citationCount Int       @default(0) @map("citation_count")
+  venue         String?
+  categories    Json?
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  shareCount    Int       @default(0) @map("share_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishedDate(sort: Desc)])
+  @@index([viewCount(sort: Desc)])
+  @@index([favoriteCount(sort: Desc)])
+  @@map("papers")
+}
+
+// 视频表
+model Video {
+  id            String    @id @default(uuid())
+  platform      String    // bilibili, youtube
+  videoId       String    @map("video_id")
+  title         String
+  description   String?
+  coverUrl      String?   @map("cover_url")
+  duration      Int?      // 秒
+  uploader      String?
+  uploaderId    String?   @map("uploader_id")
+  publishedDate DateTime? @map("published_date")
+  playCount     Int       @default(0) @map("play_count")
+  likeCount     Int       @default(0) @map("like_count")
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  tags          Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([platform, videoId])
+  @@index([publishedDate(sort: Desc)])
+  @@index([playCount(sort: Desc)])
+  @@map("videos")
+}
+
+// GitHub项目表
+model GithubRepo {
+  id            String    @id @default(uuid())
+  repoId        BigInt    @unique @map("repo_id")
+  fullName      String    @map("full_name")
+  name          String
+  description   String?
+  owner         String?
+  language      String?
+  starsCount    Int       @default(0) @map("stars_count")
+  forksCount    Int       @default(0) @map("forks_count")
+  issuesCount   Int       @default(0) @map("issues_count")
+  topics        Json?
+  createdDate   DateTime? @map("created_date")
+  updatedDate   DateTime? @map("updated_date")
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([starsCount(sort: Desc)])
+  @@index([updatedDate(sort: Desc)])
+  @@map("github_repos")
+}
+
+// Banner表
+model Banner {
+  id        String   @id @default(uuid())
+  title     String
+  imageUrl  String   @map("image_url")
+  linkUrl   String?  @map("link_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@index([isActive])
+  @@map("banners")
+}
+
+// Hugging Face 模型表
+model HuggingFaceModel {
+  id            String    @id @default(uuid())
+  hfId          String    @unique @map("hf_id")
+  fullName      String    @map("full_name")
+  name          String
+  author        String?
+  description   String?
+  license       String?
+  task          String?
+  tags          Json?
+  downloads     Int       @default(0)
+  likes         Int       @default(0)
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  shareCount    Int       @default(0) @map("share_count")
+  lastModified  DateTime? @map("last_modified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([downloads(sort: Desc)])
+  @@index([likes(sort: Desc)])
+  @@index([lastModified(sort: Desc)])
+  @@map("huggingface_models")
+}
+
+// 岗位表
+model Job {
+  id            String    @id @default(uuid())
+  title         String
+  company       String
+  companyLogo   String?   @map("company_logo")
+  location      String?
+  salaryMin     Int?      @map("salary_min")
+  salaryMax     Int?      @map("salary_max")
+  experience    String?
+  education     String?
+  description   String?
+  requirements  String?
+  benefits      String?
+  tags          Json?
+  status        String    @default("open")
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  applyCount    Int       @default(0) @map("apply_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("jobs")
+}
+
+// 社区帖子表
+model Post {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  contentType   String    @map("content_type") // share, discussion, experience
+  contentId     String?   @map("content_id")
+  title         String?
+  content       String
+  images        Json?
+  tags          Json?
+  topicId       String?   @map("topic_id")
+  viewCount     Int       @default(0) @map("view_count")
+  likeCount     Int       @default(0) @map("like_count")
+  commentCount  Int       @default(0) @map("comment_count")
+  shareCount    Int       @default(0) @map("share_count")
+  isFeatured    Boolean   @default(false) @map("is_featured")
+  isTop         Boolean   @default(false) @map("is_top")
+  status        String    @default("active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User      @relation(fields: [userId], references: [id])
+  comments      Comment[]
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([viewCount(sort: Desc)])
+  @@map("posts")
+}
+
+// 评论表
+model Comment {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  postId        String    @map("post_id")
+  parentId      String?   @map("parent_id")
+  content       String
+  likeCount     Int       @default(0) @map("like_count")
+  status        String    @default("active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User      @relation(fields: [userId], references: [id])
+  post          Post      @relation(fields: [postId], references: [id])
+
+  @@index([postId])
+  @@index([userId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+// 收藏表
+model Favorite {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  contentType   String    @map("content_type") // paper, video, repo, job, huggingface
+  contentId     String    @map("content_id")
+  folderId      String?   @map("folder_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId])
+  @@index([contentType, contentId])
+  @@map("favorites")
+}
+
+// 用户行为表
+model UserAction {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  actionType    String    @map("action_type") // view, like, share, comment
+  contentType   String    @map("content_type")
+  contentId     String    @map("content_id")
+  metadata      Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, actionType])
+  @@index([contentType, contentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("user_actions")
+}
+
+// 积分记录表
+model PointRecord {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  points        Int
+  actionType    String    @map("action_type")
+  description   String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("point_records")
+}

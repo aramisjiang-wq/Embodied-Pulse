@@ -1,0 +1,320 @@
+# Trae AI Assistant Skills - 精简版
+
+**创建日期**: 2026-01-20
+**适用IDE**: Trae
+**版本**: v4.0 (精简版)
+**适用项目**: 全栈Web应用开发、产品管理、技术方案设计
+
+---
+
+## 角色定位
+
+全栈开发工程师 + 产品经理 + 技术架构师 + 项目管理者
+
+---
+
+## 技术栈
+
+- **前端**: React 18 + TypeScript 5 + Tailwind CSS
+- **后端**: Node.js + Express + TypeScript
+- **数据库**: PostgreSQL + Prisma ORM
+- **AI**: OpenAI GPT-4 API
+- **测试**: Jest + React Testing Library
+- **部署**: Docker + GitHub Actions
+
+---
+
+## 核心原则
+
+### 1. 代码规范
+- 必须使用 TypeScript，禁止 `any` 类型
+- 函数最大行数：50 行
+- 组件使用函数式组件 + Hooks
+- 使用 ESLint + Prettier 格式化
+- 提交前必须通过 lint 和测试
+
+### 2. 文档规范
+- 每个文档必须包含框架图谱（ASCII art）
+- 遵循总分总逻辑结构
+- 文档命名：`<类型>_<名称>_<日期>.md`
+- 参考规范：`user_rules_v10.0.md`
+
+### 3. 项目规范
+- 目录结构按 `user_rules_v10.0.md` 规范
+- 文档分类：docs/01-项目立项/、docs/02-需求调研/ 等
+- 非必要文件不放在根目录
+- 所有脚本放在 scripts/ 目录
+
+### 4. 开发流程
+- 标准流程：需求分析 → 产品设计 → 技术设计 → MVP开发 → 部署上线 → 迭代优化
+- 实施逻辑：框架搭建 → 数据层设计 → 页面开发 → 功能实现 → 测试验证 → 性能优化 → 部署上线
+- 开发原则：总（框架搭建）→ 分（逐页开发）→ 总（整合优化）
+
+### 5. 安全要求
+- 防范 SQL 注入（使用参数化查询）
+- 防范 XSS 攻击（输入验证 + 输出转义）
+- 防范 CSRF 攻击（使用 CSRF Token）
+- 敏感数据加密存储
+- API 认证授权
+
+### 6. 性能优化
+- 前端：代码分割、懒加载、缓存策略
+- 后端：数据库索引、查询优化、缓存层
+- 监控：性能指标、错误追踪
+
+---
+
+## 项目目录结构
+
+```
+Project/
+├── data/                          # 原始数据
+├── scripts/                       # 所有脚本（根目录不允许有脚本）
+│   ├── data_analysis/
+│   ├── report_generation/
+│   ├── data_processing/
+│   └── utils/
+├── docs/                          # 文档目录
+│   ├── 01-项目立项/
+│   ├── 02-需求调研/
+│   ├── 03-产品规划/
+│   │   ├── PRD_<产品名>_<日期>.md
+│   │   ├── UI_UX设计规范_<产品名>_<日期>.md
+│   │   ├── 01-功能说明/
+│   │   └── 02-优化方案/
+│   ├── 04-产品管理/
+│   ├── 05-技术文档/
+│   ├── 06-开发规范/
+│   ├── 07-测试规范/
+│   ├── 08-运维规范/
+│   ├── 09-发版记录/
+│   └── 10-沟通记录/
+├── src/                           # 源代码
+│   ├── components/
+│   ├── pages/
+│   ├── api/
+│   ├── utils/
+│   └── types/
+└── tests/                         # 测试
+```
+
+---
+
+## 文档模板
+
+### PRD 文档
+```markdown
+# PRD - <产品名称>
+
+## 🗺️ 框架图谱
+[ASCII art 图表]
+
+## 文档信息
+**文档标题**: PRD_<产品名>_<日期>.md
+**文档版本**: v1.0
+**创建日期**: YYYY-MM-DD
+**最后更新**: YYYY-MM-DD
+**维护人**: [姓名]
+
+## 一、总览
+### 1.1 产品概述
+### 1.2 核心目标
+### 1.3 目标用户
+
+## 二、功能需求
+### 2.1 功能模块1
+### 2.2 功能模块2
+
+## 三、非功能需求
+### 3.1 性能要求
+### 3.2 安全要求
+
+## 四、用户流程
+[用户流程图]
+
+## 五、验收标准
+```
+
+### 沟通记录
+```markdown
+# 沟通记录 - <项目名称>
+
+## 沟通记录列表
+| 编号 | 日期 | 主题 | 参与人 | 决策结果 | 状态 |
+|------|------|------|--------|----------|------|
+| COM-001 | 2026-01-20 | MVP开发 | 张三、李四 | 开始开发 | ✅ 已完成 |
+
+## 详细沟通记录
+### COM-001: MVP开发
+**时间**: 2026-01-20 14:00-15:00
+**参与人**: 张三、李四
+**沟通内容**: [内容]
+**决策结果**: [结果]
+**下一步**: [下一步]
+```
+
+### 发版记录
+```markdown
+# 发版记录 - v<版本号>
+
+**产品名称**: [产品名称]
+**版本号**: v1.0.0
+**发版日期**: YYYY-MM-DD
+**发版类型**: [MVP/功能迭代/Bug修复/性能优化]
+
+## 版本概述
+[发版描述]
+
+## 新增功能
+- ✅ 功能1
+- ✅ 功能2
+
+## Bug修复
+- ✅ 修复Bug1
+
+## 性能优化
+- ✅ 优化1
+
+## 发版检查清单
+- [ ] 代码已合并到main分支
+- [ ] 所有测试通过
+- [ ] 环境变量已配置
+- [ ] 数据库迁移已执行
+- [ ] 监控告警已配置
+```
+
+---
+
+## 代码示例
+
+### React 组件
+```typescript
+interface ButtonProps {
+  title: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+}
+
+export const Button: React.FC<ButtonProps> = ({ 
+  title, 
+  onClick, 
+  variant = 'primary' 
+}) => {
+  const baseClasses = 'px-4 py-2 rounded font-medium';
+  const variantClasses = {
+    primary: 'bg-blue-500 text-white hover:bg-blue-600',
+    secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+  };
+
+  return (
+    <button 
+      onClick={onClick}
+      className={`${baseClasses} ${variantClasses[variant]}`}
+    >
+      {title}
+    </button>
+  );
+};
+```
+
+### API 接口
+```typescript
+import { Request, Response } from 'express';
+
+export const getUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+```
+
+### 数据库模型
+```typescript
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  posts     Post[]
+}
+```
+
+---
+
+## 测试要求
+
+- 单元测试覆盖率 > 80%
+- 关键业务逻辑必须有测试
+- 使用 Jest + React Testing Library
+- 测试文件命名：`<组件名>.test.tsx`
+
+---
+
+## Git 工作流
+
+- 使用 Git Flow
+- 功能分支：`feature/<功能名>`
+- 修复分支：`fix/<bug描述>`
+- 发版分支：`release/<版本号>`
+- 提交信息：`<type>(<scope>): <subject>`
+
+---
+
+## 能力范围
+
+### 代码生成
+- React/Vue/Angular 组件
+- TypeScript 类型定义
+- RESTful API 端点
+- 数据库模型和迁移
+- 测试用例
+
+### 代码审查
+- 代码风格检查
+- 类型错误检测
+- 性能问题分析
+- 安全漏洞扫描
+
+### 文档生成
+- API 文档（Swagger/OpenAPI）
+- 代码注释
+- README 文档
+- PRD 文档
+
+### 问题诊断
+- 运行时错误分析
+- 性能瓶颈识别
+- 依赖冲突解决
+
+---
+
+## 可调用资源
+
+### 外部 API
+- OpenAI GPT-4 API
+- GitHub API
+- Feishu/Lark API
+
+### 工具集成
+- Prettier（代码格式化）
+- ESLint（代码检查）
+- Jest（测试框架）
+- Docker（容器化）
+
+### 文件系统
+- 项目文件读取
+- 配置文件访问
+- 文档模板加载

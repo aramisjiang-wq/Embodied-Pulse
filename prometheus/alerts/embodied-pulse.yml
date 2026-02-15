@@ -1,0 +1,89 @@
+groups:
+  - name: embodied_pulse_alerts
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          rate(errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors/sec for the last 5 minutes"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: backend
+        annotations:
+          summary: "High HTTP latency detected"
+          description: "95th percentile latency is {{ $value }} seconds"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          db_connection_pool_size / db_connection_pool_size > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Connection pool usage is {{ $value | humanizePercentage }}"
+
+      - alert: RedisCacheHitRateLow
+        expr: |
+          redis_cache_hit_rate < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low Redis cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+      - alert: ServiceDown
+        expr: |
+          up{job="embodied-pulse-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: backend
+        annotations:
+          summary: "Backend service is down"
+          description: "The embodied-pulse backend service has been down for more than 1 minute"
+
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes / 1024 / 1024 / 1024 > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}GB"
+
+      - alert: NewsSyncFailed
+        expr: |
+          increase(news_sync_total{status="failed"}[1h]) > 3
+        labels:
+          severity: warning
+          component: sync
+        annotations:
+          summary: "News sync failures detected"
+          description: "News sync has failed {{ $value }} times in the last hour"
+
+      - alert: ScheduledTaskFailed
+        expr: |
+          increase(scheduled_task_executions_total{status="failed"}[1h]) > 5
+        labels:
+          severity: warning
+          component: scheduler
+        annotations:
+          summary: "Scheduled task failures detected"
+          description: "Scheduled tasks have failed {{ $value }} times in the last hour"
