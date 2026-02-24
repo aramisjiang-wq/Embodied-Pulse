@@ -8,12 +8,12 @@ export const DynamicComponents = {
   
   DiscoveryModule: dynamic(() => import('@/components/DiscoveryModule'), {
     loading: () => null,
-    ssr: true
+    ssr: false
   }),
   
   SubscriptionModule: dynamic(() => import('@/components/SubscriptionModule'), {
     loading: () => null,
-    ssr: true
+    ssr: false
   }),
   
   PDFViewer: dynamic(() => import('@/components/PDFViewer'), {
@@ -28,7 +28,7 @@ export const DynamicComponents = {
   
   RepoCard: dynamic(() => import('@/components/RepoCard'), {
     loading: () => null,
-    ssr: true
+    ssr: false
   }),
   
   // PaperCard: dynamic(() => import('@/components/PaperCard'), {

@@ -8,6 +8,7 @@ import { subscriptionApi, Subscription } from '@/lib/api/subscription';
 import { useAuthStore } from '@/store/authStore';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 
@@ -16,7 +17,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function SubscriptionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -28,12 +29,13 @@ export default function SubscriptionDetailPage() {
   const { message } = App.useApp();
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user) {
       router.push('/login');
       return;
     }
     loadSubscription();
-  }, [params?.id, user]);
+  }, [params?.id, hydrated, user]);
 
   useEffect(() => {
     if (subscription) {
@@ -232,13 +234,19 @@ export default function SubscriptionDetailPage() {
         );
 
       case 'huggingface':
+        const hfContentType = item.contentType || 'model';
+        const hfUrl = hfContentType === 'dataset'
+          ? `https://huggingface.co/datasets/${item.fullName}`
+          : hfContentType === 'space'
+            ? `https://huggingface.co/spaces/${item.fullName}`
+            : `https://huggingface.co/${item.fullName}`;
         return (
           <List.Item
             actions={[
               <Button
                 type="link"
                 icon={<RobotOutlined />}
-                onClick={() => window.open(`https://huggingface.co/${item.fullName}`, '_blank')}
+                onClick={() => window.open(hfUrl, '_blank')}
               >
                 查看
               </Button>,
@@ -247,7 +255,7 @@ export default function SubscriptionDetailPage() {
             <List.Item.Meta
               title={
                 <a
-                  href={`https://huggingface.co/${item.fullName}`}
+                  href={hfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ fontSize: 15, fontWeight: 500 }}
@@ -280,7 +288,13 @@ export default function SubscriptionDetailPage() {
               <Button
                 type="link"
                 icon={<DollarOutlined />}
-                onClick={() => window.open(item.url, '_blank')}
+                onClick={() => {
+                  if (item.applyUrl) {
+                    window.open(item.applyUrl, '_blank');
+                  } else {
+                    message.warning('暂无申请链接');
+                  }
+                }}
               >
                 申请
               </Button>,
@@ -359,17 +373,17 @@ export default function SubscriptionDetailPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px' }}>
-      <div style={{ marginBottom: 24 }}>
+    <div className={styles.pageWrapper}>
+      <div className={styles.pageHeader}>
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={handleBack}
-          style={{ marginBottom: 16 }}
+          className={styles.backButton}
         >
           返回订阅列表
         </Button>
         
-        <Card>
+        <Card className={styles.subscriptionCard}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
             <div style={{ flex: 1 }}>
               <Space size="middle" wrap>
@@ -388,7 +402,7 @@ export default function SubscriptionDetailPage() {
                 )}
               </Space>
               
-              <Title level={3} style={{ marginTop: 16, marginBottom: 8 }}>
+              <Title level={3} className={styles.subscriptionTitle}>
                 {subscription.name}
               </Title>
               

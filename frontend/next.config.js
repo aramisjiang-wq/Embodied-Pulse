@@ -1,25 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
-  // 禁用ESLint错误检查（构建时）
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   // 优化编译输出
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
   },
+  // 性能优化配置
+  experimental: {
+    optimizePackageImports: ['antd', '@ant-design/icons', 'antd/es', 'antd/lib'],
+    optimizeCss: true,
+    scrollRestoration: true,
+  },
   // 优化图片加载
   images: {
-    domains: [
-      'avatars.githubusercontent.com',
-      'i.ytimg.com',
-      'i0.hdslb.com',
-      'arxiv.org',
-    ],
     remotePatterns: [
       {
         protocol: 'https',
@@ -32,6 +27,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '**.hdslb.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'arxiv.org',
       },
     ],
     // 优化图片格式
@@ -53,12 +52,6 @@ const nextConfig = {
   compress: true,
   // 优化输出
   poweredByHeader: false,
-  // 性能优化配置
-  experimental: {
-    optimizePackageImports: ['antd', '@ant-design/icons', 'antd/es', 'antd/lib'],
-    optimizeCss: true,
-    scrollRestoration: true,
-  },
   // 静态资源缓存优化
   async headers() {
     return [

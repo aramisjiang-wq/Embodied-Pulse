@@ -10,11 +10,13 @@ import {
   unsubscribeHuggingFacePapers,
   subscribeHuggingFaceAuthor,
   unsubscribeHuggingFaceAuthor,
+  getSubscribedAuthorsContent,
 } from '../controllers/user-huggingface-subscription.controller';
 
 const router = Router();
 
 router.get('/my', authenticate, getMySubscriptions);
+router.get('/authors/content', authenticate, getSubscribedAuthorsContent);
 router.post('/papers', authenticate, subscribeHuggingFacePapers);
 router.delete('/papers', authenticate, unsubscribeHuggingFacePapers);
 router.post('/author', authenticate, subscribeHuggingFaceAuthor);

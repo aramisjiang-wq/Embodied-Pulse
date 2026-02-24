@@ -1,0 +1,120 @@
+/**
+ * CSS变量定义
+ * 统一的设计变量，确保全局样式一致性
+ */
+
+:root {
+  /* 主色调 - 与Ant Design主题统一 */
+  --color-primary: #2563EB;
+  --color-primary-hover: #3B82F6;
+  --color-primary-active: #1D4ED8;
+  --color-primary-light: #EFF6FF;
+  --color-primary-bg: #EFF6FF;
+
+  /* 功能色 */
+  --color-success: #22C55E;
+  --color-success-hover: #16A34A;
+  --color-success-light: #F0FDF4;
+  --color-warning: #F59E0B;
+  --color-warning-hover: #D97706;
+  --color-warning-light: #FFFBEB;
+  --color-error: #EF4444;
+  --color-error-hover: #DC2626;
+  --color-error-light: #FEF2F2;
+  --color-info: #3B82F6;
+  --color-info-light: #EFF6FF;
+
+  /* 文字颜色 - 与Ant Design主题统一 */
+  --color-text-primary: #171717;
+  --color-text-secondary: #525252;
+  --color-text-tertiary: #737373;
+  --color-text-disabled: #A3A3A3;
+  --color-text-white: #ffffff;
+
+  /* 背景色 */
+  --color-bg-default: #F5F5F5;
+  --color-bg-paper: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-disabled: #F5F5F5;
+  --color-bg-hover: #F5F5F5;
+
+  /* 边框色 */
+  --color-border: #E5E5E5;
+  --color-border-light: #F0F0F0;
+  --color-border-dark: #D4D4D4;
+  --color-divider: #E5E5E5;
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* 字体 */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 32px;
+  --line-height-tight: 1.35;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* 过渡 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  /* 布局 */
+  --header-height: 64px;
+  --sidebar-width: 240px;
+  --admin-sidebar-width: 200px;
+  --content-max-width: 1200px;
+  --mobile-padding: 12px;
+  --desktop-padding: 24px;
+
+  /* 组件 */
+  --card-padding: 16px;
+  --card-radius: 8px;
+  --button-height-sm: 24px;
+  --button-height-md: 32px;
+  --button-height-lg: 40px;
+  --input-height-sm: 24px;
+  --input-height-md: 32px;
+  --input-height-lg: 40px;
+  --table-header-bg: #fafafa;
+  --table-row-height: 54px;
+  --modal-padding: 24px;
+  --modal-radius: 8px;
+}
+
+/* 暗色主题变量（预留） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 暗色主题变量预留 */
+  }
+}
+
+/* 强制暗色主题 */
+[data-theme='dark'] {
+  /* 暗色主题变量 */
+}

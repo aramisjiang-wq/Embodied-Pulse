@@ -1,5 +1,12 @@
 import { PrismaClient } from '../../node_modules/.prisma/client-user';
 import { logger } from '../utils/logger';
+import { resolveDbUrlMulti } from './resolve-db-url';
+
+const dbUrl = resolveDbUrlMulti({
+  envKeys: ['DATABASE_URL', 'USER_DATABASE_URL'],
+  defaultUrl: 'file:./prisma/dev-user.db',
+  dirnameOfCaller: __dirname,
+});
 
 const prisma = new PrismaClient({
   log: [
@@ -9,7 +16,7 @@ const prisma = new PrismaClient({
   ],
   datasources: {
     db: {
-      url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
+      url: dbUrl,
     },
   },
   errorFormat: 'minimal',

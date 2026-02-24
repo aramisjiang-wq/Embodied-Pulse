@@ -11,7 +11,7 @@ export const discoveryApi = {
     sortType?: 'hot' | 'latest';
     page?: number;
     size?: number;
-  }): Promise<PaginatedResponse<FeedItem>> => {
+  }): Promise<PaginatedResponse<FeedItem> & { pinnedItems?: any[] }> => {
     const response = await cachedGet<PaginatedResponse<FeedItem>>('/discovery', { params });
     if (response && typeof response === 'object' && 'items' in response) {
       return response;

@@ -2,8 +2,8 @@ import apiClient from './client';
 import { HomeModule } from './types';
 
 export const homeModuleApi = {
-  getHomeModules: async (params?: { position?: string }): Promise<HomeModule[]> => {
-    const response = await apiClient.get<HomeModule[]>('/home-modules', { params });
+  getHomeModules: async (): Promise<HomeModule[]> => {
+    const response = await apiClient.get<HomeModule[]>('/home-modules');
     if (response.code === 0) {
       return response.data;
     } else {

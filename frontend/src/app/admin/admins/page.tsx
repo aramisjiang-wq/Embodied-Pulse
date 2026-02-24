@@ -10,6 +10,7 @@ import { Table, Button, Space, Input, Tag, Modal, Drawer, Checkbox, Form, Select
 import { SearchOutlined, SettingOutlined, UserOutlined, LockOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import apiClient from '@/lib/api/client';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const MODULES = [
   { key: 'users', label: '用户管理' },
@@ -441,9 +442,9 @@ export default function AdminAdminsPage() {
   ];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>管理员</h1>
+    <div className={styles.pageWrapper}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>管理员</h1>
         <Space>
           <Input.Search
             placeholder="搜索用户名或邮箱..."
@@ -505,8 +506,8 @@ export default function AdminAdminsPage() {
           </Space>
         }
       >
-        <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>快速应用权限模板:</div>
+        <div className={styles.templateSection}>
+          <div className={styles.templateLabel}>快速应用权限模板:</div>
           <Space wrap>
             {PERMISSION_TEMPLATES.map(template => (
               <Button 
@@ -519,7 +520,7 @@ export default function AdminAdminsPage() {
             ))}
           </Space>
         </div>
-        <div style={{ marginBottom: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
+        <div className={styles.quickActions}>
           <Space>
             <Button size="small" onClick={() => handleSelectAllPermissions(true)}>
               一键全选
@@ -531,8 +532,8 @@ export default function AdminAdminsPage() {
         </div>
         <Form form={permissionForm} layout="vertical">
           {MODULES.map(module => (
-            <div key={module.key} style={{ marginBottom: 24, padding: 16, border: '1px solid #f0f0f0', borderRadius: 8 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{module.label}</div>
+            <div key={module.key} className={styles.permissionModule}>
+              <div className={styles.moduleTitle}>{module.label}</div>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Form.Item name={`${module.key}_view`} valuePropName="checked">
                   <Checkbox>查看权限</Checkbox>
@@ -613,14 +614,14 @@ export default function AdminAdminsPage() {
           setTagsInput('');
         }}
       >
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 8 }}>标签（用逗号分隔）:</div>
+        <div className={styles.tagEditInput}>
+          <div className={styles.tagEditLabel}>标签（用逗号分隔）:</div>
           <AntInput
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="例如: 核心管理员,技术负责人,运营负责人"
           />
-          <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
+          <div className={styles.tagEditHint}>
             提示：多个标签用逗号分隔
           </div>
         </div>
@@ -640,7 +641,7 @@ export default function AdminAdminsPage() {
       >
         {visualizationAdmin && (
           <div>
-            <div style={{ marginBottom: 16 }}>
+            <div className={styles.visualizationHeader}>
               <Space>
                 <Tag color="blue">用户名: {visualizationAdmin.username}</Tag>
                 <Tag color="green">角色: {getRoleTag(visualizationAdmin.role)}</Tag>

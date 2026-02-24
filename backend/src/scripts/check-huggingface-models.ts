@@ -21,7 +21,7 @@ async function main() {
 
     console.log(`找到 ${models.length} 个模型:\n`);
 
-    models.forEach((model, index) => {
+    models.forEach((model: any, index: number) => {
       console.log(`${index + 1}. ${model.fullName}`);
       console.log(`   作者: ${model.author || 'unknown'}`);
       console.log(`   描述: ${model.description || '无'}`);

@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, Table, Button, Space, Modal, Form, Input, Switch, InputNumber, App, Popconfirm, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { customPageApi, CustomPage } from '@/lib/api/custom-page';
+import { sanitizeHtml } from '@/lib/utils/sanitize';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 const { Title } = Typography;
@@ -18,6 +20,7 @@ export default function AdminPagesPage() {
   const [form] = Form.useForm();
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(async (page = 1, size = 20) => {
     setLoading(true);
@@ -56,12 +59,12 @@ export default function AdminPagesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const success = await customPageApi.delete(id);
-      if (success) {
+      const result = await customPageApi.delete(id);
+      if (result.success) {
         message.success('删除成功');
         loadData(pagination.page, pagination.size);
       } else {
-        message.error('删除失败');
+        message.error(result.error || '删除失败');
       }
     } catch (error: any) {
       message.error(error.message || '删除失败');
@@ -71,30 +74,31 @@ export default function AdminPagesPage() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      let success = false;
-      
+      setSubmitting(true);
+
+      let result;
       if (editingPage) {
-        const result = await customPageApi.update(editingPage.id, values);
-        success = !!result;
+        result = await customPageApi.update(editingPage.id, values);
       } else {
-        const result = await customPageApi.create(values);
-        success = !!result;
+        result = await customPageApi.create(values);
       }
 
-      if (success) {
+      if (result.success && result.data) {
         message.success(editingPage ? '更新成功' : '创建成功');
         setModalVisible(false);
         loadData(pagination.page, pagination.size);
       } else {
-        message.error(editingPage ? '更新失败' : '创建失败');
+        message.error(result.error || (editingPage ? '更新失败' : '创建失败'));
       }
     } catch (error: any) {
       message.error(error.message || '操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handlePreview = (content: string) => {
-    setPreviewContent(content);
+    setPreviewContent(sanitizeHtml(content));
     setPreviewVisible(true);
   };
 
@@ -171,10 +175,10 @@ export default function AdminPagesPage() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className={styles.pageWrapper}>
       <Card>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={4} style={{ margin: 0 }}>自定义页面管理</Title>
+        <div className={styles.pageHeader}>
+          <Title level={4} className={styles.pageTitle}>自定义页面管理</Title>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             新建页面
           </Button>
@@ -204,6 +208,7 @@ export default function AdminPagesPage() {
         width={800}
         okText="保存"
         cancelText="取消"
+        confirmLoading={submitting}
       >
         <Form form={form} layout="vertical">
           <Form.Item
@@ -212,6 +217,7 @@ export default function AdminPagesPage() {
             rules={[
               { required: true, message: '请输入Slug' },
               { pattern: /^[a-z0-9-]+$/, message: 'Slug只能包含小写字母、数字和连字符' },
+              { max: 100, message: 'Slug长度不能超过100个字符' },
             ]}
           >
             <Input placeholder="例如: about, contact, faq" disabled={!!editingPage} />
@@ -219,14 +225,20 @@ export default function AdminPagesPage() {
           <Form.Item
             name="title"
             label="标题"
-            rules={[{ required: true, message: '请输入标题' }]}
+            rules={[
+              { required: true, message: '请输入标题' },
+              { max: 200, message: '标题长度不能超过200个字符' },
+            ]}
           >
             <Input placeholder="页面标题" />
           </Form.Item>
           <Form.Item
             name="content"
             label="内容（支持HTML）"
-            rules={[{ required: true, message: '请输入内容' }]}
+            rules={[
+              { required: true, message: '请输入内容' },
+              { max: 100000, message: '内容长度不能超过100000个字符' },
+            ]}
           >
             <TextArea
               rows={12}
@@ -239,7 +251,7 @@ export default function AdminPagesPage() {
             label="排序"
             tooltip="数字越小越靠前"
           >
-            <InputNumber min={0} max={999} />
+            <InputNumber min={0} max={9999} />
           </Form.Item>
           <Form.Item
             name="isActive"
@@ -258,7 +270,7 @@ export default function AdminPagesPage() {
         footer={null}
         width={800}
       >
-        <div 
+        <div
           style={{ padding: 16, maxHeight: 500, overflow: 'auto' }}
           dangerouslySetInnerHTML={{ __html: previewContent }}
         />

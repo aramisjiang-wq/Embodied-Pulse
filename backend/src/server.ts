@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 import { errorHandler } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 import routes from './routes';
@@ -12,7 +13,7 @@ import { startCronJobs } from './services/sync/cron';
 import { BilibiliCookieManager } from './services/bilibili-cookie-manager.service';
 import { BilibiliHealthService } from './services/bilibili-health.service';
 import { initJobSyncScheduler } from './scripts/init-job-sync';
-import { startSubscriptionUpdateCheck, startNewsSync, startNewsClean } from './services/scheduler.service';
+import { startSubscriptionUpdateCheck } from './services/scheduler.service';
 import { startAllHuggingFaceSchedulers } from './services/huggingface-scheduler.service';
 import { initRedis } from './services/redis.service';
 import { metricsMiddleware } from './middleware/metrics.middleware';
@@ -20,11 +21,20 @@ import { initializeEventHandlers, shutdownEventHandlers } from './events/event-h
 import { closeAllQueues } from './queues/queue.service';
 import { rateLimiter } from './middleware/rate-limiter.middleware';
 import { registerStartupTask, runStartupTasks } from './utils/startup-manager';
+import { validateEnvironment } from './utils/env-validator';
+import { websocketService } from './services/websocket.service';
 
 dotenv.config();
 
+const envValidation = validateEnvironment();
+if (!envValidation.valid) {
+  logger.error('环境变量验证失败，请检查配置后重试');
+  process.exit(1);
+}
+
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
 logger.info(`[DEBUG] LOG_LEVEL: ${process.env.LOG_LEVEL}`);
@@ -89,11 +99,11 @@ const helmetConfig = isDevelopment
       },
       crossOriginEmbedderPolicy: true,
       crossOriginOpenerPolicy: true,
-      crossOriginResourcePolicy: { policy: 'same-origin' },
+      crossOriginResourcePolicy: { policy: 'same-origin' as const },
       hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
       noSniff: true,
       xssFilter: true,
-      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' as const },
     };
 
 app.use(helmet(helmetConfig));
@@ -119,9 +129,11 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 // 启动服务器
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
   logger.info(`Server is running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  websocketService.initialize(server);
 
   registerStartupTask({
     name: 'bilibili-cookie-manager',
@@ -177,20 +189,6 @@ app.listen(PORT, async () => {
   });
 
   registerStartupTask({
-    name: 'news-sync',
-    handler: () => {
-      startNewsSync();
-    },
-  });
-
-  registerStartupTask({
-    name: 'news-clean',
-    handler: () => {
-      startNewsClean();
-    },
-  });
-
-  registerStartupTask({
     name: 'huggingface-schedulers',
     handler: () => {
       startAllHuggingFaceSchedulers();
@@ -210,6 +208,7 @@ app.listen(PORT, async () => {
 // 优雅关闭处理
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM signal received: closing HTTP server');
+  websocketService.close();
   shutdownEventHandlers();
   await closeAllQueues();
   process.exit(0);
@@ -217,6 +216,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT signal received: closing HTTP server');
+  websocketService.close();
   shutdownEventHandlers();
   await closeAllQueues();
   process.exit(0);

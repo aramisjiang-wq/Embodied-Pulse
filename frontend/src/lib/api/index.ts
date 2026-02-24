@@ -15,5 +15,6 @@ export { adminApi } from './admin';
 export { searchApi } from './search';
 export { userApi } from './user';
 export { subscriptionApi } from './subscription';
+export { contentSubscriptionApi } from './content-subscription';
 export { rankingApi } from './ranking';
 export * from './types';

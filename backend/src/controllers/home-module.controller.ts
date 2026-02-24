@@ -16,9 +16,7 @@ import { sendSuccess } from '../utils/response';
  */
 export async function getHomeModulesHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { position } = req.query;
     const modules = await getHomeModules({
-      position: position as string,
       isActive: true,
     });
     sendSuccess(res, modules);

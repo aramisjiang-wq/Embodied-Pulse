@@ -1,27 +1,23 @@
 /**
- * 用户端数据库连接
- * 存储所有用户端注册用户和相关数据
+ * 用户端数据库连接（与管理端 admin 库独立；与「管理端 - 用户管理」界面读写的为同一库）
+ * - 环境变量：USER_DATABASE_URL（上线必须配置，见 resolve-db-url.ts）
+ * - 默认（仅开发）：file:./prisma/dev-user.db，按 resolve-db-url 解析为 backend 目录下同一路径，保证从任意目录启动时用户端与管理端查阅同一用户库
+ * - 用途：用户端注册/登录、User 表及业务数据；管理端用户列表/编辑也读此库
  */
 
 import { PrismaClient as UserPrismaClient } from '../../node_modules/.prisma/client-user';
 import { logger } from '../utils/logger';
-import path from 'path';
-import fs from 'fs';
+import { resolveDbUrl } from './resolve-db-url';
 
-// 确保数据库路径正确
-let userDbUrl = process.env.USER_DATABASE_URL || 'file:./prisma/dev-user.db';
+const userDbUrl = resolveDbUrl({
+  envKey: 'USER_DATABASE_URL',
+  defaultUrl: 'file:./prisma/dev-user.db',
+  dirnameOfCaller: __dirname,
+});
 
-// 如果使用相对路径，转换为绝对路径
-if (userDbUrl.startsWith('file:./') || userDbUrl.startsWith('file:')) {
-  const dbPath = userDbUrl.replace('file:', '');
-  
-  if (fs.existsSync(dbPath)) {
-    userDbUrl = `file:${path.resolve(dbPath)}`;
-    logger.info(`User database path resolved to: ${path.resolve(dbPath)}`);
-  } else {
-    logger.error(`User database not found at: ${dbPath}`);
-    logger.warn('Will try to use the configured path anyway, Prisma will handle the error');
-  }
+// 启动时打印当前使用的用户库路径，便于排查「管理端用户列表看不到已注册用户」问题
+if (process.env.NODE_ENV !== 'production') {
+  logger.info(`[用户库] 当前连接: ${userDbUrl.replace(/^file:/, '')}`);
 }
 
 const userPrisma = new UserPrismaClient({

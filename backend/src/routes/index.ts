@@ -11,7 +11,6 @@ import videoRoutes from './video.routes';
 import repoRoutes from './repo.routes';
 import jobRoutes from './job.routes';
 import huggingfaceRoutes from './huggingface.routes';
-import newsRoutes from './news.routes';
 import postRoutes from './post.routes';
 import commentRoutes from './comment.routes';
 import favoriteRoutes from './favorite.routes';
@@ -50,6 +49,7 @@ import metricsRoutes from './metrics.routes';
 import queueRoutes from './queue.routes';
 import customPageRoutes from './custom-page.routes';
 import discoveryRoutes from './discovery.routes';
+import dailyNewsRoutes from './daily-news.routes';
 import githubRepoInfoRoutes from './github-repo-info.routes';
 import githubRepoInfoPublicRoutes from './github-repo-public.routes';
 import huggingfaceApiRoutes from './huggingface-api.routes';
@@ -58,10 +58,10 @@ import adminHuggingfaceRoutes from './admin-huggingface.routes';
 import userHuggingfaceSubscriptionRoutes from './user-huggingface-subscription.routes';
 import bilibiliSearchKeywordRoutes from './bilibili-search-keyword.routes';
 import paperSearchKeywordRoutes from './paper-search-keyword.routes';
-import newsSearchKeywordRoutes from './news-search-keyword.routes';
 import jobSyncRoutes from './job-sync.routes';
 import passwordResetRoutes from './password-reset.routes';
 import emailVerificationRoutes from './email-verification.routes';
+import systemRoutes from './system.routes';
 
 const router = Router();
 
@@ -75,7 +75,6 @@ router.use('/repos', repoRoutes);
 router.use('/jobs', jobRoutes);
 router.use('/huggingface', huggingfaceRoutes);
 router.use('/huggingface-subscriptions', userHuggingfaceSubscriptionRoutes);
-router.use('/news', newsRoutes);
 
 // 市集路由
 router.use('/posts', postRoutes);
@@ -168,6 +167,7 @@ router.use('/pages', customPageRoutes);
 router.use('/admin/pages', customPageRoutes);
 
 router.use('/discovery', discoveryRoutes);
+router.use('/news', dailyNewsRoutes);
 
 router.use('/admin/github-repo-info', githubRepoInfoRoutes);
 
@@ -185,10 +185,10 @@ router.use('/admin/bilibili-search-keywords', bilibiliSearchKeywordRoutes);
 // 论文搜索关键词路由（管理员专用，放在 /admin 下）
 router.use('/admin/paper-search-keywords', paperSearchKeywordRoutes);
 
-// 新闻搜索关键词路由（管理员专用，放在 /admin 下）
-router.use('/admin/news-search-keywords', newsSearchKeywordRoutes);
-
 // 招聘信息同步路由（管理员专用，放在 /admin 下）
 router.use('/admin/job-sync', jobSyncRoutes);
+
+// 系统管理路由（管理员专用，放在 /admin 下）
+router.use('/admin/system', systemRoutes);
 
 export default router;

@@ -26,6 +26,7 @@ import { huggingfaceApi } from '@/lib/api/huggingface';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -35,20 +36,21 @@ const { Content } = Layout;
 export default function SubscriptionsPage() {
   const { message: messageApi } = App.useApp();
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [subscriptions, setSubscriptions] = useState<ContentSubscription[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [enrichedSubscriptions, setEnrichedSubscriptions] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user) {
       messageApi.warning('请先登录');
       router.push('/login');
       return;
     }
     loadSubscriptions();
-  }, [user, activeTab]);
+  }, [hydrated, user, activeTab]);
 
   useEffect(() => {
     if (subscriptions.length > 0) {
@@ -177,6 +179,12 @@ export default function SubscriptionsPage() {
       case 'repo':
         return detail.htmlUrl || (detail.fullName ? `https://github.com/${detail.fullName}` : '#');
       case 'huggingface':
+        const hfContentType = detail.contentType || 'model';
+        if (hfContentType === 'dataset') {
+          return detail.fullName ? `https://huggingface.co/datasets/${detail.fullName}` : (detail.hfId ? `https://huggingface.co/datasets/${detail.hfId}` : '#');
+        } else if (hfContentType === 'space') {
+          return detail.fullName ? `https://huggingface.co/spaces/${detail.fullName}` : (detail.hfId ? `https://huggingface.co/spaces/${detail.hfId}` : '#');
+        }
         return detail.fullName ? `https://huggingface.co/${detail.fullName}` : (detail.hfId ? `https://huggingface.co/${detail.hfId}` : '#');
       default:
         return '#';
@@ -208,13 +216,15 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>我的订阅</h1>
-          <p style={{ color: '#666', marginBottom: 16 }}>
-            管理你订阅的内容，系统会自动为你推送更新通知
-          </p>
+    <div className={styles.pageWrapper}>
+      <Content style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div className={styles.pageHeader}>
+          <div>
+            <h1 className={styles.pageTitle}>我的订阅</h1>
+            <p style={{ color: '#666', marginBottom: 16 }}>
+              管理你订阅的内容，系统会自动为你推送更新通知
+            </p>
+          </div>
         </div>
 
         <Row gutter={16} style={{ marginBottom: 24 }}>

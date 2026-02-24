@@ -11,12 +11,31 @@ const urlsToCache = [
 
 const CACHE_DURATION = 5 * 60 * 1000;
 
+// 检测是否为开发环境
+const isDevelopment = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
+
 self.addEventListener('install', (event) => {
+  // 开发环境：跳过缓存，直接激活
+  if (isDevelopment) {
+    console.log('[SW] Development mode: skipping cache');
+    self.skipWaiting();
+    return;
+  }
+
+  // 生产环境：尝试缓存，但失败不影响激活
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
+      // 使用 Promise.allSettled 确保单个失败不影响其他
+      return Promise.allSettled(
+        urlsToCache.map(url => 
+          cache.add(url).catch(err => {
+            console.warn(`[SW] Failed to cache ${url}:`, err.message);
+            return null;
+          })
+        )
+      );
     }).catch((error) => {
-      console.warn('Service Worker cache failed:', error.message);
+      console.warn('[SW] Service Worker cache failed:', error.message);
     })
   );
   self.skipWaiting();
@@ -39,6 +58,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // 开发环境：直接返回，不拦截请求
+  if (isDevelopment) {
+    return;
+  }
 
   // 不缓存非 HTTP(S) 协议的请求（如 chrome-extension, chrome-search 等）
   if (!url.protocol.startsWith('http')) {

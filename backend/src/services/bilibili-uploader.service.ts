@@ -8,8 +8,6 @@ import { BilibiliAPI, BilibiliAPIError } from './bilibili';
 import { logger } from '../utils/logger';
 import userPrisma from '../config/database.user';
 
-const prisma = userPrisma as any;
-
 const bilibiliAPI = BilibiliAPI.fromEnv({
   timeout: 15000,
   retries: 3,
@@ -72,8 +70,9 @@ export async function getMidFromVideoUrl(bvid: string): Promise<string | null> {
 
 /**
  * 获取UP主信息
- * 注意：此API需要Bilibili Cookie认证，如果没有配置会失败
- * 失败时会返回null，由调用方决定是否使用默认信息
+ * 策略：
+ * 1. 先尝试用户信息API（需要Cookie）
+ * 2. 失败时降级到视频列表API获取UP主名称（不需要Cookie）
  */
 export async function getUploaderInfo(mid: string): Promise<{
   mid: string;
@@ -84,26 +83,68 @@ export async function getUploaderInfo(mid: string): Promise<{
   try {
     logger.info(`获取UP主信息: ${mid}`);
     
-    const userInfo = await bilibiliAPI.user.getUserInfo(parseInt(mid, 10));
-    
-    return {
-      mid: String(userInfo.mid),
-      name: userInfo.name || '',
-      avatar: userInfo.face || undefined,
-      description: userInfo.sign || undefined,
-    };
+    // 策略1：尝试用户信息API
+    try {
+      const userInfo = await bilibiliAPI.user.getUserInfo(parseInt(mid, 10));
+      
+      return {
+        mid: String(userInfo.mid),
+        name: userInfo.name || '',
+        avatar: userInfo.face || undefined,
+        description: userInfo.sign || undefined,
+      };
+    } catch (apiError: any) {
+      const errorCode = apiError?.code || apiError?.statusCode;
+      logger.warn(`用户信息API失败 (${mid}): ${apiError.message}, code: ${errorCode}`);
+      
+      // 如果是认证错误或限流，尝试降级策略
+      if (errorCode === -401 || errorCode === -799 || errorCode === -352 || errorCode === 412) {
+        logger.info(`尝试降级策略：从视频列表获取UP主信息 (${mid})`);
+        return await getUploaderInfoFromVideos(mid);
+      }
+      
+      // 其他错误也尝试降级
+      return await getUploaderInfoFromVideos(mid);
+    }
   } catch (error: any) {
-    logger.error(`获取UP主信息失败 (${mid}):`, error.message);
+    logger.error(`获取UP主信息最终失败 (${mid}):`, error.message);
+    return null;
+  }
+}
+
+/**
+ * 降级策略：从视频列表API获取UP主信息
+ * 这个API不需要Cookie，更稳定
+ */
+async function getUploaderInfoFromVideos(mid: string): Promise<{
+  mid: string;
+  name: string;
+  avatar?: string;
+  description?: string;
+} | null> {
+  try {
+    const result = await bilibiliAPI.user.getUserVideos(parseInt(mid, 10), 1, 1);
     
-    // 如果是认证错误或限流错误，返回null（由调用方决定是否使用默认信息）
-    if (error instanceof BilibiliAPIError) {
-      if (error.code === -401 || error.code === -799) {
-        logger.warn(`Bilibili API需要认证或限流 (${mid})`);
-        return null;
+    if (result?.list?.vlist && result.list.vlist.length > 0) {
+      const firstVideo = result.list.vlist[0];
+      // 视频列表中的author字段就是UP主名称
+      const name = firstVideo.author || '';
+      
+      if (name) {
+        logger.info(`从视频列表获取到UP主名称: ${name}`);
+        return {
+          mid,
+          name,
+          avatar: undefined, // 视频列表API不返回头像
+          description: undefined,
+        };
       }
     }
     
-    // 其他错误也返回null
+    logger.warn(`视频列表API未返回UP主信息 (${mid})`);
+    return null;
+  } catch (error: any) {
+    logger.error(`降级策略也失败 (${mid}):`, error.message);
     return null;
   }
 }
@@ -224,7 +265,7 @@ export async function createOrUpdateUploader(data: {
   description?: string;
 }): Promise<any> {
   try {
-    const uploader = await prisma.bilibili_uploaders.upsert({
+    const uploader = await userPrisma.bilibiliUploader.upsert({
       where: { mid: data.mid },
       update: {
         name: data.name,
@@ -232,6 +273,7 @@ export async function createOrUpdateUploader(data: {
         description: data.description,
       },
       create: {
+        id: data.mid,
         mid: data.mid,
         name: data.name,
         avatar: data.avatar,
@@ -387,12 +429,33 @@ export async function createOrUpdateUploader(data: {
 /**
  * 获取所有激活的UP主
  */
+function parseTagsField(raw: unknown): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getAllActiveUploaders(): Promise<any[]> {
   try {
-    return await prisma.bilibili_uploaders.findMany({
+    const rows = await userPrisma.bilibiliUploader.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'desc' },
     });
+    return rows.map((u: any) => ({
+      id: u.id,
+      mid: u.mid,
+      name: u.name,
+      avatar: u.avatar ?? null,
+      description: u.description ?? null,
+      tags: parseTagsField(u.tags),
+      isActive: Boolean(u.isActive ?? true),
+      videoCount: u.videoCount ?? 0,
+      lastSyncAt: u.lastSyncAt ?? null,
+    }));
   } catch (error: any) {
     logger.error('获取UP主列表失败 (Prisma):', {
       error: error.message,
@@ -411,13 +474,14 @@ export async function getAllActiveUploaders(): Promise<any[]> {
           name: string;
           avatar: string | null;
           description: string | null;
+          tags: string | null;
           is_active: number;
           video_count: number;
           last_sync_at: string | null;
           created_at: string;
           updated_at: string;
         }>>(
-          `SELECT id, mid, name, avatar, description, is_active, video_count, last_sync_at, created_at, updated_at 
+          `SELECT id, mid, name, avatar, description, tags, is_active, video_count, last_sync_at, created_at, updated_at 
            FROM bilibili_uploaders 
            WHERE is_active = 1 
            ORDER BY created_at DESC`
@@ -430,19 +494,20 @@ export async function getAllActiveUploaders(): Promise<any[]> {
           name: u.name,
           avatar: u.avatar,
           description: u.description,
+          tags: parseTagsField(u.tags),
           isActive: Boolean(u.is_active),
           videoCount: u.video_count,
-          lastSyncAt: u.last_sync_at ? new Date(u.last_sync_at) : null,
-          createdAt: new Date(u.created_at),
-          updatedAt: new Date(u.updated_at),
+          lastSyncAt: u.last_sync_at ?? null,
         }));
       } catch (sqlError: any) {
         logger.error('Raw SQL查询也失败:', sqlError);
         return [];
       }
     }
-    
-    throw error;
+
+    // 其他错误（如连接失败）也返回空数组，避免 500
+    logger.warn('getAllActiveUploaders 失败，返回空列表');
+    return [];
   }
 }
 
@@ -455,7 +520,7 @@ export async function syncUploaderVideos(mid: string, maxResults: number = 100):
   errors: number;
 }> {
   try {
-    const uploader = await prisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { mid },
     });
 
@@ -552,7 +617,7 @@ export async function syncUploaderVideos(mid: string, maxResults: number = 100):
           }
         }
 
-        await prisma.bilibili_uploaders.update({
+        await userPrisma.bilibiliUploader.update({
           where: { mid },
           data: {
             videoCount: syncedCount,

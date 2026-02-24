@@ -41,30 +41,27 @@ export function escapeHtml(text: string): string {
 
 /**
  * 清理文本中的HTML标签和特殊字符
+ * @param text 要清理的文本
+ * @param preserveNewlines 是否保留换行符（用于新闻等需要段落格式的内容）
  */
-export function cleanText(text: string): string {
+export function cleanText(text: string, preserveNewlines: boolean = false): string {
   if (!text) return '';
   
-  // 如果已经是纯文本，直接返回
   if (typeof text !== 'string') {
     return String(text);
   }
   
-  // 先使用正则表达式移除所有HTML标签（包括嵌套的）
   let cleaned = text.replace(/<[^>]+>/g, '');
   
-  // 如果在浏览器环境，使用DOM解析更准确
   if (typeof document !== 'undefined') {
     try {
       const tmp = document.createElement('div');
       tmp.innerHTML = text;
       cleaned = tmp.textContent || tmp.innerText || cleaned;
     } catch (e) {
-      // 如果DOM解析失败，使用正则表达式结果
     }
   }
   
-  // 解码HTML实体
   cleaned = cleaned
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -73,8 +70,17 @@ export function cleanText(text: string): string {
     .replace(/&#039;/g, "'")
     .replace(/&nbsp;/g, ' ');
   
-  // 移除多余的空白字符
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  if (preserveNewlines) {
+    cleaned = cleaned
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n')
+      .trim();
+  } else {
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  }
   
   return cleaned;
 }

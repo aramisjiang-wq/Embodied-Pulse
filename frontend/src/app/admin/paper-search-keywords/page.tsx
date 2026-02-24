@@ -1,10 +1,11 @@
 /**
  * 论文搜索关键词管理页面
+ * 科技极简风重构版
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -18,21 +19,12 @@ import {
   Select,
   InputNumber,
   App,
-  message,
   Tooltip,
-  Card,
-  Statistic,
-  Row,
-  Col,
+  Checkbox,
+  Divider,
+  Drawer,
   Upload,
   Alert,
-  Tabs,
-  List,
-  Avatar,
-  Typography,
-  Divider,
-  Badge,
-  Progress,
 } from 'antd';
 import {
   PlusOutlined,
@@ -42,22 +34,30 @@ import {
   ReloadOutlined,
   DownloadOutlined,
   UploadOutlined,
-  InfoCircleOutlined,
   FileTextOutlined,
-  EyeOutlined,
-  CloseOutlined,
   ThunderboltOutlined,
-  UserOutlined,
-  UnorderedListOutlined,
-  ClockCircleOutlined,
-  FireOutlined,
-  StarOutlined,
+  ControlOutlined,
+  DatabaseOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import apiClient from '@/lib/api/client';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
-const { Text, Paragraph } = Typography;
+
+const ARXIV_CATEGORIES = [
+  { value: 'cs.AI', label: 'cs.AI', desc: '人工智能' },
+  { value: 'cs.RO', label: 'cs.RO', desc: '机器人' },
+  { value: 'cs.CV', label: 'cs.CV', desc: '计算机视觉' },
+  { value: 'cs.LG', label: 'cs.LG', desc: '机器学习' },
+  { value: 'cs.CL', label: 'cs.CL', desc: '自然语言处理' },
+  { value: 'cs.NE', label: 'cs.NE', desc: '神经与进化计算' },
+  { value: 'cs.MA', label: 'cs.MA', desc: '多智能体' },
+  { value: 'eess.SY', label: 'eess.SY', desc: '系统与控制' },
+];
 
 const CATEGORIES = [
   { value: '核心概念', label: '核心概念' },
@@ -68,22 +68,17 @@ const CATEGORIES = [
   { value: '人群关注', label: '人群关注' },
 ];
 
-const SOURCE_TYPES = [
-  { value: 'admin', label: '管理员创建' },
-  { value: 'user', label: '用户订阅' },
-];
-
 interface PaperSearchKeyword {
   id: string;
   keyword: string;
   category: string | null;
-  sourceType: string;
-  isActive: boolean;
+  source_type: string;
+  is_active: boolean;
   priority: number;
   description: string | null;
   tags: string | null;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
   paperCount?: number;
 }
 
@@ -91,306 +86,318 @@ interface Paper {
   id: string;
   title: string;
   abstract: string;
-  authors: string[];
+  authors: string;
   publishedDate: string;
   arxivId: string | null;
   pdfUrl: string | null;
   citationCount: number;
-  viewCount: number;
-  favoriteCount: number;
 }
 
+type SyncMode = 'arxiv-categories' | 'keywords';
+
 export default function PaperSearchKeywordsPage() {
-  const { message: messageApi } = App.useApp();
+  const { message: msg } = App.useApp();
+
+  // keywords list
   const [loading, setLoading] = useState(false);
   const [keywords, setKeywords] = useState<PaperSearchKeyword[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<boolean | undefined>(undefined);
+
+  // keyword modal
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingKeyword, setEditingKeyword] = useState<PaperSearchKeyword | null>(null);
+  const [editingKw, setEditingKw] = useState<PaperSearchKeyword | null>(null);
   const [form] = Form.useForm();
-  const [exportLoading, setExportLoading] = useState(false);
-  const [importModalVisible, setImportModalVisible] = useState(false);
-  const [importFileList, setImportFileList] = useState<any[]>([]);
-  const [papersModalVisible, setPapersModalVisible] = useState(false);
-  const [selectedKeyword, setSelectedKeyword] = useState<PaperSearchKeyword | null>(null);
+
+  // papers drawer
+  const [papersDrawer, setPapersDrawer] = useState(false);
+  const [selectedKw, setSelectedKw] = useState<PaperSearchKeyword | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [papersLoading, setPapersLoading] = useState(false);
-  const [papersPage, setPapersPage] = useState(1);
-  const [papersPageSize] = useState(10);
   const [papersTotal, setPapersTotal] = useState(0);
+  const [papersPage, setPapersPage] = useState(1);
+
+  // sync panel
+  const [syncMode, setSyncMode] = useState<SyncMode>('arxiv-categories');
   const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<string>('');
+  // arxiv categories sync config
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['cs.AI', 'cs.RO', 'cs.CV', 'cs.LG']);
+  const [maxPerCategory, setMaxPerCategory] = useState(50);
+  // keyword sync config
+  const [syncDays, setSyncDays] = useState(7);
+  const [maxPerKeyword, setMaxPerKeyword] = useState(20);
 
-  useEffect(() => {
-    loadKeywords();
-  }, [page, pageSize, categoryFilter, sourceTypeFilter, statusFilter, searchKeyword]);
+  // import
+  const [importVisible, setImportVisible] = useState(false);
+  const [importFileList, setImportFileList] = useState<any[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
 
-  type KeywordListResponse = { items: PaperSearchKeyword[]; pagination: { total: number } };
-
-  const loadKeywords = async () => {
+  const loadKeywords = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get<KeywordListResponse>('/admin/paper-search-keywords', {
+      const res = await apiClient.get('/admin/paper-search-keywords', {
         params: {
           page,
           size: pageSize,
           category: categoryFilter || undefined,
-          sourceType: sourceTypeFilter || undefined,
           isActive: statusFilter,
-          keyword: searchKeyword || undefined,
+          keyword: searchText || undefined,
+          withPaperCount: 'true',
         },
       });
-
-      const items = response.data.items || [];
-      
-      const itemsWithPaperCount = await Promise.all(
-        items.map(async (item: PaperSearchKeyword) => {
-          try {
-            const countResponse = await apiClient.get<{ count: number }>(`/admin/paper-search-keywords/${item.id}/papers/count`);
-            return {
-              ...item,
-              paperCount: countResponse.data.count || 0,
-            };
-          } catch {
-            return {
-              ...item,
-              paperCount: 0,
-            };
-          }
-        })
-      );
-      
-      setKeywords(itemsWithPaperCount);
-      setTotal(response.data.pagination.total || 0);
-    } catch (error: any) {
-      console.error('Load keywords error:', error);
-      messageApi.error(error.message || '加载失败');
+      // 兼容：接口返回 { code, message, data: { items, pagination } }，axios 拦截器已返回 response.data
+      const raw = res as { data?: { items?: PaperSearchKeyword[]; pagination?: { total?: number } }; items?: PaperSearchKeyword[]; pagination?: { total?: number } };
+      const data = raw?.data ?? raw;
+      const list = Array.isArray(data?.items) ? data.items : [];
+      const totalNum = data?.pagination?.total ?? 0;
+      setKeywords(list);
+      setTotal(totalNum);
+    } catch (err: any) {
+      msg.error(err.message || '加载失败');
       setKeywords([]);
-      setTotal(0);
     } finally {
       setLoading(false);
+    }
+  }, [page, pageSize, categoryFilter, statusFilter, searchText, msg]);
+
+  useEffect(() => {
+    loadKeywords();
+  }, [loadKeywords]);
+
+  const loadPapers = async (kwId: string, p = 1) => {
+    setPapersLoading(true);
+    try {
+      const res = await apiClient.get(`/admin/paper-search-keywords/${kwId}/papers`, {
+        params: { page: p, size: 10 },
+      });
+      const d = res.data as { items?: Paper[]; pagination?: { total?: number } };
+      setPapers(d.items || []);
+      setPapersTotal(d.pagination?.total || 0);
+    } catch (err: any) {
+      msg.error(err.message || '加载论文失败');
+    } finally {
+      setPapersLoading(false);
+    }
+  };
+
+  const handleViewPapers = (kw: PaperSearchKeyword) => {
+    setSelectedKw(kw);
+    setPapersPage(1);
+    setPapersDrawer(true);
+    loadPapers(kw.id, 1);
+  };
+
+  const handleCreate = () => {
+    setEditingKw(null);
+    form.resetFields();
+    form.setFieldsValue({ is_active: true, priority: 0, source_type: 'admin' });
+    setModalVisible(true);
+  };
+
+  const handleEdit = (kw: PaperSearchKeyword) => {
+    setEditingKw(kw);
+    form.setFieldsValue({
+      keyword: kw.keyword,
+      category: kw.category,
+      source_type: kw.source_type,
+      is_active: kw.is_active,
+      priority: kw.priority,
+      description: kw.description,
+    });
+    setModalVisible(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      if (editingKw) {
+        await apiClient.put(`/admin/paper-search-keywords/${editingKw.id}`, {
+          keyword: values.keyword,
+          category: values.category,
+          sourceType: values.source_type,
+          isActive: values.is_active,
+          priority: values.priority,
+          description: values.description,
+        });
+        msg.success('更新成功');
+      } else {
+        await apiClient.post('/admin/paper-search-keywords', {
+          keyword: values.keyword,
+          category: values.category,
+          sourceType: values.source_type,
+          isActive: values.is_active,
+          priority: values.priority,
+          description: values.description,
+        });
+        msg.success('创建成功');
+      }
+      setModalVisible(false);
+      form.resetFields();
+      loadKeywords();
+    } catch (err: any) {
+      if (err.errorFields) return;
+      msg.error(err.message || '保存失败');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await apiClient.delete(`/admin/paper-search-keywords/${id}`);
+      msg.success('删除成功');
+      loadKeywords();
+    } catch (err: any) {
+      msg.error(err.message || '删除失败');
+    }
+  };
+
+  const handleToggleActive = async (kw: PaperSearchKeyword) => {
+    try {
+      await apiClient.put(`/admin/paper-search-keywords/${kw.id}`, {
+        isActive: !kw.is_active,
+      });
+      loadKeywords();
+    } catch (err: any) {
+      msg.error(err.message || '操作失败');
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncLoading(true);
+    setSyncResult('');
+    try {
+      if (syncMode === 'arxiv-categories') {
+        if (selectedCategories.length === 0) {
+          msg.warning('请至少选择一个 arXiv 分类');
+          setSyncLoading(false);
+          return;
+        }
+        const res = await apiClient.post('/admin/sync/arxiv-categories', {
+          categories: selectedCategories,
+          maxResultsPerCategory: maxPerCategory,
+        });
+        const d = res.data as { synced?: number; errors?: number; categories?: Record<string, { synced: number; errors: number }> };
+        const catDetail = d.categories
+          ? Object.entries(d.categories)
+              .map(([cat, r]) => `${cat}: +${r.synced}`)
+              .join(' | ')
+          : '';
+        setSyncResult(`全量拉取完成 — 共入库 ${d.synced || 0} 篇，错误 ${d.errors || 0} 次${catDetail ? `\n${catDetail}` : ''}`);
+        msg.success(`全量拉取完成，入库 ${d.synced || 0} 篇论文`);
+      } else {
+        const res = await apiClient.post('/admin/sync/papers-by-keywords', {
+          sourceType: 'all',
+          days: syncDays,
+          maxResultsPerKeyword: maxPerKeyword,
+        });
+        const d = res.data as { synced?: number; errors?: number; keywords?: number };
+        setSyncResult(`关键词同步完成 — ${d.keywords || 0} 个关键词，入库 ${d.synced || 0} 篇，错误 ${d.errors || 0} 次`);
+        msg.success(`关键词同步完成，入库 ${d.synced || 0} 篇论文`);
+      }
+      loadKeywords();
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || '同步失败';
+      const hint = '若失败请确认：已登录管理员账号、后端服务可访问 https://arxiv.org';
+      setSyncResult(`同步失败：${errMsg}\n${hint}`);
+      msg.error(errMsg);
+    } finally {
+      setSyncLoading(false);
     }
   };
 
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      const response = await apiClient.get<KeywordListResponse>('/admin/paper-search-keywords', {
-        params: {
-          page: 1,
-          size: 10000,
-          category: categoryFilter || undefined,
-          sourceType: sourceTypeFilter || undefined,
-          isActive: statusFilter,
-          keyword: searchKeyword || undefined,
-        },
+      const res = await apiClient.get('/admin/paper-search-keywords', {
+        params: { page: 1, size: 10000 },
       });
-
-      const items = response.data.items || [];
-      
-      const csvContent = [
-        ['关键词', '分类', '来源类型', '状态', '优先级', '描述', '标签', '创建时间'].join(','),
-        ...items.map((item: PaperSearchKeyword) => [
-          item.keyword,
-          item.category || '',
-          item.sourceType === 'admin' ? '管理员创建' : '用户订阅',
-          item.isActive ? '启用' : '禁用',
-          item.priority,
-          item.description || '',
-          item.tags || '',
-          dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss'),
-        ].join(',')),
+      const data = res.data as { items?: PaperSearchKeyword[] };
+      const items = data.items || [];
+      const csv = [
+        ['关键词', '分类', '来源', '状态', '优先级', '描述', '创建时间'].join(','),
+        ...items.map(k =>
+          [
+            k.keyword,
+            k.category || '',
+            k.source_type === 'admin' ? '管理员' : '用户',
+            k.is_active ? '启用' : '禁用',
+            k.priority,
+            k.description || '',
+            dayjs(k.created_at).format('YYYY-MM-DD'),
+          ].join(',')
+        ),
       ].join('\n');
-
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `paper-search-keywords-${dayjs().format('YYYYMMDD-HHmmss')}.csv`;
-      link.click();
-      
-      messageApi.success('导出成功');
-    } catch (error: any) {
-      console.error('Export error:', error);
-      messageApi.error(error.message || '导出失败');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `keywords-${dayjs().format('YYYYMMDD')}.csv`;
+      a.click();
+      msg.success('导出成功');
+    } catch {
+      msg.error('导出失败');
     } finally {
       setExportLoading(false);
     }
   };
 
   const handleImport = async () => {
-    if (importFileList.length === 0) {
-      messageApi.warning('请选择文件');
-      return;
-    }
-
+    if (!importFileList.length) { msg.warning('请选择文件'); return; }
     const file = importFileList[0];
     const reader = new FileReader();
-    
     reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
-        const lines = text.split('\n');
-        const keywords: any[] = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          const columns = line.split(',');
-          if (columns.length >= 1) {
-            const keyword = columns[0].trim();
-            if (keyword) {
-              keywords.push({
-                keyword,
-                category: columns[1]?.trim() || undefined,
-                sourceType: columns[2]?.trim() === '管理员创建' ? 'admin' : 'user',
-                priority: parseInt(columns[4]?.trim()) || 0,
-                description: columns[5]?.trim() || undefined,
-              });
-            }
-          }
-        }
-
-        if (keywords.length === 0) {
-          messageApi.warning('文件中没有有效数据');
-          return;
-        }
-
-        await apiClient.post('/admin/paper-search-keywords/batch', { keywords });
-        messageApi.success(`成功导入 ${keywords.length} 个关键词`);
-        setImportModalVisible(false);
+        const lines = text.split('\n').slice(1);
+        const batch = lines
+          .map(l => l.trim())
+          .filter(Boolean)
+          .map(l => {
+            const [keyword, category, , , priority, description] = l.split(',');
+            return keyword?.trim() ? {
+              keyword: keyword.trim(),
+              category: category?.trim() || undefined,
+              priority: parseInt(priority || '0') || 0,
+              description: description?.trim() || undefined,
+            } : null;
+          })
+          .filter(Boolean);
+        if (!batch.length) { msg.warning('文件中没有有效数据'); return; }
+        await apiClient.post('/admin/paper-search-keywords/batch', { keywords: batch });
+        msg.success(`导入 ${batch.length} 个关键词`);
+        setImportVisible(false);
         setImportFileList([]);
         loadKeywords();
-      } catch (error: any) {
-        console.error('Import error:', error);
-        messageApi.error(error.message || '导入失败');
+      } catch (err: any) {
+        msg.error(err.message || '导入失败');
       }
     };
-    
     reader.readAsText(file.originFileObj);
   };
 
-  const handleCreate = () => {
-    setEditingKeyword(null);
-    form.resetFields();
-    setModalVisible(true);
-  };
-
-  const handleEdit = (keyword: PaperSearchKeyword) => {
-    setEditingKeyword(keyword);
-    form.setFieldsValue({
-      keyword: keyword.keyword,
-      category: keyword.category,
-      sourceType: keyword.sourceType,
-      isActive: keyword.isActive,
-      priority: keyword.priority,
-      description: keyword.description,
-      tags: keyword.tags ? JSON.parse(keyword.tags) : [],
-    });
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await apiClient.delete(`/admin/paper-search-keywords/${id}`);
-      messageApi.success('删除成功');
-      loadKeywords();
-    } catch (error: any) {
-      console.error('Delete error:', error);
-      messageApi.error(error.message || '删除失败');
-    }
-  };
-
-  const handleViewPapers = async (keyword: PaperSearchKeyword) => {
-    setSelectedKeyword(keyword);
-    setPapersPage(1);
-    setPapersModalVisible(true);
-    await loadPapers(keyword.id, 1);
-  };
-
-  const loadPapers = async (keywordId: string, page: number) => {
-    setPapersLoading(true);
-    try {
-      const response = await apiClient.get(`/admin/paper-search-keywords/${keywordId}/papers`, {
-        params: {
-          page,
-          size: papersPageSize,
-        },
-      });
-
-      const items = response.data.items || [];
-      setPapers(items);
-      setPapersTotal(response.data.pagination.total || 0);
-    } catch (error: any) {
-      console.error('Load papers error:', error);
-      messageApi.error(error.message || '加载论文失败');
-      setPapers([]);
-      setPapersTotal(0);
-    } finally {
-      setPapersLoading(false);
-    }
-  };
-
-  const handleModalOk = async () => {
-    try {
-      const values = await form.validateFields();
-      const data = {
-        ...values,
-        tags: values.tags ? JSON.stringify(values.tags) : undefined,
-      };
-
-      if (editingKeyword) {
-        await apiClient.put(`/admin/paper-search-keywords/${editingKeyword.id}`, data);
-        messageApi.success('更新成功');
-      } else {
-        await apiClient.post('/admin/paper-search-keywords', data);
-        messageApi.success('创建成功');
-      }
-
-      setModalVisible(false);
-      form.resetFields();
-      loadKeywords();
-    } catch (error: any) {
-      console.error('Save error:', error);
-      messageApi.error(error.message || '保存失败');
-    }
-  };
-
-  const handleSyncPapers = async () => {
-    setSyncLoading(true);
-    try {
-      const response = await apiClient.post('/admin/sync/papers-by-keywords', {
-        sourceType: 'all',
-        days: 7,
-        maxResultsPerKeyword: 20,
-      });
-      messageApi.success(`同步成功：${response.data.synced} 篇论文，${response.data.keywords} 个关键词`);
-      loadKeywords();
-    } catch (error: any) {
-      console.error('Sync papers error:', error);
-      messageApi.error(error.response?.data?.message || error.message || '同步失败');
-    } finally {
-      setSyncLoading(false);
-    }
-  };
+  const activeCount = keywords.filter(k => k.is_active).length;
+  const totalPapers = keywords.reduce((s, k) => s + (k.paperCount || 0), 0);
+  const highPriCount = keywords.filter(k => k.priority >= 10).length;
 
   const columns = [
     {
       title: '关键词',
       dataIndex: 'keyword',
       key: 'keyword',
-      width: 180,
+      width: 160,
       render: (text: string, record: PaperSearchKeyword) => (
-        <Space size="small">
-          <Badge count={record.paperCount || 0} showZero color="#52c41a">
-            <Text strong style={{ color: '#1890ff', fontSize: '14px' }}>{text}</Text>
-          </Badge>
-        </Space>
+        <button
+          onClick={() => handleViewPapers(record)}
+          className={styles.kwCell}
+        >
+          <span className={styles.kwText}>{text}</span>
+          {(record.paperCount ?? 0) > 0 && (
+            <span className={styles.kwBadge}>{record.paperCount}</span>
+          )}
+        </button>
       ),
     },
     {
@@ -398,28 +405,18 @@ export default function PaperSearchKeywordsPage() {
       dataIndex: 'category',
       key: 'category',
       width: 100,
-      render: (text: string | null) => text ? <Tag color="blue" style={{ fontSize: '12px', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>{text}</Tag> : '-',
+      render: (v: string | null) =>
+        v ? <span className={styles.tagBlue}>{v}</span> : <span className={styles.textMuted}>—</span>,
     },
     {
       title: '来源',
-      dataIndex: 'sourceType',
-      key: 'sourceType',
-      width: 90,
-      render: (text: string) => (
-        <Tag color={text === 'admin' ? 'cyan' : 'orange'} style={{ fontSize: '12px', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>
-          {text === 'admin' ? '管理员' : '用户'}
-        </Tag>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'isActive',
-      key: 'isActive',
-      width: 70,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'success' : 'default'} style={{ fontSize: '12px' }}>
-          {isActive ? '启用' : '禁用'}
-        </Tag>
+      dataIndex: 'source_type',
+      key: 'source_type',
+      width: 80,
+      render: (v: string) => (
+        <span className={v === 'admin' ? styles.tagCyan : styles.tagOrange}>
+          {v === 'admin' ? '管理员' : '用户'}
+        </span>
       ),
     },
     {
@@ -428,68 +425,67 @@ export default function PaperSearchKeywordsPage() {
       key: 'priority',
       width: 70,
       sorter: (a: PaperSearchKeyword, b: PaperSearchKeyword) => b.priority - a.priority,
-      render: (priority: number) => (
-        <Tag color={priority >= 10 ? 'red' : priority >= 5 ? 'orange' : 'default'} style={{ fontSize: '12px' }}>
-          {priority}
-        </Tag>
+      render: (v: number) => (
+        <span className={v >= 10 ? styles.tagRed : v >= 5 ? styles.tagOrange : styles.textMuted}>
+          {v}
+        </span>
       ),
     },
     {
-      title: '论文数',
-      dataIndex: 'paperCount',
-      key: 'paperCount',
+      title: '状态',
+      dataIndex: 'is_active',
+      key: 'is_active',
       width: 80,
-      sorter: (a: PaperSearchKeyword, b: PaperSearchKeyword) => (b.paperCount || 0) - (a.paperCount || 0),
-      render: (count: number, record: PaperSearchKeyword) => (
-        <Button
-          type="link"
+      render: (v: boolean, record: PaperSearchKeyword) => (
+        <Switch
           size="small"
-          icon={<UnorderedListOutlined />}
-          onClick={() => handleViewPapers(record)}
-          style={{ padding: 0, height: 'auto', fontSize: '13px' }}
-        >
-          {count || 0}
-        </Button>
+          checked={v}
+          onChange={() => handleToggleActive(record)}
+          checkedChildren="启用"
+          unCheckedChildren="禁用"
+          style={{ minWidth: 52 }}
+        />
       ),
     },
     {
       title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 130,
-      render: (date: string) => (
-        <Text style={{ fontSize: '12px' }}>{dayjs(date).format('MM-DD HH:mm')}</Text>
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 110,
+      render: (d: string) => (
+        <span className={styles.textMuted}>{dayjs(d).format('MM-DD HH:mm')}</span>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 80,
       fixed: 'right' as const,
-      render: (_: any, record: PaperSearchKeyword) => (
-        <Space size="small">
+      render: (_: unknown, record: PaperSearchKeyword) => (
+        <Space size={4}>
           <Tooltip title="编辑">
             <Button
-              type="link"
+              type="text"
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
-              style={{ padding: 0, height: 'auto' }}
+              className={styles.actionBtn}
             />
           </Tooltip>
           <Popconfirm
-            title="确定要删除这个关键词吗？"
+            title="确定删除这个关键词？"
             onConfirm={() => handleDelete(record.id)}
-            okText="确定"
+            okText="删除"
             cancelText="取消"
+            okButtonProps={{ danger: true }}
           >
             <Tooltip title="删除">
               <Button
-                type="link"
+                type="text"
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                style={{ padding: 0, height: 'auto' }}
+                className={styles.actionBtn}
               />
             </Tooltip>
           </Popconfirm>
@@ -498,423 +494,309 @@ export default function PaperSearchKeywordsPage() {
     },
   ];
 
-  const totalPapers = keywords.reduce((sum, k) => sum + (k.paperCount || 0), 0);
-  const activeKeywords = keywords.filter(k => k.isActive).length;
-  const adminKeywords = keywords.filter(k => k.sourceType === 'admin').length;
-  const userKeywords = keywords.filter(k => k.sourceType === 'user').length;
-  const highPriorityKeywords = keywords.filter(k => k.priority >= 10).length;
-
   return (
-    <div style={{ padding: '16px', background: '#f5f5f5', minHeight: '100vh' }}>
-      <div style={{ marginBottom: 16 }}>
-        <Row gutter={[12, 12]}>
-          <Col span={4}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Statistic
-                title="总关键词"
-                value={total}
-                prefix={<FileTextOutlined style={{ color: '#1890ff' }} />}
-                valueStyle={{ color: '#1890ff', fontSize: '24px', fontWeight: 600 }}
-              />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Statistic
-                title="启用关键词"
-                value={activeKeywords}
-                prefix={<ThunderboltOutlined style={{ color: '#52c41a' }} />}
-                valueStyle={{ color: '#52c41a', fontSize: '24px', fontWeight: 600 }}
-              />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Statistic
-                title="总论文数"
-                value={totalPapers}
-                prefix={<StarOutlined style={{ color: '#fa8c16' }} />}
-                valueStyle={{ color: '#fa8c16', fontSize: '24px', fontWeight: 600 }}
-              />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Statistic
-                title="高优先级"
-                value={highPriorityKeywords}
-                prefix={<FireOutlined style={{ color: '#f5222d' }} />}
-                valueStyle={{ color: '#f5222d', fontSize: '24px', fontWeight: 600 }}
-              />
-            </Card>
-          </Col>
-        </Row>
-        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
-          <Col span={12}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Space size="large" style={{ width: '100%', justifyContent: 'space-between' }}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px', marginRight: 8 }}>管理员创建</Text>
-                  <Text strong style={{ fontSize: '18px', color: '#722ed1' }}>{adminKeywords}</Text>
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px', marginRight: 8 }}>用户订阅</Text>
-                  <Text strong style={{ fontSize: '18px', color: '#fa8c16' }}>{userKeywords}</Text>
-                </div>
-              </Space>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card 
-              size="small"
-              style={{ 
-                borderRadius: '8px', 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: 'none'
-              }}
-            >
-              <Space size="large" style={{ width: '100%', justifyContent: 'space-between' }}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px', marginRight: 8 }}>活跃度</Text>
-                  <Progress 
-                    percent={total > 0 ? Math.round((activeKeywords / total) * 100) : 0} 
-                    size="small" 
-                    strokeColor="#52c41a"
-                    format={percent => `${percent}%`}
-                  />
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px', marginRight: 8 }}>覆盖率</Text>
-                  <Progress 
-                    percent={total > 0 ? Math.round((totalPapers / (total * 10)) * 100) : 0} 
-                    size="small" 
-                    strokeColor="#1890ff"
-                    format={percent => `${percent}%`}
-                  />
-                </div>
-              </Space>
-            </Card>
-          </Col>
-        </Row>
+    <div className={styles.root}>
+      {/* ── 顶部标题 ── */}
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitle}>
+          <FileTextOutlined className={styles.pageTitleIcon} />
+          <span>论文关键词管理</span>
+          <span className={styles.pageTitleSub}>基于 arXiv 全量拉取 + 内部关键词分类</span>
+        </div>
       </div>
 
-      <Card
-        size="small"
-        style={{ 
-          borderRadius: '8px', 
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          border: 'none'
-        }}
-        title={
-          <Space>
-            <FileTextOutlined style={{ color: '#1890ff' }} />
-            <span style={{ fontSize: '16px', fontWeight: 600 }}>论文搜索关键词</span>
-          </Space>
-        }
-        extra={
-          <Space size="small" wrap>
+      {/* ── 数据概览 ── */}
+      <div className={styles.statsRow}>
+        <div className={styles.statCard}>
+          <div className={styles.statValue} style={{ color: '#3b82f6' }}>{total}</div>
+          <div className={styles.statLabel}>关键词总数</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statValue} style={{ color: '#10b981' }}>{activeCount}</div>
+          <div className={styles.statLabel}>已启用</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statValue} style={{ color: '#f59e0b' }}>{totalPapers.toLocaleString()}</div>
+          <div className={styles.statLabel}>匹配论文数</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statValue} style={{ color: '#ef4444' }}>{highPriCount}</div>
+          <div className={styles.statLabel}>高优先级 (≥10)</div>
+        </div>
+      </div>
+
+      {/* ── 同步控制台 ── */}
+      <div className={styles.syncPanel}>
+        <div className={styles.syncPanelHeader}>
+          <ControlOutlined className={styles.syncPanelIcon} />
+          <span>数据同步控制台</span>
+          <span className={styles.syncPanelSub}>
+            推荐使用全量拉取模式：先从 arXiv 全量拉取论文，再通过关键词在数据库内部检索分类
+          </span>
+        </div>
+
+        <div className={styles.syncModeTabs}>
+          <button
+            className={`${styles.modeTab} ${syncMode === 'arxiv-categories' ? styles.modeTabActive : ''}`}
+            onClick={() => setSyncMode('arxiv-categories')}
+          >
+            <DatabaseOutlined />
+            <span>全量拉取 arXiv</span>
+            <span className={styles.modeTabBadge}>推荐</span>
+          </button>
+          <button
+            className={`${styles.modeTab} ${syncMode === 'keywords' ? styles.modeTabActive : ''}`}
+            onClick={() => setSyncMode('keywords')}
+          >
+            <SearchOutlined />
+            <span>按关键词搜索</span>
+          </button>
+        </div>
+
+        <div className={styles.syncConfig}>
+          {syncMode === 'arxiv-categories' ? (
+            <div className={styles.syncConfigInner}>
+              <div className={styles.configHint} style={{ marginBottom: 12 }}>
+                <strong>全量拉取说明：</strong>按所选 arXiv 分类，拉取 <strong>最近 1 年</strong> 内提交的论文（按提交时间倒序），每个分类最多拉取下面设置的数量篇。已存在的论文会更新，不会重复入库。
+              </div>
+              <div className={styles.configGroup}>
+                <label className={styles.configLabel}>选择 arXiv 分类</label>
+                <div className={styles.categoryGrid}>
+                  {ARXIV_CATEGORIES.map(cat => (
+                    <label key={cat.value} className={styles.categoryItem}>
+                      <Checkbox
+                        checked={selectedCategories.includes(cat.value)}
+                        onChange={e => {
+                          setSelectedCategories(prev =>
+                            e.target.checked
+                              ? [...prev, cat.value]
+                              : prev.filter(c => c !== cat.value)
+                          );
+                        }}
+                      />
+                      <span className={styles.categoryLabel}>{cat.label}</span>
+                      <span className={styles.categoryDesc}>{cat.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.configGroup}>
+                <label className={styles.configLabel}>每个分类最大拉取数量</label>
+                <InputNumber
+                  min={10}
+                  max={500}
+                  value={maxPerCategory}
+                  onChange={v => setMaxPerCategory(v || 50)}
+                  className={styles.configInput}
+                  addonAfter="篇"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={styles.syncConfigInner}>
+              <div className={styles.configGroup}>
+                <label className={styles.configLabel}>拉取最近几天的论文</label>
+                <InputNumber
+                  min={1}
+                  max={30}
+                  value={syncDays}
+                  onChange={v => setSyncDays(v || 7)}
+                  className={styles.configInput}
+                  addonAfter="天"
+                />
+              </div>
+              <div className={styles.configGroup}>
+                <label className={styles.configLabel}>每个关键词最大数量</label>
+                <InputNumber
+                  min={5}
+                  max={100}
+                  value={maxPerKeyword}
+                  onChange={v => setMaxPerKeyword(v || 20)}
+                  className={styles.configInput}
+                  addonAfter="篇"
+                />
+              </div>
+              <div className={styles.configHint}>
+                <span>将用数据库中所有启用的关键词逐一搜索 arXiv API，获取最近 {syncDays} 天的论文</span>
+              </div>
+            </div>
+          )}
+
+          <div className={styles.syncActions}>
+            <Button
+              type="primary"
+              icon={syncLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
+              loading={syncLoading}
+              onClick={handleSync}
+              className={styles.syncBtn}
+              size="large"
+            >
+              {syncLoading ? '同步中...' : syncMode === 'arxiv-categories' ? '开始全量拉取' : '按关键词同步'}
+            </Button>
+            {syncResult && (
+              <div className={syncResult.startsWith('同步失败') ? styles.syncResultError : styles.syncResultOk}>
+                {syncResult.startsWith('同步失败') ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+                <span>{syncResult}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 关键词列表 ── */}
+      <div className={styles.tablePanel}>
+        <div className={styles.tablePanelHeader}>
+          <div className={styles.tableFilterRow}>
             <Input
-              placeholder="搜索关键词"
-              prefix={<SearchOutlined />}
-              style={{ width: 160, fontSize: '13px' }}
-              size="small"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="搜索关键词..."
+              prefix={<SearchOutlined className={styles.searchIcon} />}
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
               onPressEnter={() => setPage(1)}
+              className={styles.searchInput}
+              allowClear
             />
             <Select
               placeholder="分类"
-              style={{ width: 100, fontSize: '13px' }}
-              size="small"
+              value={categoryFilter || undefined}
+              onChange={v => { setCategoryFilter(v || ''); setPage(1); }}
               allowClear
-              value={categoryFilter}
-              onChange={(value) => {
-                setCategoryFilter(value);
-                setPage(1);
-              }}
               options={CATEGORIES}
-            />
-            <Select
-              placeholder="来源"
-              style={{ width: 90, fontSize: '13px' }}
-              size="small"
-              allowClear
-              value={sourceTypeFilter}
-              onChange={(value) => {
-                setSourceTypeFilter(value);
-                setPage(1);
-              }}
-              options={SOURCE_TYPES}
+              className={styles.filterSelect}
             />
             <Select
               placeholder="状态"
-              style={{ width: 80, fontSize: '13px' }}
-              size="small"
-              allowClear
               value={statusFilter}
-              onChange={(value) => {
-                setStatusFilter(value);
-                setPage(1);
-              }}
+              onChange={v => { setStatusFilter(v); setPage(1); }}
+              allowClear
               options={[
-                { value: true, label: '启用' },
-                { value: false, label: '禁用' },
+                { value: true, label: '已启用' },
+                { value: false, label: '已禁用' },
               ]}
+              className={styles.filterSelect}
             />
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                setPage(1);
-                loadKeywords();
-              }}
-            >
+            <Button icon={<ReloadOutlined />} onClick={() => { setPage(1); loadKeywords(); }}>
               刷新
             </Button>
-            <Button
-              size="small"
-              icon={<UploadOutlined />}
-              onClick={() => setImportModalVisible(true)}
-            >
-              导入
-            </Button>
-            <Button
-              size="small"
-              icon={<DownloadOutlined />}
-              loading={exportLoading}
-              onClick={handleExport}
-            >
-              导出
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreate}
-            >
-              新建
-            </Button>
-            <Button
-              size="small"
-              type="default"
-              icon={<ThunderboltOutlined />}
-              onClick={handleSyncPapers}
-              loading={syncLoading}
-              style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
-            >
-              一键拉取
-            </Button>
-          </Space>
-        }
-      >
+          </div>
+          <div className={styles.tableActions}>
+            <Button icon={<UploadOutlined />} onClick={() => setImportVisible(true)}>导入</Button>
+            <Button icon={<DownloadOutlined />} loading={exportLoading} onClick={handleExport}>导出</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新建关键词</Button>
+          </div>
+        </div>
+
         <Table
           columns={columns}
           dataSource={keywords}
           rowKey="id"
           loading={loading}
           size="small"
+          className={styles.dataTable}
           pagination={{
             current: page,
-            pageSize: pageSize,
-            total: total,
+            pageSize,
+            total,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条`,
-            pageSizeOptions: ['20', '50', '100', '200'],
-            onChange: (page, pageSize) => {
-              setPage(page);
-              setPageSize(pageSize);
-            },
-            style: { fontSize: '13px' },
+            showTotal: t => `共 ${t} 条`,
+            pageSizeOptions: ['20', '50', '100'],
+            onChange: (p, ps) => { setPage(p); setPageSize(ps); },
           }}
-          scroll={{ x: 900 }}
-          style={{ fontSize: '13px' }}
+          scroll={{ x: 750 }}
         />
-      </Card>
+      </div>
 
+      {/* ── 创建/编辑 Modal ── */}
       <Modal
-        title={editingKeyword ? '编辑关键词' : '新建关键词'}
+        title={editingKw ? '编辑关键词' : '新建关键词'}
         open={modalVisible}
-        onOk={handleModalOk}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-        }}
-        width={500}
+        onOk={handleSave}
+        onCancel={() => { setModalVisible(false); form.resetFields(); }}
+        okText={editingKw ? '保存' : '创建'}
+        width={480}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" size="small">
+        <Form form={form} layout="vertical" size="middle" style={{ marginTop: 16 }}>
           <Form.Item
             name="keyword"
             label="关键词"
             rules={[
               { required: true, message: '请输入关键词' },
-              { max: 100, message: '关键词长度不能超过100字符' },
+              { max: 100, message: '关键词不超过 100 字符' },
             ]}
           >
-            <Input placeholder="请输入关键词，如：VLA" />
+            <Input placeholder="例如：VLA、embodied AI、具身智能" />
           </Form.Item>
-
           <Form.Item name="category" label="分类">
+            <Select placeholder="选择分类（可选）" allowClear options={CATEGORIES} />
+          </Form.Item>
+          <Form.Item name="source_type" label="来源类型">
             <Select
-              placeholder="请选择分类"
-              allowClear
-              options={CATEGORIES}
-            />
-          </Form.Item>
-
-          <Form.Item name="sourceType" label="来源类型">
-            <Select
-              placeholder="请选择来源类型"
-              options={SOURCE_TYPES}
-            />
-          </Form.Item>
-
-          <Form.Item name="isActive" label="状态" valuePropName="checked">
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-          </Form.Item>
-
-          <Form.Item name="priority" label="优先级">
-            <InputNumber
-              min={0}
-              max={100}
-              placeholder="数字越大优先级越高"
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-
-          <Form.Item name="description" label="描述">
-            <TextArea
-              rows={3}
-              placeholder="请输入描述说明"
-              maxLength={500}
-              showCount
-            />
-          </Form.Item>
-
-          <Form.Item name="tags" label="标签">
-            <Select
-              mode="tags"
-              placeholder="请输入标签"
               options={[
-                { value: 'VLA', label: 'VLA' },
-                { value: '机器人', label: '机器人' },
-                { value: 'AI', label: 'AI' },
-                { value: '具身智能', label: '具身智能' },
-                { value: '计算机视觉', label: '计算机视觉' },
-                { value: '强化学习', label: '强化学习' },
+                { value: 'admin', label: '管理员创建' },
+                { value: 'user', label: '用户订阅' },
               ]}
             />
+          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="priority" label="优先级">
+              <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="0–100，越大越高" />
+            </Form.Item>
+            <Form.Item name="is_active" label="状态" valuePropName="checked">
+              <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+            </Form.Item>
+          </div>
+          <Form.Item name="description" label="描述">
+            <TextArea rows={3} placeholder="可选描述" maxLength={500} showCount />
           </Form.Item>
         </Form>
       </Modal>
 
-      <Modal
+      {/* ── 论文列表 Drawer ── */}
+      <Drawer
         title={
           <Space>
             <FileTextOutlined />
-            <span>{selectedKeyword?.keyword} - 相关论文</span>
+            <span>{selectedKw?.keyword}</span>
+            <Tag color="blue">{papersTotal} 篇论文</Tag>
           </Space>
         }
-        open={papersModalVisible}
-        onCancel={() => {
-          setPapersModalVisible(false);
-          setPapers([]);
-          setSelectedKeyword(null);
-        }}
-        footer={null}
-        width={1000}
+        open={papersDrawer}
+        onClose={() => { setPapersDrawer(false); setPapers([]); setSelectedKw(null); }}
+        width={800}
+        destroyOnHidden
       >
         <Table
           columns={[
             {
               title: '标题',
               dataIndex: 'title',
-              key: 'title',
-              render: (text: string, record: Paper) => (
-                <a
-                  href={`https://arxiv.org/abs/${record.arxivId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#1890ff' }}
-                >
-                  {text}
-                </a>
-              ),
-            },
-            {
-              title: '作者',
-              dataIndex: 'authors',
-              key: 'authors',
-              width: 200,
-              render: (authors: string[]) => (
-                <Text ellipsis style={{ maxWidth: 200 }}>
-                  {Array.isArray(authors) ? authors.join(', ') : authors}
-                </Text>
-              ),
+              render: (t: string, r: Paper) =>
+                r.arxivId ? (
+                  <a
+                    href={`https://arxiv.org/abs/${r.arxivId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#3b82f6', fontSize: 13, lineHeight: '1.4' }}
+                  >
+                    {t}
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 13 }}>{t}</span>
+                ),
             },
             {
               title: '发布日期',
               dataIndex: 'publishedDate',
-              key: 'publishedDate',
-              width: 120,
-              render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
+              width: 110,
+              render: (d: string) => d ? dayjs(d).format('YYYY-MM-DD') : '—',
             },
             {
               title: '引用数',
               dataIndex: 'citationCount',
-              key: 'citationCount',
-              width: 100,
-              render: (count: number) => count || 0,
-            },
-            {
-              title: '浏览数',
-              dataIndex: 'viewCount',
-              key: 'viewCount',
-              width: 100,
-              render: (count: number) => count || 0,
-            },
-            {
-              title: '收藏数',
-              dataIndex: 'favoriteCount',
-              key: 'favoriteCount',
-              width: 100,
-              render: (count: number) => count || 0,
+              width: 80,
+              render: (v: number) => v || 0,
             },
           ]}
           dataSource={papers}
@@ -923,33 +805,29 @@ export default function PaperSearchKeywordsPage() {
           size="small"
           pagination={{
             current: papersPage,
-            pageSize: papersPageSize,
+            pageSize: 10,
             total: papersTotal,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 篇论文`,
-            onChange: (page) => {
-              setPapersPage(page);
-              selectedKeyword && loadPapers(selectedKeyword.id, page);
+            showTotal: t => `共 ${t} 篇`,
+            onChange: p => {
+              setPapersPage(p);
+              selectedKw && loadPapers(selectedKw.id, p);
             },
           }}
-          scroll={{ y: 400 }}
+          scroll={{ y: 500 }}
         />
-      </Modal>
+      </Drawer>
 
+      {/* ── 导入 Modal ── */}
       <Modal
-        title="导入关键词"
-        open={importModalVisible}
-        onCancel={() => {
-          setImportModalVisible(false);
-          setImportFileList([]);
-        }}
-        footer={null}
-        width={600}
+        title="批量导入关键词"
+        open={importVisible}
+        onOk={handleImport}
+        onCancel={() => { setImportVisible(false); setImportFileList([]); }}
+        okText="开始导入"
+        width={520}
       >
         <Alert
-          message="CSV格式说明"
-          description="第一行为表头，每行包含：关键词,分类,来源类型,优先级,描述"
+          message="CSV 格式：关键词, 分类, 来源, 状态, 优先级, 描述（首行为表头）"
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
@@ -959,8 +837,9 @@ export default function PaperSearchKeywordsPage() {
           onChange={({ fileList }) => setImportFileList(fileList)}
           beforeUpload={() => false}
           accept=".csv"
+          maxCount={1}
         >
-          <Button icon={<UploadOutlined />}>选择文件</Button>
+          <Button icon={<UploadOutlined />}>选择 CSV 文件</Button>
         </Upload>
       </Modal>
     </div>

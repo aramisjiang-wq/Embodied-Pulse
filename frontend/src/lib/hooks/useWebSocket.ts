@@ -8,7 +8,11 @@ export type NotificationType =
   | 'comment_reply'
   | 'like'
   | 'favorite'
-  | 'system';
+  | 'system'
+  | 'repo_update'
+  | 'paper_new'
+  | 'video_new'
+  | 'job_new';
 
 export interface Notification {
   id: string;
@@ -46,7 +50,11 @@ export function useWebSocket(options: WebSocketOptions = {}) {
   const isConnectedRef = useRef(false);
 
   const connect = useCallback(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+    if (typeof window === 'undefined') return;
+    
+    const token = localStorage.getItem('user_token');
+    const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+    const wsUrl = token ? `${wsBaseUrl}/ws?token=${token}` : `${wsBaseUrl}/ws`;
     
     try {
       const ws = new WebSocket(wsUrl);
@@ -129,7 +137,10 @@ export function useWebSocket(options: WebSocketOptions = {}) {
   }, []);
 
   useEffect(() => {
-    connect();
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('user_token');
+    if (hasToken) {
+      connect();
+    }
 
     return () => {
       disconnect();
@@ -174,6 +185,26 @@ function getNotificationMessage(notification: Notification): { type: 'success' |
       return {
         type: 'warning',
         content: `系统通知：${notification.content}`,
+      };
+    case 'repo_update':
+      return {
+        type: 'info',
+        content: `项目更新：${notification.title}`,
+      };
+    case 'paper_new':
+      return {
+        type: 'info',
+        content: `新论文：${notification.title}`,
+      };
+    case 'video_new':
+      return {
+        type: 'info',
+        content: `新视频：${notification.title}`,
+      };
+    case 'job_new':
+      return {
+        type: 'info',
+        content: `新职位：${notification.title}`,
       };
     default:
       return null;

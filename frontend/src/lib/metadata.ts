@@ -126,22 +126,6 @@ export function generateJobMetadata(job: {
   })
 }
 
-export function generateNewsMetadata(news: {
-  id: string
-  title: string
-  content: string
-  source: string
-  publishedDate: string
-}): Metadata {
-  return generateSEOMetadata({
-    title: news.title,
-    description: news.content.substring(0, 160),
-    keywords: [news.source, '新闻', '具身智能', '行业动态'],
-    publishedTime: news.publishedDate,
-    author: [news.source]
-  })
-}
-
 export function generatePostMetadata(post: {
   id: string
   title: string

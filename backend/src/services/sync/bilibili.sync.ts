@@ -99,7 +99,7 @@ export async function syncBilibiliVideos(keyword?: string, maxResults: number = 
           playCount: viewCount,
           viewCount: viewCount,
           likeCount: video.like || video.stat?.like || 0,
-          tags: video.typename ? JSON.stringify([video.typename]) : null,
+          tags: video.typename ? JSON.stringify([video.typename]) : undefined,
         });
 
         syncedCount++;

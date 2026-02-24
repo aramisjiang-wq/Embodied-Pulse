@@ -15,10 +15,16 @@ export interface DiscoveryParams {
   take: number;
 }
 
+export interface DiscoveryResult {
+  items: any[];
+  total: number;
+  pinnedItems?: any[];
+}
+
 /**
  * 获取发现内容
  */
-export async function getDiscoveryContent(params: DiscoveryParams) {
+export async function getDiscoveryContent(params: DiscoveryParams): Promise<DiscoveryResult> {
   try {
     // 验证参数
     if (!params || typeof params.skip !== 'number' || typeof params.take !== 'number') {
@@ -37,32 +43,103 @@ export async function getDiscoveryContent(params: DiscoveryParams) {
       sortType,
     };
 
+    // 获取置顶内容
+    let pinnedItems: any[] = [];
+    if (params.contentType === 'all' || params.contentType === 'news') {
+      pinnedItems = await getPinnedItemsForDiscovery(params.contentType);
+    }
+
     if (params.contentType === 'community') {
-      return await getCommunityPosts(validatedParams);
+      const result = await getCommunityPosts(validatedParams);
+      return { ...result, pinnedItems };
+    }
+
+    if (params.contentType === 'news') {
+      const result = await getDailyNews(validatedParams);
+      return { ...result, pinnedItems };
     }
 
     // 根据内容类型和排序类型获取数据
+    let result;
     switch (params.contentType) {
       case 'github':
-        return await getGitHubRepos(validatedParams);
+        result = await getGitHubRepos(validatedParams);
+        break;
       case 'huggingface':
-        return await getHuggingFaceModels(validatedParams);
+        result = await getHuggingFaceModels(validatedParams);
+        break;
       case 'video':
-        return await getVideos(validatedParams);
+        result = await getVideos(validatedParams);
+        break;
       case 'paper':
-        return await getPapersContent(validatedParams);
-      case 'news':
-        return await getNews(validatedParams);
+        result = await getPapersContent(validatedParams);
+        break;
       default:
-        return await getAllContent(validatedParams);
+        result = await getAllContent(validatedParams);
     }
+
+    return { ...result, pinnedItems };
   } catch (error) {
     logger.error('Get discovery content error:', error);
     // 返回空结果而不是抛出错误，避免前端崩溃
     return {
       items: [],
       total: 0,
+      pinnedItems: [],
     };
+  }
+}
+
+/**
+ * 获取置顶内容用于发现模块
+ */
+async function getPinnedItemsForDiscovery(contentType?: string): Promise<any[]> {
+  try {
+    const { pinService } = await import('./pin.service');
+    
+    if (contentType === 'news') {
+      return pinService.getPinnedItems('news');
+    }
+    
+    return pinService.getPinnedItems();
+  } catch (error) {
+    logger.error('Get pinned items error:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取每日新闻
+ */
+async function getDailyNews(params: DiscoveryParams): Promise<{ items: any[]; total: number }> {
+  try {
+    const total = await prisma.dailyNews.count().catch(() => 0);
+
+    const news = await prisma.dailyNews.findMany({
+      orderBy: [{ isPinned: 'desc' }, { date: 'desc' }],
+      skip: params.skip,
+      take: params.take,
+    }).catch(() => []);
+
+    return {
+      items: (news || []).map(n => ({
+        id: n.id || '',
+        type: 'news' as const,
+        title: n.title || '',
+        content: n.content || '',
+        date: n.date || '',
+        viewCount: n.viewCount || 0,
+        isPinned: !!n.isPinned,
+        pinnedAt: n.pinnedAt || null,
+        publishedDate: n.date || '',
+        createdAt: n.createdAt || '',
+        updatedAt: n.updatedAt || '',
+      })),
+      total,
+    };
+  } catch (error) {
+    logger.error('Get daily news error:', error);
+    return { items: [], total: 0 };
   }
 }
 
@@ -338,7 +415,6 @@ async function getAllContent(params: DiscoveryParams) {
     getGitHubReposWithPagination(params.sortType, perSourceTake, perSourceSkip),
     getHuggingFaceModelsWithPagination(params.sortType, perSourceTake, perSourceSkip),
     getJobsWithPagination(params.sortType, perSourceTake, perSourceSkip),
-    getNewsWithPagination(params.sortType, perSourceTake, perSourceSkip),
   ]);
 
   // 安全地提取 items，如果某个请求失败则使用空数组
@@ -347,7 +423,6 @@ async function getAllContent(params: DiscoveryParams) {
   const repos = results[2].status === 'fulfilled' ? results[2].value : { items: [] };
   const models = results[3].status === 'fulfilled' ? results[3].value : { items: [] };
   const jobs = results[4].status === 'fulfilled' ? results[4].value : { items: [] };
-  const news = results[5].status === 'fulfilled' ? results[5].value : { items: [] };
 
   // 合并所有内容，确保 items 是数组
   const allItems = [
@@ -356,7 +431,6 @@ async function getAllContent(params: DiscoveryParams) {
     ...(Array.isArray(repos.items) ? repos.items : []),
     ...(Array.isArray(models.items) ? models.items : []),
     ...(Array.isArray(jobs.items) ? jobs.items : []),
-    ...(Array.isArray(news.items) ? news.items : []),
   ];
 
   // 根据排序类型重新排序
@@ -391,7 +465,6 @@ async function getAllContent(params: DiscoveryParams) {
     prisma.githubRepo.count(),
     prisma.huggingFaceModel.count(),
     prisma.job.count({ where: { status: 'open' } }),
-    prisma.news.count(),
   ]);
 
   const papersTotal = totalResults[0].status === 'fulfilled' ? totalResults[0].value : 0;
@@ -399,8 +472,7 @@ async function getAllContent(params: DiscoveryParams) {
   const reposTotal = totalResults[2].status === 'fulfilled' ? totalResults[2].value : 0;
   const modelsTotal = totalResults[3].status === 'fulfilled' ? totalResults[3].value : 0;
   const jobsTotal = totalResults[4].status === 'fulfilled' ? totalResults[4].value : 0;
-  const newsTotal = totalResults[5].status === 'fulfilled' ? totalResults[5].value : 0;
-  const total = papersTotal + videosTotal + reposTotal + modelsTotal + jobsTotal + newsTotal;
+  const total = papersTotal + videosTotal + reposTotal + modelsTotal + jobsTotal;
 
   // 安全地切片，确保不会越界
   const start = Math.max(0, params.skip);
@@ -649,51 +721,6 @@ async function getJobsWithPagination(sortType: 'hot' | 'latest', take: number, s
     };
   } catch (error) {
     logger.error('Get jobs error:', error);
-    return { items: [] };
-  }
-}
-
-/**
- * 获取新闻（带分页，用于getAllContent）
- */
-async function getNewsWithPagination(sortType: 'hot' | 'latest', take: number, skip: number) {
-  try {
-    let newsItems;
-
-    if (sortType === 'hot') {
-      newsItems = await prisma.news.findMany({
-        skip: skip,
-        take: take * 2,
-      }).catch(() => []);
-      
-      newsItems = (newsItems || [])
-        .map(n => ({
-          ...n,
-          hotScore: calculateNewsHotScore(n),
-        }))
-        .sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0))
-        .slice(0, take);
-    } else {
-      newsItems = await prisma.news.findMany({
-        orderBy: { publishedDate: 'desc' as const },
-        skip: skip,
-        take,
-      }).catch(() => []);
-    }
-
-    return {
-      items: (newsItems || []).map(n => ({
-        id: n.id || '',
-        type: 'news' as const,
-        title: n.title || '',
-        description: n.summary || '',
-        viewCount: n.viewCount || 0,
-        favoriteCount: n.likeCount || 0,
-        publishedDate: n.publishedDate || new Date(),
-      })),
-    };
-  } catch (error) {
-    logger.error('Get news error:', error);
     return { items: [] };
   }
 }
@@ -987,109 +1014,4 @@ function calculateTimeDecay(date: Date | string | null, halfLifeDays: number = 3
   
   // 确保最小值为0.1，避免完全消失
   return Math.max(decay, 0.1);
-}
-
-/**
- * 获取新闻（最热/最新）
- * 只返回与具身智能、机器人、AI相关的新闻
- */
-async function getNews(params: DiscoveryParams) {
-  try {
-    // 导入智能筛选函数
-    const { calculateRelevanceScore } = await import('./sync/smart-news-filter.sync');
-    
-    let allNews;
-    const allNewsCount = await userPrisma.news.count().catch(() => 0);
-
-    if (params.sortType === 'hot') {
-      // 最热：综合考虑浏览量、收藏数、热度评分、时间衰减
-      // 多取一些数据，用于筛选和计算热度分数
-      allNews = await userPrisma.news.findMany({
-        skip: params.skip,
-        take: params.take * 5, // 多取5倍数据，因为筛选后会减少
-      }).catch(() => []);
-    } else {
-      // 最新：按发布日期降序
-      // 多取一些数据，用于筛选
-      allNews = await userPrisma.news.findMany({
-        orderBy: { publishedDate: 'desc' as const },
-        skip: params.skip,
-        take: params.take * 5, // 多取5倍数据，因为筛选后会减少
-      }).catch(() => []);
-    }
-
-    // 筛选出相关新闻（具身智能、机器人、AI相关）
-    // 最低匹配分数设为5，确保只显示真正相关的新闻
-    const relevantNews = allNews.filter(news => {
-      // 检查是否已标记为相关
-      const description = news.description || '';
-      const isMarked = description.includes('[AI相关]');
-      
-      // 如果已标记，直接返回
-      if (isMarked) {
-        return true;
-      }
-      
-      // 否则实时计算相关性分数
-      const score = calculateRelevanceScore(news);
-      return score >= 8; // 提高最低分数到8，确保只显示真正相关的新闻
-    });
-
-    let news;
-    if (params.sortType === 'hot') {
-      // 计算热度分数并排序
-      news = relevantNews
-        .map(n => ({
-          ...n,
-          hotScore: calculateNewsHotScore(n),
-        }))
-        .sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0))
-        .slice(0, params.take);
-    } else {
-      // 最新：按发布日期降序（已经是降序，直接切片）
-      news = relevantNews.slice(0, params.take);
-    }
-
-    // 计算相关新闻的总数（用于分页）
-    // 这里我们使用一个近似值：相关新闻数量 = 筛选后的数量
-    // 如果需要精确值，需要查询所有新闻并筛选，但这样性能较差
-    const total = relevantNews.length;
-
-    return {
-      items: (news || []).map((n: any) => ({
-        id: n.id || '',
-        type: 'news' as const,
-        title: n.title || '',
-        description: n.description || '',
-        platform: n.platform || '',
-        url: n.url || '',
-        score: n.score || '',
-        view_count: n.view_count || n.viewCount || 0,
-        favorite_count: n.favorite_count || n.favoriteCount || 0,
-        published_date: n.published_date || n.publishedDate || n.created_at || n.createdAt || new Date(),
-      })),
-      total,
-    };
-  } catch (error) {
-    logger.error('Get news error:', error);
-    return { items: [], total: 0 };
-  }
-}
-
-/**
- * 计算新闻热度分数
- * 综合考虑浏览量、收藏数、热度评分、时间衰减
- */
-function calculateNewsHotScore(news: any): number {
-  const viewScore = (news.viewCount || 0) * 0.3;
-  const favoriteScore = (news.favoriteCount || 0) * 0.2;
-  // 热度评分（score字段可能是字符串，需要转换）
-  const scoreValue = news.score ? parseFloat(String(news.score)) || 0 : 0;
-  const scoreWeight = scoreValue * 0.3;
-  
-  // 时间衰减因子（新闻时效性很重要，使用较短的衰减周期）
-  const timeDecay = calculateTimeDecay(news.publishedDate || news.createdAt, 3); // 3天衰减周期
-  
-  const baseScore = viewScore + favoriteScore + scoreWeight;
-  return baseScore * timeDecay;
 }

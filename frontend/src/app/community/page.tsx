@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Layout, Card, Space, Button, Spin, Input, Row, Col, Empty, Typography, Avatar, Tag, Divider, App, Progress, Tooltip } from 'antd';
-import { PlusOutlined, SearchOutlined, FireOutlined, ClockCircleOutlined, SendOutlined, TrophyOutlined, RiseOutlined, UserOutlined, QuestionCircleOutlined, StarOutlined, CrownOutlined } from '@ant-design/icons';
+import { Card, Space, Button, Spin, Input, Row, Col, Empty, Typography, Avatar, Tag, Divider, App, Tooltip } from 'antd';
+import { PlusOutlined, SearchOutlined, FireOutlined, ClockCircleOutlined, TrophyOutlined, RiseOutlined, UserOutlined, QuestionCircleOutlined, StarOutlined, CrownOutlined } from '@ant-design/icons';
 import { communityApi } from '@/lib/api/community';
 import { Post } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
-import ShareModal from '@/components/ShareModal';
+import { DynamicComponents } from '@/lib/dynamicComponents';
 import QuickPostModal from '@/components/QuickPostModal';
 import PostCard from '@/components/PostCard';
 import { LEVEL_CONFIG, POINTS_CONFIG, getLevelBadge } from '@/lib/utils/levelUtils';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
-const { Content } = Layout;
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 const CATEGORIES = [
   { id: 'all', name: '全部', icon: '📋', description: '所有内容' },
@@ -55,7 +56,7 @@ export default function CommunityPage() {
       });
 
       if (!data || !data.items || !Array.isArray(data.items)) {
-        console.error('Invalid data structure:', data);
+        console.error('[Community] Invalid data structure:', data, 'type of data:', typeof data, 'data?.items:', data?.items);
         if (pageNum === 1) {
           setPosts([]);
         }
@@ -72,7 +73,7 @@ export default function CommunityPage() {
       setPage(pageNum);
       setHasMore(data.pagination?.hasNext || false);
     } catch (error: any) {
-      console.error('Load posts error:', error);
+      console.error('[Community] Load posts error:', error?.message || error, error?.response?.data ?? error);
       if (pageNum === 1) {
         setPosts([]);
       }
@@ -151,33 +152,63 @@ export default function CommunityPage() {
   };
 
   return (
-    <div style={{ background: '#fafafa', minHeight: 'calc(100vh - 64px)', padding: '0' }}>
-      <Content style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={2} style={{ margin: 0, marginBottom: 8, color: '#1a1a1a', fontWeight: 600 }}>
-            具身市集
-          </Title>
-          <Paragraph style={{ color: '#666', margin: 0, fontSize: 15 }}>
-            分享知识，交流想法，共同成长
-          </Paragraph>
+    <PageContainer loading={loading && posts.length === 0}>
+      <div className={styles.container}>
+        <div className={styles.pageHeader}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>
+              <FireOutlined style={{ fontSize: 20, color: '#262626' }} />
+            </div>
+            <div>
+              <h2 className={styles.pageTitle}>具身市集</h2>
+              <Paragraph className={styles.pageDescription}>
+                分享知识 · 交流想法 · 共同成长
+              </Paragraph>
+            </div>
+          </div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreatePost}
+            size="large"
+            style={{ 
+              borderRadius: 12, 
+              height: 44, 
+              background: 'rgba(255, 255, 255, 0.2)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)', 
+              color: '#fff', 
+              fontWeight: 600,
+              fontSize: 15,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            }}
+          >
+            发布内容
+          </Button>
         </div>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={16}>
             <Card
               variant="borderless"
-              style={{
-                borderRadius: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                marginBottom: 16,
-                background: '#fff',
-              }}
-              styles={{ body: { padding: '16px 20px' } }}
+              className={styles.filterCard}
+              styles={{ body: { padding: '20px 24px' } }}
             >
-              <Space style={{ width: '100%', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }} size="middle">
+              <Space className={styles.filterSection} size="middle">
                 <Input.Search
                   placeholder="搜索帖子、话题、用户..."
-                  style={{ width: 320 }}
+                  className={styles.searchInput}
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onSearch={handleSearch}
@@ -186,46 +217,59 @@ export default function CommunityPage() {
                 />
                 <Space size={8}>
                   <Button
-                    type={sort === 'hot' ? 'primary' : 'default'}
+                    type="default"
                     icon={<FireOutlined />}
                     onClick={() => setSort('hot')}
                     size="large"
+                    style={{
+                      borderRadius: '10px',
+                      fontWeight: 500,
+                      ...(sort === 'hot' ? {
+                        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
+                        border: 'none',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(249, 115, 22, 0.25)'
+                      } : {
+                        borderColor: '#e5e7eb',
+                        color: '#6b7280'
+                      })
+                    }}
                   >
                     热门
                   </Button>
                   <Button
-                    type={sort === 'latest' ? 'primary' : 'default'}
+                    type="default"
                     icon={<ClockCircleOutlined />}
                     onClick={() => setSort('latest')}
                     size="large"
+                    style={{
+                      borderRadius: '10px',
+                      fontWeight: 500,
+                      ...(sort === 'latest' ? {
+                        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
+                        border: 'none',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(249, 115, 22, 0.25)'
+                      } : {
+                        borderColor: '#e5e7eb',
+                        color: '#6b7280'
+                      })
+                    }}
                   >
                     最新
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={handleCreatePost}
-                    size="large"
-                  >
-                    发布内容
                   </Button>
                 </Space>
               </Space>
             </Card>
 
-            <div style={{ marginBottom: 16 }}>
+            <div className={styles.categoryButtons}>
               <Space size={8} wrap>
                 {CATEGORIES.map((category) => (
                   <Button
                     key={category.id}
                     type={selectedCategory === category.id ? 'primary' : 'default'}
                     onClick={() => setSelectedCategory(category.id)}
-                    style={{
-                      borderRadius: 20,
-                      height: 36,
-                      padding: '0 20px',
-                      fontSize: 14,
-                    }}
+                    className={styles.categoryButton}
                   >
                     {category.icon} {category.name}
                   </Button>
@@ -234,7 +278,7 @@ export default function CommunityPage() {
             </div>
 
             <Spin spinning={loading && posts.length === 0}>
-              <Space direction="vertical" style={{ width: '100%' }} size={16}>
+              <Space direction="vertical" className={styles.postsList} size={16}>
                 {posts.map((post) => (
                   <PostCard
                     key={post.id}
@@ -248,12 +292,12 @@ export default function CommunityPage() {
               </Space>
 
               {posts.length === 0 && !loading && (
-                <Card style={{ textAlign: 'center', padding: '80px 20px', borderRadius: 8 }}>
+                <Card className={styles.emptyCard}>
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description={
                       <div>
-                        <Text style={{ color: '#999', fontSize: 15, display: 'block', marginBottom: 16 }}>
+                        <Text className={styles.emptyText}>
                           暂无帖子，成为第一个发帖的人吧！
                         </Text>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreatePost}>
@@ -271,7 +315,7 @@ export default function CommunityPage() {
                     size="large"
                     onClick={() => loadPosts(page + 1)}
                     loading={loading}
-                    style={{ borderRadius: 20, padding: '0 40px', height: 40 }}
+                    className={styles.loadMoreButton}
                   >
                     {loading ? '加载中...' : '加载更多'}
                   </Button>
@@ -281,31 +325,34 @@ export default function CommunityPage() {
           </Col>
 
           <Col xs={24} lg={8}>
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
+            <Space direction="vertical" className={styles.sidebar} size={16}>
               <Card
                 variant="borderless"
-                style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-                styles={{ body: { padding: '16px 20px' } }}
+                className={styles.sidebarCard}
+                styles={{ body: { padding: '10px 14px' } }}
                 title={
                   <Space>
                     <FireOutlined style={{ color: '#ff4d4f' }} />
                     <Text strong>热门话题</Text>
+                    <Tooltip title="根据最近7天内帖子的标签使用频率自动生成">
+                      <QuestionCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
                   </Space>
                 }
               >
-                <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
                   {hotTopics.slice(0, 5).map((topic, index) => (
-                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Tag color={index < 3 ? 'red' : 'default'} style={{ margin: 0 }}>
+                    <div key={index} className={styles.hotTopicItem}>
+                      <Tag color={index < 3 ? 'red' : 'default'} className={styles.hotTopicRank}>
                         {index + 1}
                       </Tag>
-                      <Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Text className={styles.hotTopicText}>
                         {topic}
                       </Text>
                     </div>
                   ))}
                   {hotTopics.length === 0 && (
-                    <Text type="secondary" style={{ fontSize: 13 }}>
+                    <Text type="secondary" style={{ fontSize: 13, padding: '10px 0', display: 'block' }}>
                       暂无热门话题
                     </Text>
                   )}
@@ -314,8 +361,8 @@ export default function CommunityPage() {
 
               <Card
                 variant="borderless"
-                style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-                styles={{ body: { padding: '16px 20px' } }}
+                className={styles.sidebarCard}
+                styles={{ body: { padding: '10px 14px' } }}
                 title={
                   <Space>
                     <TrophyOutlined style={{ color: '#faad14' }} />
@@ -323,25 +370,26 @@ export default function CommunityPage() {
                   </Space>
                 }
               >
-                <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
                   {activeUsers.slice(0, 5).map((activeUser, index) => {
-                    const badge = getLevelBadge(activeUser.level || 1);
                     return (
-                    <div key={activeUser.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ position: 'relative' }}>
-                        <Avatar size={32} src={activeUser.avatar} icon={<UserOutlined />} style={{ border: `2px solid ${badge.color}` }} />
-                        <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', fontSize: 10 }}>{badge.icon}</span>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={{ display: 'block', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div key={activeUser.id} className={styles.activeUserItem}>
+                      <Avatar 
+                        size={28} 
+                        src={activeUser.avatar || activeUser.avatarUrl} 
+                        icon={<UserOutlined />} 
+                        style={{ 
+                          border: '1.5px solid #e5e7eb',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }} 
+                      />
+                      <div className={styles.activeUserInfo}>
+                        <Text className={styles.activeUserName}>
                           {activeUser.username}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {badge.icon} LV{activeUser.level} · {activeUser.points}积分
                         </Text>
                       </div>
                       {index < 3 && (
-                        <Tag color="gold" style={{ margin: 0 }}>
+                        <Tag color="gold" style={{ margin: 0, borderRadius: '6px', fontWeight: 500 }}>
                           TOP{index + 1}
                         </Tag>
                       )}
@@ -349,7 +397,7 @@ export default function CommunityPage() {
                     );
                   })}
                   {activeUsers.length === 0 && (
-                    <Text type="secondary" style={{ fontSize: 13 }}>
+                    <Text type="secondary" style={{ fontSize: 13, padding: '10px 0', display: 'block' }}>
                       暂无活跃用户
                     </Text>
                   )}
@@ -358,8 +406,8 @@ export default function CommunityPage() {
 
               <Card
                 variant="borderless"
-                style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-                styles={{ body: { padding: '16px 20px' } }}
+                className={styles.sidebarCard}
+                styles={{ body: { padding: '10px 14px' } }}
                 title={
                   <Space>
                     <CrownOutlined style={{ color: '#ffd700' }} />
@@ -370,16 +418,16 @@ export default function CommunityPage() {
                   </Space>
                 }
               >
-                <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
                   {LEVEL_CONFIG.slice(0, 6).map((level) => (
-                    <div key={level.level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 16 }}>{level.icon}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 12, fontWeight: 500 }}>
+                    <div key={level.level} className={styles.levelItem}>
+                      <span className={styles.levelIcon}>{level.icon}</span>
+                      <div className={styles.levelInfo}>
+                        <div className={styles.levelHeader}>
+                          <Text className={styles.levelName}>
                             LV{level.level} {level.name}
                           </Text>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                          <Text type="secondary" className={styles.levelRange}>
                             {level.maxPoints === Infinity ? `${level.minPoints}+` : `${level.minPoints}-${level.maxPoints}`}
                           </Text>
                         </div>
@@ -391,8 +439,8 @@ export default function CommunityPage() {
 
               <Card
                 variant="borderless"
-                style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-                styles={{ body: { padding: '16px 20px' } }}
+                className={styles.sidebarCard}
+                styles={{ body: { padding: '10px 14px' } }}
                 title={
                   <Space>
                     <StarOutlined style={{ color: '#ff4d4f' }} />
@@ -400,24 +448,24 @@ export default function CommunityPage() {
                   </Space>
                 }
               >
-                <Space direction="vertical" style={{ width: '100%' }} size={6}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                  <div className={styles.pointsItem}>
                     <span>发布帖子</span>
                     <Tag color="green">+{POINTS_CONFIG.post}</Tag>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <div className={styles.pointsItem}>
                     <span>发表评论</span>
                     <Tag color="green">+{POINTS_CONFIG.comment}</Tag>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <div className={styles.pointsItem}>
                     <span>收到点赞</span>
                     <Tag color="green">+{POINTS_CONFIG.liked}</Tag>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <div className={styles.pointsItem}>
                     <span>收到收藏</span>
                     <Tag color="green">+{POINTS_CONFIG.favorited}</Tag>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <div className={styles.pointsItem}>
                     <span>每日签到</span>
                     <Tag color="blue">+{POINTS_CONFIG.dailyLogin}</Tag>
                   </div>
@@ -426,8 +474,8 @@ export default function CommunityPage() {
 
               <Card
                 variant="borderless"
-                style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-                styles={{ body: { padding: '16px 20px' } }}
+                className={styles.sidebarCard}
+                styles={{ body: { padding: '10px 14px' } }}
                 title={
                   <Space>
                     <RiseOutlined style={{ color: '#52c41a' }} />
@@ -435,15 +483,15 @@ export default function CommunityPage() {
                   </Space>
                 }
               >
-                <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
                   {CATEGORIES.filter(c => c.id !== 'all').map((category) => (
-                    <div key={category.id}>
-                      <Text style={{ fontSize: 13, fontWeight: 500 }}>
+                    <div key={category.id} className={styles.categoryInfoItem}>
+                      <Text className={styles.categoryInfoName}>
                         {category.icon} {category.name}
                       </Text>
-                      <Paragraph style={{ fontSize: 12, color: '#666', margin: '4px 0 0 0' }}>
+                      <Text type="secondary" className={styles.categoryInfoDesc}>
                         {category.description}
-                      </Paragraph>
+                      </Text>
                     </div>
                   ))}
                 </Space>
@@ -451,9 +499,9 @@ export default function CommunityPage() {
             </Space>
           </Col>
         </Row>
-      </Content>
+      </div>
 
-      <ShareModal
+      <DynamicComponents.ShareModal
         open={shareOpen}
         title={shareTitle}
         url={shareUrl}
@@ -465,6 +513,6 @@ export default function CommunityPage() {
         onClose={() => setShowPostModal(false)}
         onSuccess={() => loadPosts(1)}
       />
-    </div>
+    </PageContainer>
   );
 }

@@ -304,29 +304,35 @@ export async function createOrUpdateGithubUser(data: CreateGithubUserData): Prom
  */
 export async function authenticateUser(email: string, password: string): Promise<User> {
   try {
-    // 获取用户
+    logger.debug(`[authenticateUser] Starting authentication for email: ${email}`);
+    
     const user = await getUserByEmail(email);
+    logger.debug(`[authenticateUser] getUserByEmail result: ${user ? `found (id: ${user.id})` : 'not found'}`);
+    
     if (!user) {
+      logger.debug(`[authenticateUser] User not found, throwing INVALID_CREDENTIALS`);
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // 检查是否有密码(GitHub用户可能没有密码)
     if (!user.passwordHash) {
+      logger.debug(`[authenticateUser] User has no password hash, throwing INVALID_CREDENTIALS`);
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // 验证密码
+    logger.debug(`[authenticateUser] Verifying password...`);
     const isValid = await verifyPassword(password, user.passwordHash);
+    logger.debug(`[authenticateUser] Password verification result: ${isValid}`);
+    
     if (!isValid) {
+      logger.debug(`[authenticateUser] Invalid password, throwing INVALID_CREDENTIALS`);
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // 检查用户是否被禁用
     if (!user.isActive) {
+      logger.debug(`[authenticateUser] User is not active, throwing USER_BANNED`);
       throw new Error('USER_BANNED');
     }
 
-    // 更新最近登录时间
     await userPrisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
@@ -335,6 +341,7 @@ export async function authenticateUser(email: string, password: string): Promise
     logger.info(`User authenticated: ${user.id} (${user.username})`);
     return user;
   } catch (error: any) {
+    logger.error(`[authenticateUser] Error caught: ${error.message}`, { stack: error.stack });
     if (error.message === 'INVALID_CREDENTIALS' || error.message === 'USER_BANNED') {
       throw error;
     }
@@ -408,12 +415,11 @@ export async function updateUserPoints(userId: string, points: number, actionTyp
       // 创建积分记录
       userPrisma.pointRecord.create({
         data: {
-          user_id: userId,
+          userId,
           points,
-          action_type: actionType,
+          actionType,
           description,
-          balance_after: newPoints,
-        } as any,
+        },
       }),
     ]);
 
@@ -426,10 +432,15 @@ export async function updateUserPoints(userId: string, points: number, actionTyp
 
 /**
  * 根据积分计算用户等级
+ * 与前端 LEVEL_CONFIG 保持一致
  */
-function calculateLevel(points: number): number {
-  if (points < 500) return Math.floor(points / 100) + 1;
-  if (points < 2000) return Math.floor((points - 500) / 300) + 5;
-  if (points < 5000) return Math.floor((points - 2000) / 600) + 10;
-  return Math.floor((points - 5000) / 1000) + 15;
+export function calculateLevel(points: number): number {
+  if (points >= 3000) return 8;
+  if (points >= 2000) return 7;
+  if (points >= 1500) return 6;
+  if (points >= 1000) return 5;
+  if (points >= 600) return 4;
+  if (points >= 300) return 3;
+  if (points >= 100) return 2;
+  return 1;
 }

@@ -83,54 +83,15 @@ export const syncApi = {
   },
 
   /**
-   * 同步GitHub岗位
+   * 同步招聘岗位：可选清空后同步 2026 滚动招聘 + 逐际动力
    */
-  syncJobs: async (params: { maxResults?: number }): Promise<SyncResult> => {
-    const response = await apiClient.post<SyncResult>('/admin/sync/jobs', params);
-    if (response.code !== 0) {
-      throw new Error(response.message);
-    }
-    return response.data;
-  },
-
-  /**
-   * 同步热点新闻
-   */
-  syncHotNews: async (params: { platform?: string; maxResults?: number }): Promise<SyncResult> => {
-    const response = await apiClient.post<SyncResult>('/admin/sync/hot-news', params);
-    if (response.code !== 0) {
-      throw new Error(response.message);
-    }
-    return response.data;
-  },
-
-  /**
-   * 同步DailyHotApi新闻
-   */
-  syncDailyHotApi: async (params: { platform?: string; maxResults?: number }): Promise<SyncResult> => {
-    const response = await apiClient.post<SyncResult>('/admin/sync/dailyhot-api', params);
-    if (response.code !== 0) {
-      throw new Error(response.message);
-    }
-    return response.data;
-  },
-
-  /**
-   * 同步36kr新闻
-   */
-  sync36kr: async (params: { maxResults?: number; useApi?: boolean }): Promise<SyncResult> => {
-    const response = await apiClient.post<SyncResult>('/admin/sync/36kr', params);
-    if (response.code !== 0) {
-      throw new Error(response.message);
-    }
-    return response.data;
-  },
-
-  /**
-   * 同步科技新闻（TechCrunch等，作为36kr的替代）
-   */
-  syncTechNews: async (params: { maxResults?: number; sources?: string[] }): Promise<SyncResult> => {
-    const response = await apiClient.post<SyncResult>('/admin/sync/tech-news', params);
+  syncJobs: async (params?: {
+    maxResults?: number;
+    clearExisting?: boolean;
+    year?: number;
+    syncLimX?: boolean;
+  }): Promise<SyncResult & { totalSynced?: number; limx?: SyncResult }> => {
+    const response = await apiClient.post<SyncResult & { totalSynced?: number; limx?: SyncResult }>('/admin/sync/jobs', params ?? {});
     if (response.code !== 0) {
       throw new Error(response.message);
     }

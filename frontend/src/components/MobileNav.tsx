@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
+import { getLevelByPoints } from '@/lib/utils/levelUtils';
 
 interface MobileNavProps {
   visible: boolean;
@@ -30,6 +31,9 @@ interface MobileNavProps {
 export default function MobileNav({ visible, onClose }: MobileNavProps) {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  
+  // 基于积分计算当前等级
+  const userLevel = user ? getLevelByPoints(user.points || 0) : null;
 
   const handleLogout = () => {
     logout();
@@ -156,7 +160,7 @@ export default function MobileNav({ visible, onClose }: MobileNavProps) {
                   <div>
                     <div style={{ fontWeight: 500 }}>{user.username}</div>
                     <div style={{ fontSize: 12, color: '#999' }}>
-                      LV{user.level} · {user.points}积分
+                      LV{userLevel?.level || 1} · {user.points}积分
                     </div>
                   </div>
                 </div>

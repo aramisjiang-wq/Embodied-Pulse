@@ -1,5 +1,6 @@
 import express from 'express'
 import userPrismaAny from '../config/database.user'
+import { logger } from '../utils/logger'
 
 const router = express.Router()
 const userPrisma = userPrismaAny as any;
@@ -139,7 +140,7 @@ ${allUrls.map(url => `  <url>
     res.set('Content-Type', 'application/xml')
     res.send(sitemap)
   } catch (error) {
-    console.error('Error generating sitemap:', error)
+    logger.error('Error generating sitemap:', error)
     res.status(500).send('Error generating sitemap')
   }
 })

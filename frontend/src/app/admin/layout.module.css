@@ -1,0 +1,104 @@
+/* ═══════════════════════════════════════════════════════════════
+   管理端侧边栏样式
+   区分节点（分组标题）和按钮（子菜单项）
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 侧边栏容器 ─────────────────────────────────────────────── */
+
+.sider {
+  /* wrapper applied to Sider div */
+}
+
+/* ── 父级节点（分组标题）样式 ──────────────────────────────── */
+/* 让节点看起来是"分类标签"而非可点击按钮 */
+
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title) {
+  background: #f0f2f5 !important;
+  color: #8c8c8c !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  border-top: 1px solid #e8e8e8;
+  padding-right: 8px !important;
+}
+
+/* 首个分组不需要上边框 */
+.sider :global(.ant-menu-submenu:first-child > .ant-menu-submenu-title) {
+  border-top: none;
+}
+
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title:hover) {
+  background: #e8eaed !important;
+  color: #595959 !important;
+}
+
+/* 父节点的展开/收起箭头也统一成灰色 */
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title .ant-menu-submenu-arrow) {
+  color: #bfbfbf !important;
+}
+
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title .ant-menu-submenu-arrow::before),
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title .ant-menu-submenu-arrow::after) {
+  background: #bfbfbf !important;
+}
+
+/* 父节点图标颜色 */
+.sider :global(.ant-menu-submenu > .ant-menu-submenu-title .anticon) {
+  color: #8c8c8c !important;
+  font-size: 12px !important;
+}
+
+/* ── 子菜单项（导航按钮）样式 ─────────────────────────────── */
+
+.sider :global(.ant-menu-item) {
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 13px !important;
+  color: #374151 !important;
+  margin: 1px 6px !important;
+  width: calc(100% - 12px) !important;
+  border-radius: 6px !important;
+}
+
+.sider :global(.ant-menu-item:hover) {
+  background: #e8f0fe !important;
+  color: #1677ff !important;
+}
+
+.sider :global(.ant-menu-item:hover .anticon) {
+  color: #1677ff !important;
+}
+
+.sider :global(.ant-menu-item-selected) {
+  background: #e8f0fe !important;
+  color: #1677ff !important;
+  font-weight: 600 !important;
+}
+
+.sider :global(.ant-menu-item-selected .anticon) {
+  color: #1677ff !important;
+}
+
+/* 选中项左侧高亮条 */
+.sider :global(.ant-menu-item-selected::after) {
+  display: none !important;
+}
+
+/* 子菜单内的子列表背景 */
+.sider :global(.ant-menu-sub.ant-menu-inline) {
+  background: #fff !important;
+  padding: 4px 0 !important;
+}
+
+/* ── 子菜单项的图标颜色 ───────────────────────────────────── */
+
+.sider :global(.ant-menu-item .anticon) {
+  font-size: 13px !important;
+  color: #6b7280;
+}

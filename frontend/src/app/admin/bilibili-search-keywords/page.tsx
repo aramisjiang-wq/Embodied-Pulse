@@ -52,6 +52,7 @@ import {
 import { bilibiliSearchKeywordApi, BilibiliSearchKeyword, CreateKeywordData } from '@/lib/api/bilibili-search-keyword';
 import { getProxyImageUrl } from '@/utils/image-proxy';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
@@ -100,13 +101,14 @@ export default function BilibiliSearchKeywordsPage() {
         isActive: statusFilter,
         keyword: searchKeyword || undefined,
       });
-
-      const items = response.data.items || [];
+      const data = response?.data;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const totalCount = typeof data?.pagination?.total === 'number' ? data.pagination.total : 0;
       setKeywords(items);
-      setTotal(response.data.pagination.total || 0);
+      setTotal(totalCount);
     } catch (error: any) {
       console.error('Load keywords error:', error);
-      messageApi.error(error.message || '加载失败');
+      messageApi.error(error?.message || '加载失败');
       setKeywords([]);
       setTotal(0);
     } finally {
@@ -151,8 +153,7 @@ export default function BilibiliSearchKeywordsPage() {
         isActive: statusFilter,
         keyword: searchKeyword || undefined,
       });
-
-      const items = response.data.items || [];
+      const items = Array.isArray(response?.data?.items) ? response.data.items : [];
       
       const csvContent = [
         ['关键词', '分类', '优先级', '状态', '描述', '创建时间'].join(','),
@@ -230,8 +231,9 @@ export default function BilibiliSearchKeywordsPage() {
 
         const result = await bilibiliSearchKeywordApi.batchCreateKeywords(keywordsToImport);
         
-        if (result.data?.errors && result.data.errors.length > 0) {
-          messageApi.warning(`导入完成：成功 ${result.data.success?.length || 0} 个，失败 ${result.data.errors.length} 个`);
+        const resultData = result.data as { errors?: unknown[]; success?: unknown[] } | undefined;
+        if (resultData?.errors && Array.isArray(resultData.errors) && resultData.errors.length > 0) {
+          messageApi.warning(`导入完成：成功 ${resultData.success?.length || 0} 个，失败 ${resultData.errors.length} 个`);
         } else {
           messageApi.success(`导入成功：共 ${keywordsToImport.length} 个关键词`);
         }
@@ -464,19 +466,21 @@ export default function BilibiliSearchKeywordsPage() {
     setModalVisible(true);
   };
 
+  const tagStyle = { fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 500 } as const;
+
   const columns = [
     {
       title: '关键词',
       dataIndex: 'keyword',
       key: 'keyword',
-      width: 120,
+      width: 140,
       fixed: 'left' as const,
       render: (text: string, record: BilibiliSearchKeyword) => (
-        <Space size={4}>
-          <span style={{ fontWeight: 500, fontSize: 13 }}>{text}</span>
+        <Space size={6}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>{text}</span>
           {record.priority > 0 && (
             <Tooltip title={`优先级: ${record.priority}`}>
-              <Tag color="orange" style={{ fontSize: 11, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>P{record.priority}</Tag>
+              <Tag color="orange" style={tagStyle}>P{record.priority}</Tag>
             </Tooltip>
           )}
         </Space>
@@ -486,12 +490,12 @@ export default function BilibiliSearchKeywordsPage() {
       title: '分类',
       dataIndex: 'category',
       key: 'category',
-      width: 80,
+      width: 100,
       render: (category: string) => (
         category ? (
-          <Tag color="blue" style={{ fontSize: 11, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>{category}</Tag>
+          <Tag color="blue" style={tagStyle}>{category}</Tag>
         ) : (
-          <span style={{ color: '#999', fontSize: 12 }}>-</span>
+          <span style={{ color: '#9ca3af', fontSize: 14 }}>—</span>
         )
       ),
     },
@@ -499,55 +503,27 @@ export default function BilibiliSearchKeywordsPage() {
       title: '优先级',
       dataIndex: 'priority',
       key: 'priority',
-      width: 70,
+      width: 80,
       sorter: (a: BilibiliSearchKeyword, b: BilibiliSearchKeyword) => a.priority - b.priority,
-      render: (priority: number) => {
-        return (
-          <Tag
-            color={priority > 0 ? 'orange' : 'default'}
-            style={{
-              fontSize: 11,
-              padding: '2px 8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              borderRadius: 4,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {priority}
-          </Tag>
-        );
-      },
+      render: (priority: number) => (
+        <Tag color={priority > 0 ? 'orange' : 'default'} style={tagStyle}>{priority}</Tag>
+      ),
     },
     {
       title: '视频数',
       dataIndex: 'videoCount',
       key: 'videoCount',
-      width: 70,
+      width: 84,
       sorter: (a: any, b: any) => (a.videoCount || 0) - (b.videoCount || 0),
-      render: (count: number) => {
-        return (
-          <Tag
-            color={count > 0 ? 'green' : 'default'}
-            style={{
-              fontSize: 11,
-              padding: '2px 8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              borderRadius: 4,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {count || 0}
-          </Tag>
-        );
-      },
+      render: (count: number) => (
+        <Tag color={(count || 0) > 0 ? 'green' : 'default'} style={tagStyle}>{count || 0}</Tag>
+      ),
     },
     {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
-      width: 80,
+      width: 90,
       filters: [
         { text: '启用', value: true },
         { text: '禁用', value: false },
@@ -566,13 +542,11 @@ export default function BilibiliSearchKeywordsPage() {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
-      width: 150,
+      width: 160,
       ellipsis: true,
       render: (description: string) => (
-        <Tooltip title={description || '-'}>
-          <span style={{ color: '#666', fontSize: 12 }}>
-            {description || '-'}
-          </span>
+        <Tooltip title={description || '—'}>
+          <span style={{ color: '#6b7280', fontSize: 14 }}>{description || '—'}</span>
         </Tooltip>
       ),
     },
@@ -580,26 +554,26 @@ export default function BilibiliSearchKeywordsPage() {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 130,
-      sorter: (a: BilibiliSearchKeyword, b: BilibiliSearchKeyword) => 
+      width: 120,
+      sorter: (a: BilibiliSearchKeyword, b: BilibiliSearchKeyword) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (date: string) => (
         <Tooltip title={dayjs(date).format('YYYY-MM-DD HH:mm:ss')}>
-          <span style={{ fontSize: 12 }}>{dayjs(date).format('MM-DD HH:mm')}</span>
+          <span style={{ fontSize: 14 }}>{dayjs(date).format('MM-DD HH:mm')}</span>
         </Tooltip>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 150,
       fixed: 'right' as const,
       render: (_: any, record: BilibiliSearchKeyword) => (
-        <Space size={4}>
+        <Space size={6}>
           <Tooltip title="查看相关视频">
             <Button
               type="text"
-              size="small"
+              size="middle"
               icon={<VideoCameraOutlined />}
               onClick={() => loadVideosForKeyword(record)}
             />
@@ -607,25 +581,20 @@ export default function BilibiliSearchKeywordsPage() {
           <Tooltip title="编辑">
             <Button
               type="text"
-              size="small"
+              size="middle"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
           <Popconfirm
-            title="确认删除?"
+            title="确认删除？"
             description="删除后不会影响已抓取的视频"
             onConfirm={() => handleDelete(record.id)}
             okText="确认"
             cancelText="取消"
           >
             <Tooltip title="删除">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-              />
+              <Button type="text" size="middle" danger icon={<DeleteOutlined />} />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -634,15 +603,16 @@ export default function BilibiliSearchKeywordsPage() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className={styles.pageWrapper}>
       <Card>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Bilibili搜索词管理</h1>
-            <Space>
+          <div className={styles.pageHeader}>
+            <h1 className={styles.pageTitle}>B站搜索词管理</h1>
+            <div className={styles.filterRow}>
               <Input.Search
                 placeholder="搜索关键词..."
-                style={{ width: 200 }}
+                style={{ width: 240 }}
+                size="middle"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 onSearch={() => setPage(1)}
@@ -651,7 +621,8 @@ export default function BilibiliSearchKeywordsPage() {
               />
               <Select
                 placeholder="分类筛选"
-                style={{ width: 120 }}
+                style={{ width: 140 }}
+                size="middle"
                 value={categoryFilter || undefined}
                 onChange={(value) => {
                   setCategoryFilter(value);
@@ -664,8 +635,9 @@ export default function BilibiliSearchKeywordsPage() {
                 ))}
               </Select>
               <Select
-                placeholder="状态筛选"
-                style={{ width: 100 }}
+                placeholder="状态"
+                style={{ width: 110 }}
+                size="middle"
                 value={statusFilter === undefined ? undefined : statusFilter ? 'true' : 'false'}
                 onChange={(value) => {
                   setStatusFilter(value === undefined ? undefined : value === 'true');
@@ -676,129 +648,126 @@ export default function BilibiliSearchKeywordsPage() {
                 <Select.Option value="true">启用</Select.Option>
                 <Select.Option value="false">禁用</Select.Option>
               </Select>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={loadKeywords}
-              >
+              <Button icon={<ReloadOutlined />} onClick={loadKeywords} size="middle">
                 刷新
               </Button>
-            </Space>
+            </div>
           </div>
 
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Space>
+          <div className={styles.actionRow}>
+            <Space size="middle" wrap>
               <Button
                 type="default"
                 icon={<CheckCircleOutlined />}
                 onClick={handleEnableAllKeywords}
+                size="middle"
               >
-                启用所有关键词
+                启用全部
               </Button>
               <Button
                 type="default"
                 icon={<CloseCircleOutlined />}
                 onClick={handleDisableAllKeywords}
+                size="middle"
               >
-                禁用所有关键词
+                禁用全部
               </Button>
-              <Button
-                icon={<UploadOutlined />}
-                onClick={() => setImportModalVisible(true)}
-              >
+              <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)} size="middle">
                 导入
               </Button>
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleExport}
                 loading={exportLoading}
+                size="middle"
               >
                 导出
               </Button>
             </Space>
-            <Space>
+            <Space size="middle">
               <Button
                 type="primary"
                 icon={<ThunderboltOutlined />}
                 onClick={handleSyncAllKeywords}
                 loading={syncLoading}
+                size="middle"
               >
                 一键抓取视频
               </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleAdd}
-              >
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} size="middle">
                 新增关键词
               </Button>
             </Space>
-          </Space>
+          </div>
 
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Row gutter={[16, 16]} className={styles.statsRow}>
             <Col xs={12} sm={12} md={6} lg={6} xl={6}>
-              <Card size="small" style={{ borderRadius: 8 }}>
+              <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="总关键词数"
                   value={total}
                   prefix={<InfoCircleOutlined />}
-                  valueStyle={{ color: '#1890ff', fontSize: 20 }}
-                  suffix={<span style={{ fontSize: 12, color: '#999' }}>个</span>}
+                  valueStyle={{ color: '#1890ff', fontSize: 22 }}
+                  suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
               </Card>
             </Col>
             <Col xs={12} sm={12} md={6} lg={6} xl={6}>
-              <Card size="small" style={{ borderRadius: 8 }}>
+              <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="启用关键词"
                   value={keywords.filter(k => k.isActive).length}
-                  valueStyle={{ color: '#52c41a', fontSize: 20 }}
-                  suffix={<span style={{ fontSize: 12, color: '#999' }}>个</span>}
+                  valueStyle={{ color: '#52c41a', fontSize: 22 }}
+                  suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
               </Card>
             </Col>
             <Col xs={12} sm={12} md={6} lg={6} xl={6}>
-              <Card size="small" style={{ borderRadius: 8 }}>
+              <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="禁用关键词"
                   value={keywords.filter(k => !k.isActive).length}
-                  valueStyle={{ color: '#ff4d4f', fontSize: 20 }}
-                  suffix={<span style={{ fontSize: 12, color: '#999' }}>个</span>}
+                  valueStyle={{ color: '#ef4444', fontSize: 22 }}
+                  suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
               </Card>
             </Col>
             <Col xs={12} sm={12} md={6} lg={6} xl={6}>
-              <Card size="small" style={{ borderRadius: 8 }}>
+              <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="关联视频"
                   value={keywords.reduce((sum, k) => sum + (k.videoCount || 0), 0)}
                   prefix={<VideoCameraOutlined />}
-                  valueStyle={{ color: '#722ed1', fontSize: 20 }}
-                  suffix={<span style={{ fontSize: 12, color: '#999' }}>个</span>}
+                  valueStyle={{ color: '#7c3aed', fontSize: 22 }}
+                  suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
               </Card>
             </Col>
           </Row>
 
-      <Table
-        columns={columns}
-        dataSource={keywords}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 1100 }}
-        pagination={{
-          current: page,
-          pageSize: pageSize,
-          total: total,
-          onChange: (p, s) => {
-            setPage(p);
-            setPageSize(s || 50);
-          },
-          showTotal: (total) => `共 ${total} 条`,
-          showSizeChanger: true,
-          pageSizeOptions: ['20', '50', '100', '200'],
-        }}
-        size="small"
-      />
+          <div className={styles.tableWrap}>
+            <Table
+              columns={columns}
+              dataSource={keywords}
+              rowKey="id"
+              loading={loading}
+              scroll={{ x: 1100 }}
+              locale={{ emptyText: total === 0 && !loading ? '暂无关键词，请先运行初始化脚本或点击「新增关键词」' : undefined }}
+              pagination={{
+                current: page,
+                pageSize: pageSize,
+                total: total,
+                onChange: (p, s) => {
+                  setPage(p);
+                  setPageSize(s || 50);
+                },
+                showTotal: (t) => `共 ${t} 条`,
+                showSizeChanger: true,
+                pageSizeOptions: ['20', '50', '100', '200'],
+              }}
+              size="middle"
+            />
+          </div>
 
       <Modal
         title={editingKeyword ? '编辑关键词' : '新增关键词'}

@@ -34,6 +34,10 @@ export default function GlobalSidebarWrapper({ children }: { children: React.Rea
 
   const shouldHideLayout = isAdminPage || hideLayoutPages.some(page => pathname?.startsWith(page));
 
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
   if (shouldHideLayout) {
     return <>{children}</>;
   }
@@ -43,18 +47,19 @@ export default function GlobalSidebarWrapper({ children }: { children: React.Rea
 
   return (
     <>
-      {mounted && <Header sidebarCollapsed={collapsed} onSidebarCollapse={setCollapsed} />}
-      {mounted && !isMobile && <GlobalSidebar collapsed={collapsed} onCollapse={setCollapsed} />}
+      <Header sidebarCollapsed={collapsed} onSidebarCollapse={setCollapsed} />
+      {!isMobile && <GlobalSidebar collapsed={collapsed} onCollapse={setCollapsed} />}
       <div 
         id="main-content"
         style={{ 
+          position: 'relative',
           marginTop: 64,
-          marginLeft: mounted ? marginLeft : 200,
-          width: mounted ? width : 'calc(100% - 200px)',
-          transition: 'all 0.2s',
+          marginLeft: isMobile ? 0 : (collapsed ? 80 : 200),
           minHeight: 'calc(100vh - 64px)',
           padding: 0,
-          overflowX: 'hidden'
+          overflowX: 'hidden',
+          boxSizing: 'border-box',
+          transition: 'margin-left 0.2s',
         }}
       >
         {children}

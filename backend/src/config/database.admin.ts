@@ -1,36 +1,19 @@
 /**
- * 管理端数据库连接
- * 存储所有管理员账号和权限信息
+ * 管理端数据库连接（与用户端完全独立，勿混用）
+ * - 环境变量：ADMIN_DATABASE_URL（上线必须配置，见 resolve-db-url.ts）
+ * - 默认（仅开发）：file:./prisma/dev-admin.db，会解析为绝对路径
+ * - 用途：管理员账号、admins 表及权限等，仅管理端登录 /admin 使用
  */
 
 import { PrismaClient as AdminPrismaClient } from '../../node_modules/.prisma/client-admin';
 import { logger } from '../utils/logger';
-import path from 'path';
-import fs from 'fs';
+import { resolveDbUrl } from './resolve-db-url';
 
-// 确保数据库路径正确
-let adminDbUrl = process.env.ADMIN_DATABASE_URL || 'file:./prisma/admin.db';
-
-// 如果使用相对路径，转换为绝对路径
-if (adminDbUrl.startsWith('file:./') || adminDbUrl.startsWith('file:')) {
-  const dbPath = adminDbUrl.replace('file:', '');
-  // 从 src/config/ 目录，需要回到项目根目录，然后到 prisma/admin.db
-  const absolutePath = path.resolve(__dirname, '..', '..', 'prisma', 'admin.db');
-  
-  if (fs.existsSync(absolutePath)) {
-    adminDbUrl = `file:${absolutePath}`;
-    logger.info(`Admin database path resolved to: ${absolutePath}`);
-  } else {
-    // 尝试相对路径解析
-    const relativePath = path.resolve(__dirname, '..', dbPath);
-    if (fs.existsSync(relativePath)) {
-      adminDbUrl = `file:${relativePath}`;
-      logger.info(`Admin database path resolved to: ${relativePath}`);
-    } else {
-      logger.error(`Admin database not found at: ${absolutePath} or ${relativePath}`);
-    }
-  }
-}
+const adminDbUrl = resolveDbUrl({
+  envKey: 'ADMIN_DATABASE_URL',
+  defaultUrl: 'file:./prisma/dev-admin.db',
+  dirnameOfCaller: __dirname,
+});
 
 const adminPrisma = new AdminPrismaClient({
   log: [

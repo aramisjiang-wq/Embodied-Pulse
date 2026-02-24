@@ -24,6 +24,7 @@ export async function getDiscovery(req: Request, res: Response, next: NextFuncti
 
     sendSuccess(res, {
       items: result.items,
+      pinnedItems: result.pinnedItems,
       pagination: buildPaginationResponse(page, size, result.total),
     });
   } catch (error) {

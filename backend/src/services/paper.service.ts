@@ -123,10 +123,22 @@ export async function getPaperById(paperId: string): Promise<Paper | null> {
 /**
  * 创建论文
  */
-export async function createPaper(data: Omit<Paper, 'id' | 'createdAt' | 'updatedAt' | 'viewCount' | 'favoriteCount' | 'shareCount'>): Promise<Paper> {
+export interface CreatePaperInput {
+  arxivId?: string | null;
+  title: string;
+  authors: string;
+  abstract?: string | null;
+  categories?: string | null;
+  pdfUrl?: string | null;
+  publishedDate?: Date | null;
+  citationCount?: number;
+  venue?: string | null;
+  isPinned?: boolean;
+  pinnedAt?: Date | null;
+}
+
+export async function createPaper(data: CreatePaperInput): Promise<Paper> {
   try {
-    // 使用upsert避免重复，基于arxivId去重
-    // 如果arxivId为空，生成一个临时唯一ID
     const uniqueId = data.arxivId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
     const paper = await prisma.paper.upsert({
@@ -153,6 +165,8 @@ export async function createPaper(data: Omit<Paper, 'id' | 'createdAt' | 'update
         publishedDate: data.publishedDate,
         citationCount: data.citationCount || 0,
         venue: data.venue,
+        isPinned: data.isPinned || false,
+        pinnedAt: data.pinnedAt || null,
         viewCount: 0,
         favoriteCount: 0,
         shareCount: 0,

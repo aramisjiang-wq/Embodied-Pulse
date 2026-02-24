@@ -1,4 +1,5 @@
 import userPrisma from '../config/database.user';
+import { logger } from '../utils/logger';
 
 const prisma = userPrisma;
 
@@ -41,16 +42,20 @@ export class PointsService {
 
       return { success: true };
     } catch (error) {
-      console.error('Add points error:', error);
+      logger.error('Add points error:', error);
       return { success: false, error };
     }
   }
 
   static calculateLevel(points: number): number {
-    if (points < 500) return Math.floor(points / 100) + 1;
-    if (points < 2000) return Math.floor((points - 500) / 300) + 5;
-    if (points < 5000) return Math.floor((points - 2000) / 600) + 10;
-    return Math.floor((points - 5000) / 1000) + 15;
+    if (points >= 3000) return 8;
+    if (points >= 2000) return 7;
+    if (points >= 1500) return 6;
+    if (points >= 1000) return 5;
+    if (points >= 600) return 4;
+    if (points >= 300) return 3;
+    if (points >= 100) return 2;
+    return 1;
   }
 
   static async checkAchievements(userId: string) {
@@ -82,7 +87,7 @@ export class PointsService {
         achievements.push({ id: 'new_creator', name: '新晋创作者', icon: '🎯' });
       }
 
-      if (user.points >= 5000) {
+      if (user.points >= 3000) {
         achievements.push({ id: 'points_master', name: '积分大师', icon: '💎' });
       } else if (user.points >= 1000) {
         achievements.push({ id: 'points_expert', name: '积分专家', icon: '⭐' });
@@ -90,7 +95,7 @@ export class PointsService {
 
       return { success: true, achievements };
     } catch (error) {
-      console.error('Check achievements error:', error);
+      logger.error('Check achievements error:', error);
       return { success: false, error };
     }
   }

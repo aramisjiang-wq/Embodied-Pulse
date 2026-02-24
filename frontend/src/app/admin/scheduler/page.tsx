@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Switch, Tag, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -143,7 +145,6 @@ export default function AdminSchedulerPage() {
       sync_bilibili: { color: 'pink', text: '同步Bilibili' },
       sync_youtube: { color: 'orange', text: '同步YouTube' },
       sync_jobs: { color: 'cyan', text: '同步岗位' },
-      sync_news: { color: 'red', text: '同步新闻' },
     };
     const config = typeMap[taskType] || { color: 'default', text: taskType };
     return <Tag color={config.color}>{config.text}</Tag>;
@@ -253,9 +254,9 @@ export default function AdminSchedulerPage() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>调度器管理</h1>
+    <PageContainer title="调度器管理" loading={loading && schedulers.length === 0}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>调度器管理</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           新建调度任务
         </Button>
@@ -302,7 +303,6 @@ export default function AdminSchedulerPage() {
               <Option value="sync_bilibili">同步Bilibili</Option>
               <Option value="sync_youtube">同步YouTube</Option>
               <Option value="sync_jobs">同步岗位</Option>
-              <Option value="sync_news">同步新闻</Option>
             </Select>
           </Form.Item>
 
@@ -328,6 +328,6 @@ export default function AdminSchedulerPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

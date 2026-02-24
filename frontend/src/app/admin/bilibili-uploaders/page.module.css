@@ -1,0 +1,170 @@
+/* 科技极简风 - B站UP主管理 */
+
+.pageWrapper {
+  padding: 20px 24px 32px;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: var(--bp-bg, #fafbfc);
+  min-height: 100vh;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--bp-text-primary, #0f172a);
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  font-size: 12px;
+  color: var(--bp-text-tertiary, #64748b);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.statsRow {
+  margin-bottom: 20px;
+}
+
+.statsRow :global(.ant-card) {
+  border-radius: 8px;
+  border: 1px solid var(--bp-border, #e2e8f0);
+  box-shadow: none;
+  background: var(--bp-bg-card, #fff);
+}
+
+.statsRow :global(.ant-statistic-title) {
+  font-size: 11px;
+  color: var(--bp-text-tertiary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.statsRow :global(.ant-statistic-content-value) {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--bp-text-primary, #0f172a);
+}
+
+.cardMain {
+  border-radius: 10px;
+  border: 1px solid var(--bp-border, #e2e8f0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: var(--bp-bg-card, #fff);
+  overflow: hidden;
+}
+
+.cardMain :global(.ant-card-body) {
+  padding: 16px 20px 20px;
+}
+
+/* 表格极简 */
+.tableWrap :global(.ant-table) {
+  font-size: 13px;
+}
+
+.tableWrap :global(.ant-table-thead > tr > th) {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bp-text-tertiary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--bp-bg-subtle, #f8fafc) !important;
+  border-bottom: 1px solid var(--bp-border, #e2e8f0);
+  padding: 10px 12px;
+}
+
+.tableWrap :global(.ant-table-tbody > tr > td) {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bp-border-light, #f1f5f9);
+  color: var(--bp-text-secondary, #334155);
+}
+
+.tableWrap :global(.ant-table-tbody > tr:hover > td) {
+  background: var(--bp-bg-subtle, #f8fafc) !important;
+}
+
+.uploaderInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.uploaderName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--bp-text-primary, #0f172a);
+}
+
+.uploaderDescription {
+  font-size: 11px;
+  color: var(--bp-text-tertiary, #64748b);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.tagChip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.tagChipCn {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.tagChipIntl {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.tagChipMedia {
+  background: rgba(139, 92, 246, 0.1);
+  color: #6d28d9;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.linkBilibili {
+  font-size: 12px;
+  color: var(--bp-accent, #0ea5e9);
+  font-weight: 500;
+}
+
+.linkBilibili:hover {
+  color: #0284c7;
+}
+
+.syncBadge {
+  font-size: 11px;
+  color: var(--bp-text-tertiary, #64748b);
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: 12px 16px 24px;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cardMain :global(.ant-card-body) {
+    padding: 12px 16px;
+  }
+}

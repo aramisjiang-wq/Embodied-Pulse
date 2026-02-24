@@ -16,6 +16,16 @@ export const userApi = {
     email?: string;
     bio?: string;
     avatarUrl?: string;
+    githubUrl?: string;
+    linkedinUrl?: string;
+    twitterUrl?: string;
+    websiteUrl?: string;
+    location?: string;
+    skills?: string;
+    interests?: string;
+    identityType?: string | null;
+    organizationName?: string | null;
+    region?: string | null;
   }): Promise<User> => {
     const response = await apiClient.put<User>('/user/profile', data);
     return response.data;

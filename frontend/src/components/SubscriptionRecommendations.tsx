@@ -1,16 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Button, Space, Tag, Empty, Spin, Row, Col, Typography, App } from 'antd';
+import { Card, Button, Tag, Empty, Spin, Row, Col, Typography, App, Progress, Tooltip } from 'antd';
 import { 
   PlusOutlined, 
   ThunderboltOutlined, 
   FireOutlined,
   RiseOutlined,
+  ReloadOutlined,
+  FileTextOutlined,
+  PlayCircleOutlined,
+  GithubOutlined,
+  RobotOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { subscriptionApi, Subscription } from '@/lib/api/subscription';
 
-const { Title, Text } = Typography;
+const { Text, Paragraph } = Typography;
 
 interface Recommendation {
   type: 'hot' | 'trending' | 'suggested';
@@ -22,6 +28,20 @@ interface Recommendation {
   reason: string;
   confidence: number;
 }
+
+const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  paper:       { label: '论文',     icon: <FileTextOutlined />,   color: '#7c3aed' },
+  video:       { label: '视频',     icon: <PlayCircleOutlined />, color: '#dc2626' },
+  repo:        { label: 'GitHub',   icon: <GithubOutlined />,     color: '#374151' },
+  huggingface: { label: 'HF 模型', icon: <RobotOutlined />,      color: '#d97706' },
+  job:         { label: '招聘',     icon: <TeamOutlined />,       color: '#0891b2' },
+};
+
+const REC_META = {
+  hot:       { label: '热门',   icon: <FireOutlined />,         color: '#ff4d4f', bg: '#fff1f0', border: '#ffa39e' },
+  trending:  { label: '趋势',   icon: <RiseOutlined />,         color: '#52c41a', bg: '#f6ffed', border: '#b7eb8f' },
+  suggested: { label: '智能',   icon: <ThunderboltOutlined />,  color: '#1677ff', bg: '#e6f4ff', border: '#91caff' },
+};
 
 export function SubscriptionRecommendations({ onCreateSubscription }: { onCreateSubscription: (data: {
   contentType: string;
@@ -40,9 +60,7 @@ export function SubscriptionRecommendations({ onCreateSubscription }: { onCreate
     try {
       const data = await subscriptionApi.getSubscriptions({ page: 1, size: 100 });
       const subscriptions = Array.isArray(data) ? data : (data.items || []);
-      
-      const recs = generateRecommendations(subscriptions);
-      setRecommendations(recs);
+      setRecommendations(generateRecommendations(subscriptions));
     } catch (error: unknown) {
       console.error('Load recommendations error:', error);
       message.error('加载推荐失败');
@@ -56,8 +74,8 @@ export function SubscriptionRecommendations({ onCreateSubscription }: { onCreate
   }, [loadRecommendations]);
 
   const generateRecommendations = (subscriptions: Subscription[]): Recommendation[] => {
-    const recommendations: Recommendation[] = [];
-    
+    const recs: Recommendation[] = [];
+
     const contentTypeCount = subscriptions.reduce((acc, sub) => {
       acc[sub.contentType] = (acc[sub.contentType] || 0) + 1;
       return acc;
@@ -68,11 +86,9 @@ export function SubscriptionRecommendations({ onCreateSubscription }: { onCreate
       try {
         const parsed = JSON.parse(sub.keywords) as unknown;
         return Array.isArray(parsed) ? parsed.filter((kw): kw is string => typeof kw === 'string') : [];
-      } catch {
-        return [];
-      }
+      } catch { return []; }
     });
-    const keywordFrequency = allKeywords.reduce((acc, kw) => {
+    const keywordFreq = allKeywords.reduce((acc, kw) => {
       acc[kw] = (acc[kw] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -81,83 +97,64 @@ export function SubscriptionRecommendations({ onCreateSubscription }: { onCreate
       if (!sub.tags) return [];
       try {
         const parsed = JSON.parse(sub.tags) as unknown;
-        return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === 'string') : [];
-      } catch {
-        return [];
-      }
+        return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : [];
+      } catch { return []; }
     });
-    const tagFrequency = allTags.reduce((acc, tag) => {
+    const tagFreq = allTags.reduce((acc, tag) => {
       acc[tag] = (acc[tag] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const topContentType = Object.entries(contentTypeCount)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'paper';
-
-    const hotKeywords = (Object.entries(keywordFrequency) as [string, number][])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([kw]) => kw);
-
-    const trendingTags = (Object.entries(tagFrequency) as [string, number][])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([tag]) => tag);
+    const topContentType = Object.entries(contentTypeCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'paper';
+    const hotKeywords = (Object.entries(keywordFreq) as [string, number][])
+      .sort((a, b) => b[1] - a[1]).slice(0, 10).map(([kw]) => kw);
+    const trendingTags = (Object.entries(tagFreq) as [string, number][])
+      .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([tag]) => tag);
 
     const embodiedAIKeywords = [
       'embodied AI', 'robotics', 'computer vision', 'deep learning',
       'reinforcement learning', 'navigation', 'manipulation', 'SLAM',
-      'human-robot interaction', 'multi-agent', 'simulation'
+      'human-robot interaction', 'multi-agent', 'simulation',
     ];
 
-    const hotRecs = hotKeywords.slice(0, 3).map((keyword, idx) => ({
+    recs.push(...hotKeywords.slice(0, 3).map((keyword, idx) => ({
       type: 'hot' as const,
-      title: `热门关键词: ${keyword}`,
+      title: keyword,
       contentType: topContentType,
       keywords: [keyword, ...embodiedAIKeywords.slice(idx, idx + 2)],
-      reason: `该关键词在您的历史订阅中出现${keywordFrequency[keyword]}次`,
-      confidence: 0.8 + (idx * 0.05),
-    }));
+      reason: `该关键词在您的历史订阅中出现 ${keywordFreq[keyword]} 次`,
+      confidence: Math.min(0.95, 0.85 - idx * 0.05),
+    })));
 
-    const trendingRecs = trendingTags.slice(0, 2).map((tag, idx) => ({
+    recs.push(...trendingTags.slice(0, 2).map((tag, idx) => ({
       type: 'trending' as const,
-      title: `热门标签: ${tag}`,
+      title: tag,
       contentType: topContentType,
       keywords: [tag],
       tags: [tag, ...trendingTags.slice(idx + 1, idx + 3)],
-      reason: `该标签在相关内容中较为流行`,
-      confidence: 0.7 + (idx * 0.05),
-    }));
+      reason: '该标签在相关内容中较为流行',
+      confidence: Math.min(0.95, 0.75 - idx * 0.05),
+    })));
 
-    const suggestedRecs = embodiedAIKeywords.slice(0, 3).map((keyword, idx) => {
-      const hasSimilar = hotKeywords.some(kw => 
-        kw.toLowerCase().includes(keyword.toLowerCase()) || 
-        keyword.toLowerCase().includes(kw.toLowerCase())
-      );
-      
-      return {
-        type: 'suggested' as const,
-        title: `推荐: ${keyword}`,
-        contentType: topContentType,
-        keywords: [keyword, ...embodiedAIKeywords.slice(idx + 3, idx + 5)],
-        reason: hasSimilar ? '基于您的订阅历史推荐' : 'Embodied AI热门研究方向',
-        confidence: 0.6 + (idx * 0.05),
-      };
-    });
+    recs.push(...embodiedAIKeywords.slice(0, 3).map((keyword, idx) => ({
+      type: 'suggested' as const,
+      title: keyword,
+      contentType: topContentType,
+      keywords: [keyword, ...embodiedAIKeywords.slice(idx + 3, idx + 5)],
+      reason: hotKeywords.some(kw => kw.toLowerCase().includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(kw.toLowerCase()))
+        ? '基于您的订阅历史推荐'
+        : 'Embodied AI 热门研究方向',
+      confidence: Math.min(0.95, 0.65 - idx * 0.05),
+    })));
 
-    recommendations.push(...hotRecs, ...trendingRecs, ...suggestedRecs);
-    
-    return recommendations.sort((a, b) => b.confidence - a.confidence).slice(0, 6);
+    return recs.sort((a, b) => b.confidence - a.confidence).slice(0, 6);
   };
 
-  const handleCreateFromRecommendation = async (rec: Recommendation) => {
+  const handleCreate = async (rec: Recommendation) => {
     const recId = `${rec.type}-${rec.title}`;
-    
     if (creating.has(recId)) return;
-    
     try {
       setCreating(prev => new Set(prev).add(recId));
-      
       await onCreateSubscription({
         contentType: rec.contentType,
         keywords: rec.keywords,
@@ -165,159 +162,162 @@ export function SubscriptionRecommendations({ onCreateSubscription }: { onCreate
         authors: rec.authors,
         notifyEnabled: true,
       });
-      
       message.success('订阅创建成功');
       loadRecommendations();
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : '创建订阅失败');
     } finally {
       setCreating(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(recId);
-        return newSet;
+        const s = new Set(prev);
+        s.delete(recId);
+        return s;
       });
     }
   };
 
-  const getRecommendationIcon = (type: string) => {
-    switch (type) {
-      case 'hot':
-        return <FireOutlined style={{ color: '#ff4d4f' }} />;
-      case 'trending':
-        return <RiseOutlined style={{ color: '#52c41a' }} />;
-      case 'suggested':
-        return <ThunderboltOutlined style={{ color: '#1890ff' }} />;
-      default:
-        return <ThunderboltOutlined />;
-    }
+  const confidenceColor = (v: number) => {
+    if (v >= 0.8) return '#52c41a';
+    if (v >= 0.6) return '#faad14';
+    return '#1677ff';
   };
-
-  const getRecommendationTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      hot: '热门推荐',
-      trending: '趋势推荐',
-      suggested: '智能推荐',
-    };
-    return labels[type] || type;
-  };
-
-  const getRecommendationTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      hot: 'red',
-      trending: 'green',
-      suggested: 'blue',
-    };
-    return colors[type] || 'default';
-  };
-
-  if (loading) {
-    return (
-      <Card>
-        <Spin />
-      </Card>
-    );
-  }
-
-  if (recommendations.length === 0) {
-    return (
-      <Card>
-        <Empty
-          description="暂无推荐"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      </Card>
-    );
-  }
 
   return (
-    <Card>
-      <div style={{ marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          <ThunderboltOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-          订阅推荐
-        </Title>
-        <Text type="secondary">
-          基于您的订阅历史和热门趋势为您推荐
-        </Text>
+    <div>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThunderboltOutlined style={{ color: '#1677ff', fontSize: 16 }} />
+          <Text strong style={{ fontSize: 15 }}>订阅推荐</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>基于您的订阅历史和热门趋势</Text>
+        </div>
+        <Tooltip title="刷新推荐">
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined spin={loading} />}
+            onClick={loadRecommendations}
+            disabled={loading}
+          />
+        </Tooltip>
       </div>
 
-      <Row gutter={[16, 16]}>
-        {recommendations.map((rec, idx) => (
-          <Col xs={24} sm={12} md={8} key={`${rec.type}-${idx}`}>
-            <Card
-              hoverable
-              size="small"
-              style={{ 
-                height: '100%',
-                borderLeft: `3px solid ${rec.type === 'hot' ? '#ff4d4f' : rec.type === 'trending' ? '#52c41a' : '#1890ff'}`,
-              }}
-              styles={{ body: { height: '100%', display: 'flex', flexDirection: 'column', gap: 12 } }}
-            >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 28 }}>
-                <Tag 
-                  icon={getRecommendationIcon(rec.type)}
-                  color={getRecommendationTypeColor(rec.type)}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <Spin size="default" />
+        </div>
+      ) : recommendations.length === 0 ? (
+        <Empty description="暂无推荐" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+      ) : (
+        <Row gutter={[12, 12]}>
+          {recommendations.map((rec, idx) => {
+            const recMeta = REC_META[rec.type];
+            const typeMeta = TYPE_META[rec.contentType];
+            const recId = `${rec.type}-${rec.title}`;
+            const pct = Math.round(rec.confidence * 100);
+
+            return (
+              <Col xs={24} sm={12} lg={8} key={`${rec.type}-${idx}`} style={{ display: 'flex' }}>
+                <Card
+                  hoverable
+                  style={{
+                    flex: 1,
+                    borderTop: `3px solid ${recMeta.color}`,
+                    borderRadius: 8,
+                  }}
+                  styles={{ body: { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, height: '100%' } }}
                 >
-                  {getRecommendationTypeLabel(rec.type)}
-                </Tag>
-                <Tag color="default">
-                  置信度: {(rec.confidence * 100).toFixed(0)}%
-                </Tag>
-              </div>
+                  {/* Top row: type badge + content type */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Tag
+                      icon={recMeta.icon}
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        padding: '2px 8px',
+                        color: recMeta.color,
+                        background: recMeta.bg,
+                        border: `1px solid ${recMeta.border}`,
+                        borderRadius: 4,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {recMeta.label}推荐
+                    </Tag>
+                    {typeMeta && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, color: typeMeta.color }}>
+                        {typeMeta.icon}
+                        <span>{typeMeta.label}</span>
+                      </span>
+                    )}
+                  </div>
 
-              <div style={{ minHeight: 40 }}>
-                <Text strong style={{ fontSize: 14 }}>
-                  {rec.title}
-                </Text>
-              </div>
+                  {/* Title */}
+                  <Text strong style={{ fontSize: 14, lineHeight: 1.5, display: 'block' }}>
+                    {rec.title}
+                  </Text>
 
-              <div style={{ minHeight: 36 }}>
-                <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                  {rec.reason}
-                </Text>
-              </div>
+                  {/* Reason */}
+                  <Paragraph
+                    type="secondary"
+                    style={{ fontSize: 12, lineHeight: 1.6, margin: 0 }}
+                    ellipsis={{ rows: 2 }}
+                  >
+                    {rec.reason}
+                  </Paragraph>
 
-              <div style={{ minHeight: 44 }}>
-                <Text strong style={{ fontSize: 12 }}>关键词：</Text>
-                <Space size={[4, 4]} wrap>
-                  {rec.keywords.slice(0, 3).map((kw, kidx) => (
-                    <Tag key={kidx} style={{ fontSize: 11 }}>{kw}</Tag>
-                  ))}
-                  {rec.keywords.length > 3 && <Tag>+{rec.keywords.length - 3}</Tag>}
-                </Space>
-              </div>
+                  {/* Keywords */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {rec.keywords.slice(0, 4).map((kw, kidx) => (
+                      <Tag
+                        key={kidx}
+                        style={{ margin: 0, fontSize: 11, padding: '1px 6px', borderRadius: 3, maxWidth: 120 }}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                          {kw}
+                        </span>
+                      </Tag>
+                    ))}
+                    {rec.keywords.length > 4 && (
+                      <Tag style={{ margin: 0, fontSize: 11, padding: '1px 6px', borderRadius: 3, color: '#8c8c8c', borderColor: '#d9d9d9' }}>
+                        +{rec.keywords.length - 4}
+                      </Tag>
+                    )}
+                  </div>
 
-              <div style={{ minHeight: 32 }}>
-                {rec.tags && rec.tags.length > 0 ? (
-                  <>
-                    <Text strong style={{ fontSize: 12 }}>标签：</Text>
-                    <Space size={[4, 4]} wrap>
-                      {rec.tags.slice(0, 2).map((tag, tidx) => (
-                        <Tag key={tidx} color="blue" style={{ fontSize: 11 }}>{tag}</Tag>
-                      ))}
-                      {rec.tags.length > 2 && <Tag>+{rec.tags.length - 2}</Tag>}
-                    </Space>
-                  </>
-                ) : (
-                  <Text type="secondary" style={{ fontSize: 12, visibility: 'hidden' }}>占位</Text>
-                )}
-              </div>
+                  {/* Confidence */}
+                  <div style={{ marginTop: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>匹配置信度</Text>
+                      <Text style={{ fontSize: 12, fontWeight: 600, color: confidenceColor(rec.confidence) }}>
+                        {pct}%
+                      </Text>
+                    </div>
+                    <Progress
+                      percent={pct}
+                      showInfo={false}
+                      size={['100%', 4]}
+                      strokeColor={confidenceColor(rec.confidence)}
+                      trailColor="#f0f0f0"
+                    />
+                  </div>
 
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                block
-                style={{ marginTop: 'auto' }}
-                loading={creating.has(`${rec.type}-${rec.title}`)}
-                onClick={() => handleCreateFromRecommendation(rec)}
-              >
-                创建订阅
-              </Button>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-    </Card>
+                  {/* CTA Button */}
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    block
+                    style={{ marginTop: 4 }}
+                    loading={creating.has(recId)}
+                    onClick={() => handleCreate(rec)}
+                  >
+                    一键创建订阅
+                  </Button>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+      )}
+    </div>
   );
 }

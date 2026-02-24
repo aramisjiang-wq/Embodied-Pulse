@@ -3,9 +3,9 @@ import apiClient from './client';
 export interface OverviewData {
   totalUploaders: number;
   totalVideos: number;
-  totalPlayCount: number;
+  total_play_count: number;
   newVideosThisMonth: number;
-  avgPlayCount: number;
+  avg_play_count: number;
   lastUpdatedAt: string;
 }
 
@@ -14,7 +14,7 @@ export interface PublishTrendData {
     period: string;
     uploaderId: string;
     uploaderName: string;
-    videoCount: number;
+    video_count: number;
   }>;
 }
 
@@ -32,11 +32,12 @@ export interface RankingItem {
   uploaderId: string;
   uploaderName: string;
   avatar: string;
-  videoCount: number;
-  totalPlayCount: number;
-  avgPlayCount: number;
-  growthRate: number;
-  year?: string;
+  video_count: number;
+  total_play_count: number;
+  avg_play_count: number;
+  total_like_count: number;
+  total_favorite_count: number;
+  growth_rate: number;
 }
 
 export interface BilibiliUploader {
@@ -44,6 +45,7 @@ export interface BilibiliUploader {
   mid: string;
   name: string;
   avatar?: string;
+  description?: string;
   tags?: string[];
   video_count: number;
 }
@@ -61,10 +63,10 @@ export interface UploaderDetail {
   };
   stats: {
     totalVideos: number;
-    totalPlayCount: number;
-    avgPlayCount: number;
-    totalLikeCount: number;
-    totalFavoriteCount: number;
+    total_play_count: number;
+    avg_play_count: number;
+    total_like_count: number;
+    total_favorite_count: number;
     avgDuration: number;
     newVideosThisMonth: number;
   };

@@ -29,8 +29,9 @@ const getJwtSecret = (secretName: string): string => {
 
 const JWT_SECRET: string = getJwtSecret('JWT_SECRET');
 const JWT_REFRESH_SECRET: string = getJwtSecret('JWT_REFRESH_SECRET');
-const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '7d';
-const REFRESH_TOKEN_EXPIRES_IN: string = process.env.REFRESH_TOKEN_EXPIRES_IN || '30d';
+// 长久登录：access 30 天，refresh 365 天；可通过环境变量覆盖
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '30d';
+const REFRESH_TOKEN_EXPIRES_IN: string = process.env.REFRESH_TOKEN_EXPIRES_IN || '365d';
 
 export interface TokenPayload {
   userId: string;

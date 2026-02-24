@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Avatar, Space, Tag, Button, Tooltip, Divider, Dropdown, Modal, App, Progress } from 'antd';
 import { 
   LikeOutlined, 
@@ -12,15 +12,18 @@ import {
   MoreOutlined,
   StarOutlined,
   StarFilled,
-  CrownOutlined
+  CrownOutlined,
+  UserOutlined
 } from '@ant-design/icons';
-import { Post } from '@/lib/api/types';
+import { Post, Comment } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
 import { communityApi } from '@/lib/api/community';
 import EditPostModal from '@/components/EditPostModal';
-import { getLevelBadge, getLevelProgress } from '@/lib/utils/levelUtils';
+import { getLevelBadge, getLevelProgress, getLevelByPoints } from '@/lib/utils/levelUtils';
 import dayjs from 'dayjs';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getDateStyle } from '@/lib/utils/dateUtils';
 import type { MenuProps } from 'antd';
 
 const formatRelativeTime = (date: string): string => {
@@ -61,17 +64,38 @@ const POST_TYPE_CONFIG = {
 
 export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: PostCardProps) {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const { message } = App.useApp();
   const typeConfig = POST_TYPE_CONFIG[post.contentType as keyof typeof POST_TYPE_CONFIG] || POST_TYPE_CONFIG.discussion;
   const isOwner = user?.id === post.userId;
-  const levelBadge = getLevelBadge(post.user.level || 1);
+  const userLevel = getLevelByPoints(post.user.points || 0);
+  const levelBadge = getLevelBadge(userLevel.level);
   const levelProgress = getLevelProgress(post.user.points || 0);
   const getErrorMessage = (error: unknown, fallback: string) => (
     error instanceof Error ? error.message : fallback
   );
+
+  useEffect(() => {
+    // 加载最新的2条评论用于预览
+    if (post.commentCount > 0) {
+      setLoadingComments(true);
+      communityApi.getComments(post.id, { page: 1, size: 2 })
+        .then((data) => {
+          setComments(data.items || []);
+        })
+        .catch(() => {
+          // 静默失败，不影响主流程
+        })
+        .finally(() => {
+          setLoadingComments(false);
+        });
+    }
+  }, [post.id, post.commentCount]);
 
   const handleFavorite = async () => {
     if (!user) {
@@ -139,100 +163,95 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
         style={{
           borderRadius: 12,
           marginBottom: 16,
-          border: '1px solid #e8e8e8',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          transition: 'all 0.3s ease',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          background: '#ffffff',
         }}
         styles={{
           body: {
-            padding: '20px',
+            padding: '18px 20px',
           },
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
+          e.currentTarget.style.borderColor = '#f97316';
           e.currentTarget.style.transform = 'translateY(-2px)';
+          router.prefetch(`/community/${post.id}`);
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+          e.currentTarget.style.borderColor = '#e5e7eb';
           e.currentTarget.style.transform = 'translateY(0)';
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div style={{ display: 'flex', flex: 1 }}>
             <Link href={`/user/${post.user.id}`}>
-              <div style={{ position: 'relative' }}>
+              <span
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget.querySelector('span');
+                  if (el) {
+                    el.style.borderColor = '#f97316';
+                    el.style.transform = 'scale(1.05)';
+                    el.style.boxShadow = '0 2px 8px rgba(249, 115, 22, 0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget.querySelector('span');
+                  if (el) {
+                    el.style.borderColor = '#e5e7eb';
+                    el.style.transform = 'scale(1)';
+                    el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+                  }
+                }}
+              >
                 <Avatar 
-                  src={post.user.avatarUrl} 
+                  src={post.user.avatarUrl || (post.user as { avatar?: string }).avatar} 
                   size={44} 
+                  icon={<UserOutlined />}
                   style={{ 
-                    border: `2px solid ${levelBadge.color}`,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }} 
+                    border: '2px solid #e5e7eb',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    transition: 'all 0.3s ease'
+                  }}
                 />
-                <div style={{
-                  position: 'absolute',
-                  bottom: -2,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: 12,
-                  lineHeight: 1,
-                }}>
-                  {levelBadge.icon}
-                </div>
-              </div>
+              </span>
             </Link>
             <div style={{ marginLeft: 12, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                 <Link
                   href={`/user/${post.user.id}`}
-                  style={{ fontSize: 15, fontWeight: 600, color: '#262626', textDecoration: 'none' }}
+                  style={{ 
+                    fontSize: 15, 
+                    fontWeight: 600, 
+                    color: '#1f2937', 
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#f97316';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#1f2937';
+                  }}
                 >
                   {post.user.username}
                 </Link>
-                <Tag 
-                  style={{ 
-                    fontSize: 11, 
-                    padding: '0 8px', 
-                    margin: 0, 
-                    height: 20, 
-                    lineHeight: '20px',
-                    borderRadius: 10,
-                    background: levelBadge.color,
-                    border: 'none',
-                    color: '#fff',
-                    fontWeight: 500
-                  }}
-                >
-                  {levelBadge.icon} LV{post.user.level} {levelBadge.name}
-                </Tag>
-                <span style={{ color: '#999', fontSize: 12 }}>
+                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
                   {formatRelativeTime(post.createdAt)}
                 </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ width: 60, height: 4 }}>
-                  <Progress 
-                    percent={levelProgress} 
-                    size="small" 
-                    showInfo={false}
-                    strokeColor={levelBadge.color}
-                    trailColor="#f0f0f0"
-                  />
-                </div>
-                <span style={{ fontSize: 11, color: '#8c8c8c' }}>
-                  {post.user.points || 0}积分
-                </span>
                 <Tag 
                   style={{ 
                     fontSize: 11, 
-                    padding: '0 8px', 
+                    padding: '2px 8px', 
                     margin: 0, 
-                    height: 20, 
-                    lineHeight: '20px',
-                    borderRadius: 10,
-                    background: typeConfig.color,
-                    color: '#fff',
-                    border: 'none',
+                    height: 22, 
+                    lineHeight: '18px',
+                    borderRadius: 6,
+                    background: '#f3f4f6',
+                    border: '1px solid #e5e7eb',
+                    color: '#4b5563',
                     fontWeight: 500
                   }}
                 >
@@ -247,8 +266,8 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
                       margin: 0, 
                       height: 20, 
                       lineHeight: '20px',
-                      borderRadius: 10,
-                      fontWeight: 500
+                      borderRadius: 4,
+                      fontWeight: 400
                     }}
                   >
                     置顶
@@ -263,8 +282,8 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
                       margin: 0, 
                       height: 20, 
                       lineHeight: '20px',
-                      borderRadius: 10,
-                      fontWeight: 500
+                      borderRadius: 4,
+                      fontWeight: 400
                     }}
                   >
                     精华
@@ -291,13 +310,21 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
                 fontSize: 17,
                 fontWeight: 600,
                 marginBottom: 10,
-                color: '#262626',
+                color: '#111827',
                 lineHeight: 1.5,
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'color 0.2s ease',
+                letterSpacing: '-0.1px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#f97316';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#111827';
               }}
             >
               {post.title}
@@ -309,45 +336,47 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
           <div
             style={{
               fontSize: 14,
-              color: '#595959',
-              lineHeight: 1.8,
+              color: '#4b5563',
+              lineHeight: 1.7,
               marginBottom: 14,
               display: '-webkit-box',
               WebkitLineClamp: 3,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontWeight: 400
             }}
           >
             {post.content}
           </div>
         </Link>
 
-        {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
+                {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <Space size={6} wrap>
               {post.tags.map((tag: string) => (
                 <Tag 
                   key={tag} 
                   style={{ 
-                    fontSize: 12, 
-                    padding: '2px 10px', 
-                    borderRadius: 12, 
+                    fontSize: 11, 
+                    padding: '2px 8px', 
+                    borderRadius: 6, 
                     cursor: 'pointer',
-                    background: '#f5f5f5',
-                    border: '1px solid #e8e8e8',
-                    color: '#666',
-                    transition: 'all 0.2s'
+                    background: '#f3f4f6',
+                    border: '1px solid #e5e7eb',
+                    color: '#4b5563',
+                    transition: 'all 0.2s',
+                    fontWeight: 400
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#e6f7ff';
-                    e.currentTarget.style.borderColor = '#91d5ff';
-                    e.currentTarget.style.color = '#1890ff';
+                    e.currentTarget.style.background = '#ffedd5';
+                    e.currentTarget.style.borderColor = '#fdba74';
+                    e.currentTarget.style.color = '#f97316';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#f5f5f5';
-                    e.currentTarget.style.borderColor = '#e8e8e8';
-                    e.currentTarget.style.color = '#666';
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.color = '#4b5563';
                   }}
                 >
                   #{tag}
@@ -357,37 +386,142 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
           </div>
         )}
 
-        <Divider style={{ margin: '12px 0' }} />
+        {/* 评论预览 */}
+        {comments.length > 0 && (
+          <div style={{ 
+            marginTop: 12, 
+            marginBottom: 12, 
+            padding: '12px 14px', 
+            background: '#f9fafb', 
+            borderRadius: 8,
+            border: '1px solid #e5e7eb'
+          }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, fontWeight: 500 }}>
+              最新评论 ({post.commentCount || 0})
+            </div>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {comments.map((comment) => (
+                <div key={comment.id} style={{ display: 'flex', gap: 8 }}>
+                  <Avatar 
+                    size={24} 
+                    src={comment.user?.avatarUrl} 
+                    icon={<UserOutlined />}
+                    style={{ flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#1f2937', marginBottom: 2 }}>
+                      {comment.user?.username}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
+                      {comment.content}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Space>
+            {post.commentCount > comments.length && (
+              <Link href={`/community/${post.id}`} style={{ display: 'block', marginTop: 8 }}>
+                <Button 
+                  type="text" 
+                  size="small"
+                  style={{ 
+                    fontSize: 12, 
+                    color: '#f97316',
+                    padding: 0,
+                    height: 'auto'
+                  }}
+                >
+                  查看全部 {post.commentCount} 条评论 →
+                </Button>
+              </Link>
+            )}
+          </div>
+        )}
 
-        <Space size={24}>
+        <Divider style={{ margin: '12px 0', borderColor: '#e5e7eb' }} />
+
+        <Space size={20} wrap>
           <Tooltip title="点赞">
             <Button
               type="text"
-              icon={<LikeOutlined style={{ fontSize: 16 }} />}
+              icon={<LikeOutlined style={{ fontSize: 14 }} />}
               onClick={() => onLike(post.id)}
-              style={{ color: '#8c8c8c', fontSize: 13 }}
+              style={{ 
+                color: '#6b7280', 
+                fontSize: 12, 
+                padding: '4px 8px', 
+                height: 30,
+                borderRadius: 6,
+                fontWeight: 500,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.background = '#fef2f2';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              {post.likeCount}
+              {post.likeCount || 0}
             </Button>
           </Tooltip>
           <Link href={`/community/${post.id}`}>
             <Tooltip title="评论">
               <Button
                 type="text"
-                icon={<CommentOutlined style={{ fontSize: 16 }} />}
-                style={{ color: '#8c8c8c', fontSize: 13 }}
+                icon={<CommentOutlined style={{ fontSize: 14 }} />}
+                style={{ 
+                  color: '#6b7280', 
+                  fontSize: 12, 
+                  padding: '4px 8px', 
+                  height: 30,
+                  borderRadius: 6,
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#f97316';
+                  e.currentTarget.style.background = '#fff7ed';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.background = 'transparent';
+                }}
               >
-                {post.commentCount}
+                {post.commentCount || 0}
               </Button>
             </Tooltip>
           </Link>
           <Tooltip title="收藏">
             <Button
               type="text"
-              icon={isFavorited ? <StarFilled style={{ color: '#faad14', fontSize: 16 }} /> : <StarOutlined style={{ fontSize: 16 }} />}
+              icon={isFavorited ? <StarFilled style={{ color: '#f59e0b', fontSize: 14 }} /> : <StarOutlined style={{ fontSize: 14 }} />}
               onClick={handleFavorite}
               loading={favoriteLoading}
-              style={{ color: isFavorited ? '#faad14' : '#8c8c8c', fontSize: 13 }}
+              style={{ 
+                color: isFavorited ? '#f59e0b' : '#6b7280', 
+                fontSize: 12, 
+                padding: '4px 8px', 
+                height: 30,
+                borderRadius: 6,
+                fontWeight: 500,
+                transition: 'all 0.2s ease',
+                background: isFavorited ? '#fffbeb' : 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                if (!isFavorited) {
+                  e.currentTarget.style.color = '#f59e0b';
+                  e.currentTarget.style.background = '#fffbeb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isFavorited) {
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
             >
               {isFavorited ? '已收藏' : '收藏'}
             </Button>
@@ -395,17 +529,42 @@ export default function PostCard({ post, onLike, onShare, onDelete, onEdit }: Po
           <Tooltip title="分享">
             <Button
               type="text"
-              icon={<ShareAltOutlined style={{ fontSize: 16 }} />}
+              icon={<ShareAltOutlined style={{ fontSize: 14 }} />}
               onClick={() => onShare(post)}
-              style={{ color: '#8c8c8c', fontSize: 13 }}
+              style={{ 
+                color: '#6b7280', 
+                fontSize: 12, 
+                padding: '4px 8px', 
+                height: 30,
+                borderRadius: 6,
+                fontWeight: 500,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#10b981';
+                e.currentTarget.style.background = '#ecfdf5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              {post.shareCount}
+              {post.shareCount || 0}
             </Button>
           </Tooltip>
           <Tooltip title="浏览">
-            <span style={{ color: '#8c8c8c', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <EyeOutlined style={{ fontSize: 16 }} />
-              {post.viewCount}
+            <span style={{ 
+              color: '#6b7280', 
+              fontSize: 12, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 5,
+              fontWeight: 500,
+              padding: '4px 8px',
+              borderRadius: 6
+            }}>
+              <EyeOutlined style={{ fontSize: 14 }} />
+              {post.viewCount || 0}
             </span>
           </Tooltip>
         </Space>

@@ -58,6 +58,15 @@ export async function getActiveBanners(): Promise<Banner[]> {
   }
 }
 
+/** 将前端可能传的 sortOrder 转为 Prisma 的 order，并去掉非法字段 */
+function normalizeBannerData(data: Record<string, unknown>): Record<string, unknown> {
+  const { sortOrder, ...rest } = data;
+  return {
+    ...rest,
+    order: typeof sortOrder === 'number' ? sortOrder : (rest.order ?? 0),
+  };
+}
+
 export async function createBanner(data: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>): Promise<Banner> {
   try {
     // 限制最多3个Banner
@@ -65,8 +74,8 @@ export async function createBanner(data: Omit<Banner, 'id' | 'createdAt' | 'upda
     if (existingCount >= 3) {
       throw new Error('BANNER_LIMIT_EXCEEDED: 最多只能创建3个Banner');
     }
-    
-    return await prisma.banner.create({ data });
+    const normalized = normalizeBannerData(data as Record<string, unknown>);
+    return await prisma.banner.create({ data: normalized as Parameters<typeof prisma.banner.create>[0]['data'] });
   } catch (error: any) {
     logger.error('Create banner error:', error);
     if (error.message?.includes('BANNER_LIMIT_EXCEEDED')) {
@@ -78,7 +87,8 @@ export async function createBanner(data: Omit<Banner, 'id' | 'createdAt' | 'upda
 
 export async function updateBanner(bannerId: string, data: Partial<Banner>): Promise<Banner> {
   try {
-    return await prisma.banner.update({ where: { id: bannerId }, data });
+    const normalized = normalizeBannerData(data as Record<string, unknown>);
+    return await prisma.banner.update({ where: { id: bannerId }, data: normalized as Parameters<typeof prisma.banner.update>[0]['data'] });
   } catch (error) {
     logger.error('Update banner error:', error);
     throw new Error('BANNER_UPDATE_FAILED');

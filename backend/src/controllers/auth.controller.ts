@@ -15,6 +15,22 @@ import { sendSuccess, sendError } from '../utils/response';
 import { logger } from '../utils/logger';
 import userPrisma from '../config/database.user';
 
+async function parseVipPermissions(user: any): Promise<string[]> {
+  try {
+    if (!user.tags) return [];
+    const parsed = typeof user.tags === 'string' ? JSON.parse(user.tags) : user.tags;
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      if (parsed.vipPermissions && Array.isArray(parsed.vipPermissions)) {
+        return parsed.vipPermissions;
+      }
+    }
+    return [];
+  } catch (error) {
+    logger.error('Failed to parse VIP permissions:', error);
+    return [];
+  }
+}
+
 /**
  * 邮箱注册
  */
@@ -64,7 +80,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       role: userRole,
     });
 
-    // 返回响应
+    const vipPermissions = await parseVipPermissions(user);
+
     sendSuccess(res, {
       token: accessToken,
       refreshToken,
@@ -77,6 +94,10 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         level: user.level,
         points: user.points,
         isVip: user.isVip,
+        vipPermissions,
+        identityType: (user as any).identityType ?? null,
+        organizationName: (user as any).organizationName ?? null,
+        region: (user as any).region ?? null,
       },
     });
   } catch (error: any) {
@@ -127,7 +148,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       role: userRole,
     });
 
-    // 返回响应
+    const vipPermissions = await parseVipPermissions(user);
+
     sendSuccess(res, {
       token: accessToken,
       refreshToken,
@@ -140,6 +162,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         level: user.level,
         points: user.points,
         isVip: user.isVip,
+        vipPermissions,
+        identityType: (user as any).identityType ?? null,
+        organizationName: (user as any).organizationName ?? null,
+        region: (user as any).region ?? null,
       },
     });
   } catch (error: any) {
@@ -148,6 +174,11 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     }
     if (error.message === 'USER_BANNED') {
       return sendError(res, 1004, '账号已被禁用', 403);
+    }
+    if (error.message === 'AUTHENTICATION_FAILED' || error.message === 'USER_FETCH_FAILED' || error.message === 'PASSWORD_VERIFICATION_FAILED') {
+      const detail = error.cause?.message ?? (error as any).meta?.message ?? error.message;
+      logger.error('[Login] Authentication failed (server error):', { message: error.message, detail, stack: error.stack });
+      return sendError(res, 5000, '登录失败，请稍后重试。若持续出现请检查用户数据库连接或联系管理员。', 500);
     }
     next(error);
   }
@@ -295,11 +326,12 @@ export async function getCurrentUser(req: Request, res: Response, next: NextFunc
         points: 0,
       });
     } else {
-      // 如果是普通用户，从用户端数据库获取信息
       const user = await getUserById(userId);
       if (!user) {
         return sendError(res, 1005, '用户不存在', 404);
       }
+
+      const vipPermissions = await parseVipPermissions(user);
 
       sendSuccess(res, {
         id: user.id,
@@ -310,6 +342,10 @@ export async function getCurrentUser(req: Request, res: Response, next: NextFunc
         level: user.level,
         points: user.points,
         isVip: user.isVip,
+        vipPermissions,
+        identityType: (user as any).identityType ?? null,
+        organizationName: (user as any).organizationName ?? null,
+        region: (user as any).region ?? null,
       });
     }
   } catch (error) {

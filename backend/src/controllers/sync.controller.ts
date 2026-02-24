@@ -13,16 +13,12 @@ import {
   syncRecentHuggingFacePapers,
   syncBilibiliVideos,
   syncYouTubeVideos,
-  syncJobsFromGithub,
   syncPapersByKeywords,
   syncVideosByKeywords,
 } from '../services/sync';
-import { syncHotNews as syncHotNewsService, syncHotNewsByPlatforms } from '../services/sync/hot-news.sync';
-import { syncDailyHotApi as syncDailyHotApiService, syncDailyHotApiByPlatforms } from '../services/sync/dailyhot-api.sync';
-import { sync36krNews } from '../services/sync/36kr.sync';
-import { syncTechNews as syncTechNewsService, syncTechNewsBySource } from '../services/sync/tech-news.sync';
+import { syncArxivByCategory } from '../services/sync/arxiv.sync';
 import { syncSemanticScholarPapers } from '../services/sync/semantic-scholar.sync';
-import { dailySmartFilter } from '../services/sync/smart-news-filter.sync';
+import { syncLimXJobs } from '../services/sync/limx-jobs.sync';
 import { logger } from '../utils/logger';
 import { createDataSourceLog, updateDataSourceSyncResult } from '../services/data-source.service';
 import adminPrisma from '../config/database.admin';
@@ -64,7 +60,6 @@ export const syncArxiv = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发arXiv同步: ${query}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -79,7 +74,6 @@ export const syncArxiv = async (req: Request, res: Response) => {
     const result = await syncArxivPapers(query, maxResults, startDate, endDate);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -105,7 +99,6 @@ export const syncArxiv = async (req: Request, res: Response) => {
   } catch (error: any) {
     const duration = Date.now() - startTime;
     
-    // 记录错误日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -134,7 +127,6 @@ export const syncGithub = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发GitHub同步: ${query}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -149,7 +141,6 @@ export const syncGithub = async (req: Request, res: Response) => {
     const result = await syncGithubRepos(query, maxResults);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -175,7 +166,6 @@ export const syncGithub = async (req: Request, res: Response) => {
   } catch (error: any) {
     const duration = Date.now() - startTime;
     
-    // 记录错误日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -204,7 +194,6 @@ export const syncHuggingFacePapers = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发HuggingFace论文同步${date ? `, 日期: ${date}` : days ? `, 最近${days}天` : ''}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -218,19 +207,15 @@ export const syncHuggingFacePapers = async (req: Request, res: Response) => {
     
     let result;
     if (date) {
-      // 同步指定日期的论文
       result = await syncHuggingFacePapersByDate(date, maxResults);
     } else if (days) {
-      // 同步最近几天的论文
       result = await syncRecentHuggingFacePapers(days, maxResults);
     } else {
-      // 默认同步最近7天
       result = await syncRecentHuggingFacePapers(7, maxResults);
     }
     
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -262,7 +247,6 @@ export const syncHuggingFacePapers = async (req: Request, res: Response) => {
       duration,
     });
 
-    // 记录错误日志
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -293,7 +277,6 @@ export const syncHuggingFace = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发HuggingFace同步${task ? `: ${task}` : ''}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -308,7 +291,6 @@ export const syncHuggingFace = async (req: Request, res: Response) => {
     const result = await syncHuggingFaceModels(task, maxResults);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -317,7 +299,7 @@ export const syncHuggingFace = async (req: Request, res: Response) => {
         requestUrl: `https://huggingface.co/api/models${task ? `?task=${task}` : ''}&limit=${maxResults}`,
         requestMethod: 'GET',
         requestBody: { task, maxResults },
-        responseCode: result.success ? 200 : 200, // 即使失败也返回200，因为result.success=false已经表示失败
+        responseCode: result.success ? 200 : 200,
         duration,
         syncedCount: result.synced,
         errorCount: result.errors,
@@ -331,7 +313,6 @@ export const syncHuggingFace = async (req: Request, res: Response) => {
       ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
     }
 
-    // 如果同步失败，返回200但包含错误信息，而不是500错误
     if (!result.success) {
       return sendSuccess(res, result, (result as any).message || 'HuggingFace同步失败');
     }
@@ -340,7 +321,6 @@ export const syncHuggingFace = async (req: Request, res: Response) => {
   } catch (error: any) {
     const duration = Date.now() - startTime;
     
-    // 记录错误日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -369,7 +349,6 @@ export const syncBilibili = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发Bilibili同步: ${query}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -384,7 +363,6 @@ export const syncBilibili = async (req: Request, res: Response) => {
     const result = await syncBilibiliVideos(query, maxResults);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -410,7 +388,6 @@ export const syncBilibili = async (req: Request, res: Response) => {
   } catch (error: any) {
     const duration = Date.now() - startTime;
     
-    // 记录错误日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -439,7 +416,6 @@ export const syncYouTube = async (req: Request, res: Response) => {
     
     logger.info(`管理员 ${req.user?.email} 触发YouTube同步: ${query}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
@@ -454,7 +430,6 @@ export const syncYouTube = async (req: Request, res: Response) => {
     const result = await syncYouTubeVideos(query, maxResults);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -480,7 +455,6 @@ export const syncYouTube = async (req: Request, res: Response) => {
   } catch (error: any) {
     const duration = Date.now() - startTime;
     
-    // 记录错误日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
@@ -498,22 +472,21 @@ export const syncYouTube = async (req: Request, res: Response) => {
 };
 
 /**
- * 同步热点新闻
+ * 同步Semantic Scholar论文
  */
-export const syncHotNews = async (req: Request, res: Response) => {
+export const syncSemanticScholar = async (req: Request, res: Response) => {
   const startTime = Date.now();
   let dataSourceId: string | null = null;
   
   try {
-    const { platform = 'baidu', maxResults = 50 } = req.body;
+    const { query = 'embodied AI OR robotics', maxResults = 100, year, fieldsOfStudy, skipOnRateLimit = false } = req.body;
     
-    logger.info(`管理员 ${req.user?.email} 触发热点新闻同步，平台: ${platform}`);
+    logger.info(`管理员 ${req.user?.email} 触发Semantic Scholar同步: ${query}`);
     
-    // 查找数据源
     if ('dataSource' in adminPrisma) {
       try {
         const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: 'hot_news' },
+          where: { name: 'semantic_scholar' },
         });
         dataSourceId = dataSource?.id || null;
       } catch (error) {
@@ -521,22 +494,22 @@ export const syncHotNews = async (req: Request, res: Response) => {
       }
     }
     
-    const result = await syncHotNewsService(platform, maxResults);
+    const result = await syncSemanticScholarPapers(query, maxResults, year, fieldsOfStudy, skipOnRateLimit);
     const duration = Date.now() - startTime;
 
-    // 记录日志（失败不影响主流程）
     if (dataSourceId) {
       createDataSourceLog({
         dataSourceId,
         type: 'sync',
         status: result.success ? 'success' : 'error',
-        requestUrl: `https://orz.ai/api/v1/dailynews/?platform=${platform}&limit=${maxResults}`,
+        requestUrl: `https://api.semanticscholar.org/graph/v1/paper/search`,
         requestMethod: 'GET',
-        requestBody: { platform, maxResults },
-        responseCode: result.success ? 200 : 500,
+        requestBody: { query, maxResults, year, fieldsOfStudy },
+        responseCode: result.success ? 200 : 200,
         duration,
         syncedCount: result.synced,
         errorCount: result.errors,
+        errorMessage: result.success ? undefined : result.message,
       }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
 
       updateDataSourceSyncResult(
@@ -546,194 +519,65 @@ export const syncHotNews = async (req: Request, res: Response) => {
       ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
     }
 
-    sendSuccess(res, result, '热点新闻同步完成');
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    
-    // 记录错误日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: 'error',
-        errorMessage: error.message || '同步失败',
-        duration,
-      }).catch(err => logger.debug('错误日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(dataSourceId, 'error').catch(err => logger.debug('错误结果更新失败（不影响主流程）:', err));
-    }
-
-    sendError(res, 500, error.message || '同步失败', 500);
-  }
-};
-
-/**
- * 同步DailyHotApi新闻
- */
-export const syncDailyHotApi = async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  let dataSourceId: string | null = null;
-  
-  try {
-    const { platform = 'baidu', maxResults = 50 } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发DailyHotApi同步，平台: ${platform}`);
-    
-    // 查找数据源
-    if ('dataSource' in adminPrisma) {
-      try {
-        const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: 'dailyhot_api' },
-        });
-        dataSourceId = dataSource?.id || null;
-      } catch (error) {
-        logger.warn('查找数据源失败，跳过日志记录:', error);
-      }
-    }
-    
-    const result = await syncDailyHotApiService(platform, maxResults);
-    const duration = Date.now() - startTime;
-
-    // 记录日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: result.success ? 'success' : 'error',
-        requestUrl: `https://api-hot.imsyy.top/${platform}`,
-        requestMethod: 'GET',
-        requestBody: { platform, maxResults },
-        responseCode: result.success ? 200 : 500,
-        duration,
-        syncedCount: result.synced,
-        errorCount: result.errors,
-      }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(
-        dataSourceId,
-        result.success ? 'success' : 'error',
-        { synced: result.synced, errors: result.errors, total: result.total }
-      ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
-    }
-
-    sendSuccess(res, result, 'DailyHotApi同步完成');
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    
-    // 记录错误日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: 'error',
-        errorMessage: error.message || '同步失败',
-        duration,
-      }).catch(err => logger.debug('错误日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(dataSourceId, 'error').catch(err => logger.debug('错误结果更新失败（不影响主流程）:', err));
-    }
-
-    sendError(res, 500, error.message || '同步失败', 500);
-  }
-};
-
-/**
- * 同步36kr新闻
- */
-export const sync36kr = async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  let dataSourceId: string | null = null;
-  
-  try {
-    const { maxResults = 100, useApi = true } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发36kr新闻同步`);
-    
-    // 查找数据源
-    if ('dataSource' in adminPrisma) {
-      try {
-        const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: '36kr' },
-        });
-        dataSourceId = dataSource?.id || null;
-      } catch (error) {
-        logger.warn('查找数据源失败，跳过日志记录:', error);
-      }
-    }
-    
-    const result = await sync36krNews(maxResults, useApi);
-    const duration = Date.now() - startTime;
-
-    // 记录日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: result.success ? 'success' : 'error',
-        requestUrl: `https://36kr.com/api/search-column/mainsite`,
-        requestMethod: 'GET',
-        requestBody: { maxResults, useApi },
-        responseCode: result.success ? 200 : 200, // 即使失败也返回200，因为result.success=false已经表示失败
-        duration,
-        syncedCount: result.synced,
-        errorCount: result.errors,
-        errorMessage: result.success ? undefined : (result as any).message,
-      }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(
-        dataSourceId,
-        result.success ? 'success' : 'error',
-        { synced: result.synced, errors: result.errors, total: result.total }
-      ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
-    }
-
-    // 如果同步失败，返回200但包含错误信息，而不是500错误
     if (!result.success) {
-      return sendSuccess(res, result, (result as any).message || '36kr新闻同步失败');
+      return sendSuccess(res, result, result.message || 'Semantic Scholar同步失败');
     }
-
-    sendSuccess(res, result, '36kr新闻同步完成');
+    sendSuccess(res, result, 'Semantic Scholar同步完成');
   } catch (error: any) {
-    const duration = Date.now() - startTime;
-    
-    // 记录错误日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: 'error',
-        errorMessage: error.message || '同步失败',
-        duration,
-      }).catch(err => logger.debug('错误日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(dataSourceId, 'error').catch(err => logger.debug('错误结果更新失败（不影响主流程）:', err));
-    }
-
+    logger.error('Semantic Scholar同步失败:', error);
     sendError(res, 500, error.message || '同步失败', 500);
   }
 };
 
 /**
- * 智能筛选相关新闻
+ * 全量拉取 ArXiv 指定分类的论文
+ * 逻辑说明：按所选分类，拉取「最近 1 年」内提交的论文（按提交时间倒序），每分类最多 maxResultsPerCategory 篇。
+ * 已存在的论文（同 arxivId）会 upsert 更新，不会重复入库。
  */
-export const smartFilterNews = async (req: Request, res: Response) => {
+export const syncArxivCategoriesHandler = async (req: Request, res: Response) => {
   const startTime = Date.now();
-  
+
   try {
-    const { platform, days = 7, minScore = 5 } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发智能新闻筛选，平台: ${platform || '全部'}, 最近${days}天`);
-    
-    const result = await dailySmartFilter();
+    const {
+      categories = ['cs.AI', 'cs.RO', 'cs.CV', 'cs.LG', 'cs.CL'],
+      maxResultsPerCategory = 50,
+    } = req.body;
+
+    logger.info(`管理员 ${req.user?.email} 触发 ArXiv 分类全量拉取，分类: ${categories.join(', ')}, 每分类: ${maxResultsPerCategory}（时间范围: 最近1年）`);
+
+    let totalSynced = 0;
+    let totalErrors = 0;
+    const categoryResults: Record<string, { synced: number; errors: number }> = {};
+
+    for (const category of categories) {
+      try {
+        const result = await syncArxivByCategory(category, maxResultsPerCategory);
+        totalSynced += result.synced;
+        totalErrors += result.errors;
+        categoryResults[category] = { synced: result.synced, errors: result.errors };
+        logger.info(`分类 ${category} 同步完成: 成功 ${result.synced} 篇`);
+      } catch (err: any) {
+        logger.error(`分类 ${category} 同步失败: ${err.message}`);
+        totalErrors++;
+        categoryResults[category] = { synced: 0, errors: 1 };
+      }
+    }
+
     const duration = Date.now() - startTime;
+    logger.info(`ArXiv 分类全量拉取完成，耗时: ${duration}ms`);
 
-    logger.info(`智能筛选完成，耗时: ${duration}ms`);
-
-    sendSuccess(res, result, '智能筛选完成');
+    sendSuccess(res, {
+      success: true,
+      synced: totalSynced,
+      errors: totalErrors,
+      categories: categoryResults,
+      duration,
+    }, 'ArXiv 分类全量拉取完成');
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error(`智能筛选失败: ${error.message}`, { duration });
-    sendError(res, 500, error.message || '智能筛选失败', 500);
+    const errMsg = error.message || 'ArXiv 分类全量拉取失败';
+    logger.error(`ArXiv 分类全量拉取失败: ${errMsg}`, { duration });
+    sendError(res, 500, errMsg, 500);
   }
 };
 
@@ -786,216 +630,18 @@ export const syncVideosByKeywordsHandler = async (req: Request, res: Response) =
 };
 
 /**
- * 同步GitHub岗位
+ * 同步招聘岗位（仅逐际动力，不清空现有数据；其他岗位请后台手动添加或使用脚本）
  */
-/**
- * 同步Semantic Scholar论文
- */
-export const syncSemanticScholar = async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  let dataSourceId: string | null = null;
-  
-  try {
-    const { query = 'embodied AI OR robotics', maxResults = 100, year, fieldsOfStudy, skipOnRateLimit = false } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发Semantic Scholar同步: ${query}`);
-    
-    // 查找数据源（如果存在）
-    if ('dataSource' in adminPrisma) {
-      try {
-        const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: 'semantic_scholar' },
-        });
-        dataSourceId = dataSource?.id || null;
-      } catch (error) {
-        logger.warn('查找数据源失败，跳过日志记录:', error);
-      }
-    }
-    
-    const result = await syncSemanticScholarPapers(query, maxResults, year, fieldsOfStudy, skipOnRateLimit);
-    const duration = Date.now() - startTime;
-
-    // 记录日志
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: result.success ? 'success' : 'error',
-        requestUrl: `https://api.semanticscholar.org/graph/v1/paper/search`,
-        requestMethod: 'GET',
-        requestBody: { query, maxResults, year, fieldsOfStudy },
-        responseCode: result.success ? 200 : 200,
-        duration,
-        syncedCount: result.synced,
-        errorCount: result.errors,
-        errorMessage: result.success ? undefined : result.message,
-      }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(
-        dataSourceId,
-        result.success ? 'success' : 'error',
-        { synced: result.synced, errors: result.errors, total: result.total }
-      ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
-    }
-
-    if (!result.success) {
-      return sendSuccess(res, result, result.message || 'Semantic Scholar同步失败');
-    }
-    sendSuccess(res, result, 'Semantic Scholar同步完成');
-  } catch (error: any) {
-    logger.error('Semantic Scholar同步失败:', error);
-    sendError(res, 500, error.message || '同步失败', 500);
-  }
-};
-
-/**
- * 同步科技新闻（TechCrunch等，作为36kr的替代）
- */
-export const syncTechNews = async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  let dataSourceId: string | null = null;
-  
-  try {
-    const { maxResults = 50, sources } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发科技新闻同步${sources ? `: ${sources.join(', ')}` : ''}`);
-    
-    // 查找数据源
-    if ('dataSource' in adminPrisma) {
-      try {
-        const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: 'tech_news' },
-        });
-        dataSourceId = dataSource?.id || null;
-      } catch (error) {
-        logger.warn('查找数据源失败，跳过日志记录:', error);
-      }
-    }
-    
-    // 如果sources是空数组，则同步所有源；如果有值，则同步指定源
-    const result = sources && Array.isArray(sources) && sources.length > 0
-      ? await syncTechNewsService(maxResults, sources)
-      : await syncTechNewsService(maxResults);
-    
-    const duration = Date.now() - startTime;
-
-    // 记录日志
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: result.success ? 'success' : 'error',
-        requestUrl: 'https://techcrunch.com/feed/',
-        requestMethod: 'GET',
-        requestBody: { maxResults, sources },
-        responseCode: result.success ? 200 : 200,
-        duration,
-        syncedCount: result.synced,
-        errorCount: result.errors,
-        errorMessage: result.success ? undefined : result.message,
-      }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(
-        dataSourceId,
-        result.success ? 'success' : 'error',
-        { synced: result.synced, errors: result.errors, total: result.total }
-      ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
-    }
-
-    // 如果同步失败，返回200但包含错误信息
-    if (!result.success) {
-      return sendSuccess(res, result, result.message || '科技新闻同步失败');
-    }
-
-    sendSuccess(res, result, '科技新闻同步完成');
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    
-    // 记录错误日志
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: 'error',
-        errorMessage: error.message || '同步失败',
-        duration,
-      }).catch(err => logger.debug('错误日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(dataSourceId, 'error').catch(err => logger.debug('错误结果更新失败（不影响主流程）:', err));
-    }
-
-    sendError(res, 500, error.message || '同步失败', 500);
-  }
-};
-
 export const syncJobs = async (req: Request, res: Response) => {
   const startTime = Date.now();
-  let dataSourceId: string | null = null;
-  
   try {
-    const { maxResults = 200 } = req.body;
-    
-    logger.info(`管理员 ${req.user?.email} 触发GitHub岗位同步`);
-    
-    // 查找数据源
-    if ('dataSource' in adminPrisma) {
-      try {
-        const dataSource = await (adminPrisma as any).dataSource.findUnique({
-          where: { name: 'github-jobs' },
-        });
-        dataSourceId = dataSource?.id || null;
-      } catch (error) {
-        logger.warn('查找数据源失败，跳过日志记录:', error);
-      }
-    }
-    
-    const result = await syncJobsFromGithub({ maxResults });
+    logger.info(`管理员 ${req.user?.email} 触发逐际动力岗位同步`);
+    const result = await syncLimXJobs();
     const duration = Date.now() - startTime;
-
-    // 记录日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: result.success ? 'success' : 'error',
-        requestUrl: `https://github.com/StarCycle/Awesome-Embodied-AI-Job`,
-        requestMethod: 'GET',
-        requestBody: { maxResults },
-        responseCode: result.success ? 200 : 500,
-        duration,
-        syncedCount: result.synced,
-        errorCount: result.errors,
-      }).catch(err => logger.debug('同步日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(
-        dataSourceId,
-        result.success ? 'success' : 'error',
-        { synced: result.synced, errors: result.errors, total: result.total }
-      ).catch(err => logger.debug('同步结果更新失败（不影响主流程）:', err));
-    }
-
-    // 如果同步失败，返回200但包含错误信息，而不是500错误
-    if (!result.success) {
-      return sendSuccess(res, result, (result as any).message || 'GitHub岗位同步失败');
-    }
-
-    sendSuccess(res, result, 'GitHub岗位同步完成');
+    sendSuccess(res, { ...result, duration }, '逐际动力岗位同步完成');
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    
-    // 记录错误日志（失败不影响主流程）
-    if (dataSourceId) {
-      createDataSourceLog({
-        dataSourceId,
-        type: 'sync',
-        status: 'error',
-        errorMessage: error.message || '同步失败',
-        duration,
-      }).catch(err => logger.debug('错误日志记录失败（不影响主流程）:', err));
-
-      updateDataSourceSyncResult(dataSourceId, 'error').catch(err => logger.debug('错误结果更新失败（不影响主流程）:', err));
-    }
-
+    logger.error('逐际动力岗位同步失败', { message: error.message });
     sendError(res, 500, error.message || '同步失败', 500);
   }
 };

@@ -17,6 +17,7 @@ export interface GetReposParams {
   keyword?: string;
   domain?: string;
   scenario?: string;
+  category?: string;
 }
 
 // 解析topics字段：将JSON字符串转换为数组
@@ -31,6 +32,55 @@ function parseTopics(topics: string | null | undefined): string[] {
   }
 }
 
+/** 分类 id 与可能存在于 DB 中的值（id / 中文标签 / 清单标题变体）一致，与前端 REPO_CATEGORIES 及资源清单文档对应 */
+const CATEGORY_ID_TO_DB_VALUES: Record<string, string[]> = {
+  '1.1': ['1.1', '视觉-语言-动作 (VLA)', '视觉-语言-动作模型 (VLA)'],
+  '1.2': ['1.2', '模仿学习与行为克隆'],
+  '1.3': ['1.3', '强化学习框架与算法'],
+  '1.4': ['1.4', '世界模型与预测'],
+  '2.1': ['2.1', '核心数据集'],
+  '2.2': ['2.2', '机器人仿真环境'],
+  '3.1': ['3.1', '机器人操作与抓取'],
+  '3.2': ['3.2', '灵巧手与精细操作'],
+  '3.3': ['3.3', '运动规划与控制'],
+  '4.1': ['4.1', '机器人导航与SLAM'],
+  '4.2': ['4.2', '3D视觉与点云处理'],
+  '4.3': ['4.3', '机器人视觉与感知'],
+  '5.1': ['5.1', 'ROS与机器人操作系统'],
+  '5.2': ['5.2', '人形机器人与四足机器人'],
+  '5.3': ['5.3', '开源机器人硬件平台'],
+  '5.4': ['5.4', '大语言模型与机器人结合'],
+  '5.5': ['5.5', '遥操作与数据采集'],
+  '5.6': ['5.6', 'Sim2Real与域适应'],
+  '6.1': ['6.1', '机器人学习框架'],
+  '6.2': ['6.2', '机器人工具与库'],
+  '6.3': ['6.3', '综合资源清单'],
+  '6.4': ['6.4', '自动驾驶与移动机器人'],
+  '6.5': ['6.5', '触觉感知与传感器'],
+  '6.6': ['6.6', '多机器人系统'],
+  '6.7': ['6.7', '机器人安全与可靠性'],
+};
+
+/** 解析 category 筛选：若为 id（如 1.1）则匹配 id 及对应中文标签，否则精确匹配 */
+function resolveCategoryWhere(category: string): { category: { in: string[] } } | { category: string } {
+  const expanded = CATEGORY_ID_TO_DB_VALUES[category];
+  if (expanded && expanded.length > 0) {
+    return { category: { in: expanded } };
+  }
+  return { category };
+}
+
+/** DB 中的 category 值 -> 前端侧边栏用的 id（1.1, 1.2, ...），用于 getRepoCounts 归一化 */
+const DB_CATEGORY_VALUE_TO_ID: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const [id, values] of Object.entries(CATEGORY_ID_TO_DB_VALUES)) {
+    for (const v of values) {
+      map[v] = id;
+    }
+  }
+  return map;
+})();
+
 export async function getRepos(params: GetReposParams): Promise<{ repos: GithubRepo[]; total: number }> {
   const cacheKey = queryCache.generateKey('repos', params);
 
@@ -42,6 +92,11 @@ export async function getRepos(params: GetReposParams): Promise<{ repos: GithubR
 
         if (params.language) {
           where.language = params.language;
+        }
+
+        const category = params.category?.trim();
+        if (category && category !== 'undefined') {
+          Object.assign(where, resolveCategoryWhere(category));
         }
 
         // 关键词搜索（SQLite不支持mode: 'insensitive'，使用contains即可）
@@ -121,6 +176,55 @@ export async function getRepos(params: GetReposParams): Promise<{ repos: GithubR
   );
 }
 
+export interface RepoCountsResult {
+  total: number;
+  categoryCounts: Record<string, number>;
+  languageCounts: Record<string, number>;
+}
+
+/** 获取各分类、各语言的仓库数量，用于侧边栏展示 */
+export async function getRepoCounts(): Promise<RepoCountsResult> {
+  const cacheKey = queryCache.generateKey('repo-counts', {});
+
+  return queryCache.execute(
+    cacheKey,
+    async () => {
+      const [total, categoryRows, languageRows] = await Promise.all([
+        prisma.githubRepo.count(),
+        prisma.githubRepo.groupBy({
+          by: ['category'],
+          _count: { id: true },
+          where: { category: { not: null } },
+        }),
+        prisma.githubRepo.groupBy({
+          by: ['language'],
+          _count: { id: true },
+          where: { language: { not: null } },
+        }),
+      ]);
+
+      // 归一化为前端侧边栏使用的 id（1.1, 1.2, ...），同一 id 对应多种 DB 值（如 "1.1" 与 "视觉-语言-动作 (VLA)"）合并计数
+      const categoryCounts: Record<string, number> = {};
+      for (const row of categoryRows) {
+        if (row.category != null) {
+          const id = DB_CATEGORY_VALUE_TO_ID[row.category] ?? row.category;
+          categoryCounts[id] = (categoryCounts[id] ?? 0) + row._count.id;
+        }
+      }
+
+      const languageCounts: Record<string, number> = {};
+      for (const row of languageRows) {
+        if (row.language != null) {
+          languageCounts[row.language] = row._count.id;
+        }
+      }
+
+      return { total, categoryCounts, languageCounts };
+    },
+    300 as any
+  );
+}
+
 export async function getRepoById(repoId: string): Promise<GithubRepo | null> {
   try {
     const repo = await prisma.githubRepo.findUnique({ where: { id: repoId } });
@@ -159,6 +263,15 @@ export async function createRepo(data: any): Promise<any> {
       topics: data.topics,
     });
 
+    // 重复项目识别：用户提交时若 fullName 已存在则拒绝，避免重复收录
+    const fullNameTrimmed = data.fullName.trim();
+    const existingByFullName = await prisma.githubRepo.findUnique({
+      where: { fullName: fullNameTrimmed },
+    });
+    if (existingByFullName) {
+      throw new Error('REPO_ALREADY_EXISTS');
+    }
+
     // 处理topics字段：如果是数组，转换为JSON字符串；如果是字符串，直接使用
     let topicsValue = '[]';
     if (data.topics !== undefined && data.topics !== null) {
@@ -176,26 +289,23 @@ export async function createRepo(data: any): Promise<any> {
       }
     }
 
-    // 处理repoId：转换为number（schema.user.prisma中repoId是Int类型）
+    // 处理repoId：转换为String（schema.user.prisma中repoId现在是String类型）
     // repoId是必需的，如果没有提供，生成一个基于fullName的hash值
-    let repoIdValue: number;
+    let repoIdValue: string;
     if (data.repoId !== undefined && data.repoId !== null) {
-      // 支持字符串、数字、BigInt类型，统一转换为number
+      // 支持字符串、数字、BigInt类型，统一转换为String
       if (typeof data.repoId === 'bigint') {
-        repoIdValue = Number(data.repoId);
+        repoIdValue = data.repoId.toString();
       } else if (typeof data.repoId === 'string') {
-        repoIdValue = Number(data.repoId);
+        repoIdValue = data.repoId;
+      } else if (typeof data.repoId === 'number') {
+        repoIdValue = String(Math.floor(data.repoId));
       } else {
-        repoIdValue = Number(data.repoId);
-      }
-      
-      // 验证number是否有效
-      if (isNaN(repoIdValue) || !isFinite(repoIdValue)) {
-        throw new Error('REPO_INVALID_REPOID: repoId必须是有效的数字');
+        repoIdValue = String(data.repoId);
       }
     } else {
       // 如果没有提供repoId，生成一个基于fullName的hash值
-      // 使用简单的hash算法生成一个number值
+      // 使用简单的hash算法生成一个大整数
       if (!data.fullName) {
         throw new Error('REPO_MISSING_FULLNAME: 无法生成repoId，fullName是必需的');
       }
@@ -203,7 +313,7 @@ export async function createRepo(data: any): Promise<any> {
         return ((acc << 5) - acc) + char.charCodeAt(0);
       }, 0);
       // 转换为正数并确保足够大
-      repoIdValue = Math.abs(fullNameHash) + 1000000000;
+      repoIdValue = String(Math.abs(fullNameHash) + 1000000000);
       logger.warn(`RepoId not provided, generating hash for ${data.fullName}: ${repoIdValue}`);
     }
 
@@ -234,7 +344,8 @@ export async function createRepo(data: any): Promise<any> {
       viewCount: 0,
       favoriteCount: 0,
       addedBy: data.addedBy || 'admin',
-      notifyEnabled: data.notifyEnabled !== undefined ? data.notifyEnabled : true,
+      notifyEnabled: data.notifyEnabled !== undefined ? (data.notifyEnabled ? 1 : 0) : 1,
+      ...(data.category !== undefined && data.category !== null && data.category !== '' ? { category: String(data.category).trim() } : {}),
     };
 
     const updateData: any = {
@@ -249,7 +360,8 @@ export async function createRepo(data: any): Promise<any> {
       createdDate: createdDate,
       updatedDate: updatedDate,
       ...(data.addedBy !== undefined ? { addedBy: data.addedBy } : {}),
-      ...(data.notifyEnabled !== undefined ? { notifyEnabled: data.notifyEnabled } : {}),
+      ...(data.notifyEnabled !== undefined ? { notifyEnabled: data.notifyEnabled ? 1 : 0 } : {}),
+      ...(data.category !== undefined ? { category: data.category === null || data.category === '' ? null : String(data.category).trim() } : {}),
     }
 
     if (data.owner !== undefined && data.owner !== null) {
@@ -265,10 +377,8 @@ export async function createRepo(data: any): Promise<any> {
       updatedDate: updatedDate?.toISOString(),
     });
 
-    // 核心问题：Prisma生成的类型定义中，repoId (BigInt) 不能用于where查询条件
-    // GithubRepoWhereInput 和 GithubRepoWhereUniqueInput 中都没有 repoId 字段
-    // 这是因为SQLite对BigInt类型的限制
-    // 解决方案：使用fullName作为唯一键进行upsert操作（fullName在WhereUniqueInput中）
+    // 使用fullName作为唯一键进行upsert操作（fullName在WhereUniqueInput中）
+    // repoId现在是String类型，可以正常存储大数值ID
     
     let repo;
     
@@ -301,7 +411,7 @@ export async function createRepo(data: any): Promise<any> {
           // repoId冲突：说明另一个fullName已经使用了这个repoId
           // 由于不能通过repoId查询，先查找所有记录检查冲突
           const allRepos = await prisma.githubRepo.findMany();
-          const conflictingRepo = allRepos.find(r => r.repoId.toString() === repoIdValue.toString() && r.fullName !== data.fullName);
+          const conflictingRepo = allRepos.find(r => r.repoId === repoIdValue && r.fullName !== data.fullName);
           
           if (conflictingRepo) {
             logger.error(`RepoId conflict: repoId ${repoIdValue} already used by ${conflictingRepo.fullName}`);
@@ -406,6 +516,13 @@ export async function updateRepo(repoId: string, data: Partial<GithubRepo>): Pro
           // 如果不是有效的JSON，保持原值
         }
       }
+    }
+    
+    // 处理分类字段：空字符串视为清空（null）
+    if (updateData.category !== undefined) {
+      updateData.category = updateData.category === '' || updateData.category == null 
+        ? null 
+        : String(updateData.category).trim();
     }
     
     const repo = await prisma.githubRepo.update({ where: { id: repoId }, data: updateData });

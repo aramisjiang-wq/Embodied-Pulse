@@ -1,0 +1,133 @@
+.pageWrapper {
+  padding: 1.5rem 1.75rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-primary, #1f2937);
+  letter-spacing: -0.02em;
+}
+
+.statsRow {
+  margin-bottom: 1.5rem;
+}
+
+.filterBar {
+  margin-bottom: 1rem;
+}
+
+.keywordTitle {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-bottom: 4px;
+}
+
+.keywordDescription {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* 筛选与操作区 */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* 统计卡片 */
+.statCard {
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.statCard :global(.ant-statistic-title) {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.statCard :global(.ant-statistic-content-value) {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+/* 表格容器 */
+.tableWrap {
+  font-size: 0.9375rem;
+}
+
+.tableWrap :global(.ant-table) {
+  font-size: 0.9375rem;
+}
+
+.tableWrap :global(.ant-table-thead > tr > th) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 12px 14px;
+}
+
+.tableWrap :global(.ant-table-tbody > tr > td) {
+  padding: 12px 14px;
+  font-size: 0.9375rem;
+}
+
+.tableWrap :global(.ant-pagination) {
+  font-size: 0.875rem;
+}
+
+/* 标签统一样式 */
+.tagCommon {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* 空状态 */
+.emptyWrap {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: 1rem;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actionRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

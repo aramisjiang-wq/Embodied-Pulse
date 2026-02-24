@@ -6,6 +6,7 @@ import { Video } from '../../node_modules/.prisma/client-user';
 import { logger } from '../utils/logger';
 import userPrisma from '../config/database.user';
 import { queryCache } from './query-cache.service';
+import { Prisma } from '../../node_modules/.prisma/client-user';
 
 const prisma = userPrisma;
 
@@ -15,7 +16,7 @@ export interface GetVideosParams {
   sort?: 'latest' | 'hot' | 'play';
   platform?: string;
   keyword?: string;
-  uploaderId?: string; // UP主ID（Bilibili的mid）
+  uploaderId?: string;
 }
 
 export async function getVideos(params: GetVideosParams): Promise<{ videos: Video[]; total: number }> {
@@ -25,18 +26,16 @@ export async function getVideos(params: GetVideosParams): Promise<{ videos: Vide
     cacheKey,
     async () => {
       try {
-        const where: any = {};
+        const where: Prisma.VideoWhereInput = {};
 
         if (params.platform) {
           where.platform = params.platform;
         }
 
-        // 按UP主筛选
         if (params.uploaderId) {
           where.uploaderId = params.uploaderId;
         }
 
-        // 关键词搜索（SQLite不支持mode: 'insensitive'，使用contains即可）
         if (params.keyword) {
           where.OR = [
             { title: { contains: params.keyword } },
@@ -44,7 +43,7 @@ export async function getVideos(params: GetVideosParams): Promise<{ videos: Vide
           ];
         }
 
-        let orderBy: any = {};
+        let orderBy: Prisma.VideoOrderByWithRelationInput = {};
         switch (params.sort) {
           case 'play':
             orderBy = { playCount: 'desc' };
@@ -64,54 +63,50 @@ export async function getVideos(params: GetVideosParams): Promise<{ videos: Vide
         ]);
 
         return { videos, total };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as Error & { code?: string; meta?: unknown };
         logger.error('Get videos error:', {
-          error: error.message,
-          code: error.code,
-          meta: error.meta,
-          stack: error.stack,
+          error: err.message,
+          code: err.code,
+          meta: err.meta,
+          stack: err.stack,
         });
-        
-        // 如果是表不存在或字段不存在错误，返回空结果而不是抛出错误
-        if (error.code === 'P2021' || 
-            error.code === 'P2022' ||
-            error.message?.includes('does not exist') || 
-            error.message?.includes('no such table') ||
-            error.message?.includes('column') && error.message?.includes('does not exist')) {
-          logger.warn('Video表或字段可能不存在，返回空结果');
-          return { videos: [], total: 0 };
-        }
-        
-        throw new Error('VIDEOS_FETCH_FAILED');
+        // 任何数据库/缓存异常都返回空结果，避免 500
+        return { videos: [], total: 0 };
       }
     },
-    180 as any
+    { ttl: 180 }
   );
 }
 
-export async function getVideoById(videoId: string): Promise<Video | null> {
-  try {
-    const video = await prisma.video.findUnique({ where: { id: videoId } });
-    if (video) {
-      await prisma.video.update({
-        where: { id: videoId },
-        data: { viewCount: { increment: 1 } },
-      });
-    }
-    return video;
-  } catch (error) {
-    logger.error('Get video by ID error:', error);
-    throw new Error('VIDEO_FETCH_FAILED');
-  }
+export interface CreateVideoInput {
+  platform?: string;
+  videoId?: string;
+  bvid?: string;
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  duration?: number | null;
+  uploader?: string;
+  uploaderId?: string;
+  publishedDate?: Date;
+  viewCount?: number;
+  playCount?: number;
+  likeCount?: number;
+  favoriteCount?: number;
+  commentCount?: number;
+  tags?: string | string[];
+  category?: string;
+  platformId?: string;
 }
 
-export async function createVideo(data: any): Promise<Video> {
+export async function createVideo(data: CreateVideoInput): Promise<Video> {
   try {
-    // 用户端数据库使用bvid字段，从videoId或bvid获取
-    const bvid = data.bvid || data.videoId || '';
-    const videoId = data.videoId || data.bvid || '';
+    const bvid = data.bvid || data.videoId || data.platformId || '';
+    const videoId = data.videoId || data.bvid || data.platformId || '';
     
-    // 先检查是否已存在（基于bvid去重）
     const existing = bvid ? await prisma.video.findFirst({
       where: {
         OR: [
@@ -121,17 +116,20 @@ export async function createVideo(data: any): Promise<Video> {
       },
     }) : null;
     
+    const tagsValue = data.tags 
+      ? (Array.isArray(data.tags) ? JSON.stringify(data.tags) : data.tags)
+      : null;
+    
     if (existing) {
-      // 更新现有记录
       const video = await prisma.video.update({
         where: { id: existing.id },
         data: {
-          platform: data.platform || 'bilibili',
+          platform: data.platform || existing.platform,
           videoId: videoId,
           bvid: bvid || null,
           title: data.title,
           description: data.description,
-          coverUrl: data.coverUrl,
+          coverUrl: data.coverUrl || data.thumbnailUrl,
           duration: data.duration !== undefined && data.duration !== null ? Number(data.duration) : existing.duration,
           uploader: data.uploader,
           uploaderId: data.uploaderId,
@@ -139,12 +137,13 @@ export async function createVideo(data: any): Promise<Video> {
           viewCount: data.viewCount !== undefined ? Number(data.viewCount) : existing.viewCount,
           playCount: data.playCount !== undefined ? Number(data.playCount) : existing.playCount,
           likeCount: data.likeCount !== undefined ? Number(data.likeCount) : existing.likeCount,
+          favoriteCount: data.favoriteCount !== undefined ? Number(data.favoriteCount) : existing.favoriteCount,
+          tags: tagsValue,
         },
       });
       logger.info(`Video updated: ${bvid}`);
       return video;
     } else {
-      // 创建新记录（用户端数据库schema）
       const video = await prisma.video.create({
         data: {
           platform: data.platform || 'bilibili',
@@ -152,14 +151,16 @@ export async function createVideo(data: any): Promise<Video> {
           bvid: bvid || null,
           title: data.title,
           description: data.description,
-          coverUrl: data.coverUrl,
+          coverUrl: data.coverUrl || data.thumbnailUrl,
           duration: data.duration ? Number(data.duration) : null,
           uploader: data.uploader,
           uploaderId: data.uploaderId,
           publishedDate: data.publishedDate,
           playCount: data.playCount || 0,
           viewCount: data.viewCount || 0,
+          likeCount: data.likeCount || 0,
           favoriteCount: data.favoriteCount || 0,
+          tags: tagsValue,
         },
       });
       logger.info(`Video created: ${bvid}`);
@@ -186,5 +187,16 @@ export async function deleteVideo(videoId: string): Promise<void> {
   } catch (error) {
     logger.error('Delete video error:', error);
     throw new Error('VIDEO_DELETION_FAILED');
+  }
+}
+
+export async function getVideoById(videoId: string): Promise<Video | null> {
+  try {
+    return await prisma.video.findUnique({
+      where: { id: videoId },
+    });
+  } catch (error) {
+    logger.error('Get video by id error:', error);
+    return null;
   }
 }

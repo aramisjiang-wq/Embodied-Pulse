@@ -5,10 +5,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Tabs, Button, Space, Table, Modal, Form, Input, InputNumber, DatePicker, Tag, Popconfirm, Select, Empty, App } from 'antd';
+import { Tabs, Button, Space, Table, Modal, Form, Input, InputNumber, DatePicker, Tag, Popconfirm, Select, Empty, App, Checkbox, message } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import apiClient from '@/lib/api/client';
+import PageContainer from '@/components/PageContainer';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 
@@ -46,7 +48,7 @@ export default function AdminContentPage() {
       } else if (activeTab === 'huggingface') {
         apiPath = '/huggingface';
       } else if (activeTab === 'news') {
-        apiPath = '/news';
+        apiPath = '/admin/content/news';
       } else {
         message.error('不支持的内容类型');
         return;
@@ -55,8 +57,9 @@ export default function AdminContentPage() {
       const response = await apiClient.get(apiPath, {
         params: { page: pageNum, size },
       });
-      setItems(response.data.items || []);
-      setTotal(response.data.pagination?.total || 0);
+      const data = response.data as { items?: unknown[]; pagination?: { total?: number } };
+      setItems(data.items || []);
+      setTotal(data.pagination?.total || 0);
       setPage(pageNum);
     } catch (error: any) {
       console.error('Load content error:', error);
@@ -338,9 +341,9 @@ export default function AdminContentPage() {
   );
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>内容管理</h1>
+    <PageContainer title="内容管理" loading={loading && items.length === 0}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>内容管理</h1>
         <Button type="primary" onClick={() => setShowModal(true)}>
           新增内容
         </Button>
@@ -361,20 +364,21 @@ export default function AdminContentPage() {
       />
 
       {items.length === 0 && !loading ? (
-        <Empty description="暂无数据" style={{ padding: '40px 0' }} />
+        <Empty description="暂无数据" className={styles.emptyState} />
       ) : (
-        <Table
-          rowKey="id"
-          loading={loading}
-          dataSource={items}
-          scroll={{ x: 1200 }}
-          pagination={{
-            current: page,
-            pageSize: size,
-            total,
-            onChange: (p) => loadContent(p),
-            showTotal: (total) => `共 ${total} 条记录`,
-          }}
+        <div className={styles.tableWrapper}>
+          <Table
+            rowKey="id"
+            loading={loading}
+            dataSource={items}
+            scroll={{ x: 1200 }}
+            pagination={{
+              current: page,
+              pageSize: size,
+              total,
+              onChange: (p) => loadContent(p),
+              showTotal: (total) => `共 ${total} 条记录`,
+            }}
         columns={[
           ...(activeTab === 'papers'
             ? [
@@ -463,28 +467,31 @@ export default function AdminContentPage() {
                   title: '状态',
                   dataIndex: 'status',
                   render: (value: string) => (
-                    <Tag color={value === 'open' ? 'green' : 'red'}>{value === 'open' ? '招聘中' : '已关闭'}</Tag>
+                    <Tag color={value === 'open' ? 'green' : 'red'}>
+                      {value === 'open' ? '招聘中' : '已关闭'}
+                    </Tag>
                   ),
                 },
               ]
             : []),
           ...(activeTab === 'news'
             ? [
-                { title: '标题', dataIndex: 'title', width: 300, ellipsis: true },
-                { 
-                  title: '平台', 
-                  dataIndex: 'platform', 
-                  width: 100,
-                  render: (platform: string) => <Tag color="blue">{platform}</Tag>
+                {
+                  title: '日期',
+                  dataIndex: 'date',
+                  render: (value: string) => value ? dayjs(value).format('YYYY-MM-DD') : '-',
                 },
-                { 
-                  title: '热度评分', 
-                  dataIndex: 'score', 
-                  width: 100,
-                  render: (score: string) => score ? <Tag color="orange">{score}</Tag> : '-'
+                { title: '标题', dataIndex: 'title' },
+                {
+                  title: '置顶',
+                  dataIndex: 'isPinned',
+                  render: (value: boolean) => (
+                    <Tag color={value ? 'blue' : 'default'}>
+                      {value ? '是' : '否'}
+                    </Tag>
+                  ),
                 },
-                { title: '浏览量', dataIndex: 'viewCount', width: 80 },
-                { title: '收藏数', dataIndex: 'favoriteCount', width: 80 },
+                { title: '浏览量', dataIndex: 'viewCount', render: (value: number) => value || 0 },
               ]
             : []),
           {
@@ -555,11 +562,12 @@ export default function AdminContentPage() {
             ),
           },
         ]}
-        />
+          />
+        </div>
       )}
 
       <Modal
-        title={`${editingItem ? '编辑' : '新增'}${activeTab === 'banners' ? 'Banner' : activeTab === 'papers' ? '论文' : activeTab === 'videos' ? '视频' : activeTab === 'repos' ? 'GitHub项目' : activeTab === 'huggingface' ? 'HuggingFace模型' : activeTab === 'news' ? '新闻' : '岗位'}`}
+        title={`${editingItem ? '编辑' : '新增'}${activeTab === 'banners' ? 'Banner' : activeTab === 'papers' ? '论文' : activeTab === 'videos' ? '视频' : activeTab === 'repos' ? 'GitHub项目' : activeTab === 'huggingface' ? 'HuggingFace模型' : '岗位'}`}
         open={showModal}
         onCancel={() => {
           setShowModal(false);
@@ -575,35 +583,29 @@ export default function AdminContentPage() {
         {activeTab === 'repos' && renderRepoForm()}
         {activeTab === 'news' && (
           <Form form={form} onFinish={handleCreate} layout="vertical">
-            <Form.Item name="platform" label="平台" rules={[{ required: true }]}>
-              <Select placeholder="选择平台">
-                <Select.Option value="baidu">百度</Select.Option>
-                <Select.Option value="weibo">微博</Select.Option>
-                <Select.Option value="zhihu">知乎</Select.Option>
-                <Select.Option value="bilibili">Bilibili</Select.Option>
-                <Select.Option value="douban">豆瓣</Select.Option>
-                <Select.Option value="juejin">掘金</Select.Option>
-              </Select>
+            <Form.Item name="date" label="日期" rules={[{ required: true }]}>
+              <Input type="date" />
             </Form.Item>
             <Form.Item name="title" label="标题" rules={[{ required: true }]}>
-              <Input placeholder="新闻标题" />
+              <Input placeholder="如：（2月23日）具身智能领域动态" />
             </Form.Item>
-            <Form.Item name="url" label="URL" rules={[{ required: true }, { type: 'url', message: '请输入有效的URL' }]}>
-              <Input placeholder="https://..." />
+            <Form.Item name="content" label="内容" rules={[{ required: true }]}>
+              <TextArea rows={15} placeholder="支持 Markdown 格式，每条新闻包含：标题、时间、来源、链接、观点" />
             </Form.Item>
-            <Form.Item name="score" label="热度评分">
-              <Input placeholder="热度评分（可选）" />
-            </Form.Item>
-            <Form.Item name="description" label="描述">
-              <TextArea rows={4} placeholder="新闻描述（可选）" />
-            </Form.Item>
-            <Form.Item name="publishedDate" label="发布时间">
-              <DatePicker showTime style={{ width: '100%' }} />
+            <Form.Item name="isPinned" valuePropName="checked">
+              <Checkbox>置顶显示</Checkbox>
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit" block>
-                创建新闻
-              </Button>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  {editingItem ? '更新' : '创建'}
+                </Button>
+                <Button onClick={() => {
+                  setShowModal(false);
+                  setEditingItem(null);
+                  form.resetFields();
+                }}>取消</Button>
+              </Space>
             </Form.Item>
           </Form>
         )}
@@ -674,6 +676,6 @@ export default function AdminContentPage() {
           </Form>
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

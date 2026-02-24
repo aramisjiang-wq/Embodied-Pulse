@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Table, Modal, Input, Space, Tag, Typography, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import styles from './page.module.css';
 
 const { Title, Text } = Typography;
 
@@ -177,7 +178,7 @@ export default function CommunityConfigPage() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className={styles.pageWrapper}>
       <Title level={2}>市集配置</Title>
 
       <Card
@@ -193,7 +194,7 @@ export default function CommunityConfigPage() {
             </Button>
           </Space>
         }
-        style={{ marginBottom: 24 }}
+        className={styles.sectionCard}
       >
         <Table
           columns={manualTopicColumns}

@@ -41,14 +41,16 @@ export async function createComment(data: CreateCommentData): Promise<Comment> {
       return newComment;
     });
 
-    // 奖励积分
-    await updateUserPoints(data.userId, 15, 'create_comment', '发表评论');
+    // 奖励积分（失败不影响评论创建）
+    updateUserPoints(data.userId, 15, 'create_comment', '发表评论').catch(err => {
+      logger.warn(`Failed to award points for comment ${comment.id}:`, err);
+    });
 
     logger.info(`Comment created: ${comment.id} by user ${data.userId}`);
     return comment;
   } catch (error) {
     logger.error('Create comment error:', error);
-    throw new Error('COMMENT_CREATION_FAILED');
+    throw error;
   }
 }
 
@@ -63,7 +65,6 @@ export async function getCommentsByPostId(
   try {
     const where = {
       postId,
-      status: 'active',
     };
     const [comments, total] = await Promise.all([
       prisma.comment.findMany({

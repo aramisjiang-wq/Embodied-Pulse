@@ -3,15 +3,15 @@
  * 定期同步HuggingFace Papers和作者模型
  */
 
-import cron from 'node-cron';
+import cron, { ScheduledTask } from 'node-cron';
 import { syncHuggingFacePapersByDate } from './sync/huggingface-papers.sync';
 import { getAllAuthorSubscriptions, syncAuthorModels } from './huggingface-author-subscription.service';
 import { getSubscribedPapersUsers, getSubscribedAuthorUsers } from './user-huggingface-subscription.service';
 import { logger } from '../utils/logger';
 import { createNotification } from './notification.service';
 
-let papersSyncJob: cron.ScheduledTask | null = null;
-let authorSyncJob: cron.ScheduledTask | null = null;
+let papersSyncJob: ScheduledTask | null = null;
+let authorSyncJob: ScheduledTask | null = null;
 
 export function startHuggingFaceSyncScheduler() {
   if (papersSyncJob) {

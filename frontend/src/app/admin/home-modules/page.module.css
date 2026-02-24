@@ -1,0 +1,47 @@
+.pageWrapper {
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.moduleCard {
+  margin-bottom: 16px;
+}
+
+.moduleTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.moduleDescription {
+  font-size: 12px;
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}

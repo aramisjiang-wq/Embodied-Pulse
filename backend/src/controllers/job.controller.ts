@@ -77,7 +77,7 @@ export async function createJobPost(req: Request, res: Response, next: NextFunct
       return sendError(res, 1002, '请先登录', 401);
     }
 
-    const job = await createJob(req.body);
+    const job = await createJob({ ...req.body, userId: req.user.id });
     sendSuccess(res, job);
   } catch (error) {
     next(error);

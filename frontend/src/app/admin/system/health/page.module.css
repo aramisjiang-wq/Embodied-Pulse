@@ -1,0 +1,25 @@
+.container {
+  padding: 0;
+}
+
+.healthCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.healthIcon {
+  font-size: 32px;
+  color: #1890ff;
+}
+
+.healthInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metadata {
+  margin-top: 8px;
+}

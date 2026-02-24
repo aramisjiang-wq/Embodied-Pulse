@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import userPrisma from '../config/database.user';
+import { websocketService } from './websocket.service';
 
 const prisma = userPrisma as any;
 
@@ -37,6 +38,16 @@ export async function createNotification(params: CreateNotificationParams) {
     });
 
     logger.info(`Notification created for user ${params.userId}: ${params.title}`);
+
+    websocketService.sendToUser(params.userId, {
+      id: notification.id,
+      type: params.type,
+      title: params.title,
+      content: params.content,
+      metadata: params.metadata,
+      createdAt: notification.created_at || new Date().toISOString(),
+    });
+
     return notification;
   } catch (error) {
     logger.error('Create notification error:', error);

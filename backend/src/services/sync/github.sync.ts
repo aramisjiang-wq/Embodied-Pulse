@@ -69,7 +69,7 @@ export async function syncGithubRepos(query: string = 'embodied-ai OR robotics',
     for (const repo of repos) {
       try {
         await createRepo({
-          repoId: BigInt(repo.id), // 使用repoId（BigInt类型）
+          repoId: String(repo.id), // 使用repoId（String类型）
           name: repo.name,
           fullName: repo.full_name,
           description: repo.description || '',

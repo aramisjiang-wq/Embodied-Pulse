@@ -1,7 +1,6 @@
 import { Response } from 'express';
 import { ApiResponse } from '../types/api';
 
-// 处理BigInt和Date序列化问题
 const serializeBigInt = (obj: any): any => {
   if (obj === null || obj === undefined) return obj;
   
@@ -28,6 +27,25 @@ const serializeBigInt = (obj: any): any => {
   return obj;
 };
 
+export const success = <T>(data: T, message = 'success'): ApiResponse<T> => {
+  return {
+    code: 0,
+    message,
+    data: serializeBigInt(data) as T,
+    timestamp: Date.now(),
+  };
+};
+
+export const error = (message: string, code: string | number = 1): ApiResponse => {
+  const errorCode = typeof code === 'number' ? code : (parseInt(code) || 1);
+  return {
+    code: errorCode,
+    message,
+    data: null,
+    timestamp: Date.now(),
+  };
+};
+
 export const sendSuccess = <T>(res: Response, data: T, message = 'success'): void => {
   const response: ApiResponse<T> = {
     code: 0,
@@ -44,9 +62,7 @@ export const sendError = (
   message: string,
   statusCode = 400
 ): void => {
-  // 如果code是数字，使用它；如果是字符串，尝试转换为数字，否则使用statusCode
   const errorCode = typeof code === 'number' ? code : (parseInt(code) || statusCode);
-  // 确保statusCode是数字
   const finalStatusCode = typeof statusCode === 'number' ? statusCode : 400;
   const response: ApiResponse = {
     code: errorCode,

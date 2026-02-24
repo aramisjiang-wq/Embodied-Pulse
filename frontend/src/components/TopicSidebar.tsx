@@ -3,6 +3,7 @@
 import { Card, Space, Tag, Typography, Button, Avatar, Badge } from 'antd';
 import { FireOutlined, TrophyOutlined, UserOutlined, RiseOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
+import { getLevelByPoints } from '@/lib/utils/levelUtils';
 
 const { Text } = Typography;
 
@@ -232,7 +233,7 @@ export default function TopicSidebar({ selectedTopic, onTopicChange, postCounts 
                   </div>
                   <Space size={4}>
                     <Tag color="blue" style={{ fontSize: 10, padding: '0 4px', margin: 0, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                      LV{user.level}
+                      LV{getLevelByPoints(user.points || 0).level}
                     </Tag>
                     <Text type="secondary" style={{ fontSize: 11 }}>
                       {user.postCount}帖

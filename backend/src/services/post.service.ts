@@ -56,6 +56,7 @@ export async function createPost(data: CreatePostData): Promise<Post> {
         contentId: data.contentId || '',
         title: data.title || '',
         content: data.content,
+        tags: data.tags ? JSON.stringify(data.tags) : null,
       },
     });
 
@@ -227,8 +228,20 @@ export async function getMyPosts(userId: string, params: GetMyPostsParams): Prom
       prisma.post.count({ where }),
     ]);
 
-    return { posts, total };
-  } catch (error) {
+    const normalized = posts.map(p => ({
+      ...p,
+      commentCount: p._count?.comments ?? p.commentCount ?? 0,
+      tags: (() => {
+        if (Array.isArray(p.tags)) return p.tags;
+        if (typeof p.tags === 'string' && p.tags) {
+          try { return JSON.parse(p.tags); } catch { return []; }
+        }
+        return [];
+      })(),
+    }));
+
+    return { posts: normalized, total };
+  } catch (error: any) {
     logger.error('Get my posts error:', {
       error: error.message,
       code: error.code,
@@ -237,6 +250,62 @@ export async function getMyPosts(userId: string, params: GetMyPostsParams): Prom
       params,
     });
     throw new Error('MY_POSTS_FETCH_FAILED');
+  }
+}
+
+/**
+ * 更新帖子
+ */
+export async function updatePost(
+  postId: string,
+  userId: string,
+  data: { contentType?: string; title?: string; content?: string; tags?: string[] }
+): Promise<any> {
+  try {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new Error('POST_NOT_FOUND');
+    if (post.userId !== userId) throw new Error('POST_PERMISSION_DENIED');
+
+    const updateData: any = {};
+    if (data.contentType !== undefined) updateData.contentType = data.contentType;
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.content !== undefined) {
+      if (data.content.length < 1 || data.content.length > 5000) {
+        throw new Error('POST_CONTENT_INVALID');
+      }
+      updateData.content = data.content;
+    }
+    if (data.tags !== undefined) {
+      updateData.tags = JSON.stringify(data.tags);
+    }
+
+    return await prisma.post.update({ where: { id: postId }, data: updateData });
+  } catch (error: any) {
+    if (['POST_NOT_FOUND', 'POST_PERMISSION_DENIED', 'POST_CONTENT_INVALID'].includes(error.message)) {
+      throw error;
+    }
+    logger.error('Update post error:', error);
+    throw new Error('POST_UPDATE_FAILED');
+  }
+}
+
+/**
+ * 删除帖子
+ */
+export async function deletePost(postId: string, userId: string): Promise<void> {
+  try {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new Error('POST_NOT_FOUND');
+    if (post.userId !== userId) throw new Error('POST_PERMISSION_DENIED');
+
+    await prisma.post.delete({ where: { id: postId } });
+    logger.info(`Post deleted: ${postId} by user ${userId}`);
+  } catch (error: any) {
+    if (['POST_NOT_FOUND', 'POST_PERMISSION_DENIED'].includes(error.message)) {
+      throw error;
+    }
+    logger.error('Delete post error:', error);
+    throw new Error('POST_DELETE_FAILED');
   }
 }
 

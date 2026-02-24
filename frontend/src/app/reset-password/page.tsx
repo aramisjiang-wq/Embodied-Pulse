@@ -6,6 +6,7 @@ import { LockOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/api/client';
+import styles from './page.module.css';
 
 export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
@@ -27,9 +28,10 @@ export default function ResetPasswordPage() {
     const validateToken = async () => {
       try {
         const response = await apiClient.get(`/password-reset/validate/${token}`);
-        if (response.data?.valid) {
+        const validateData = response.data as { valid?: boolean; email?: string };
+        if (validateData?.valid) {
           setValid(true);
-          setEmail(response.data.email);
+          setEmail(validateData.email || '');
         }
       } catch (error) {
         message.error('重置链接无效或已过期');
@@ -132,15 +134,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f0f2f5',
-      padding: '24px'
-    }}>
-      <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+    <div className={styles.pageWrapper}>
+      <Card className={styles.formCard}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>重置密码</h1>
           <p style={{ color: '#666' }}>为账号 {email} 设置新密码</p>

@@ -6,25 +6,35 @@
 
 import { useEffect, useState } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Space, Button, App } from 'antd';
-import { 
-  DashboardOutlined, 
-  FileTextOutlined, 
-  UserOutlined, 
+import {
+  DashboardOutlined,
+  FileTextOutlined,
+  UserOutlined,
   CommentOutlined,
   BarChartOutlined,
   BellOutlined,
   LockOutlined,
-  ReloadOutlined,
   LogoutOutlined,
   SettingOutlined,
   GithubOutlined,
   RobotOutlined,
   TeamOutlined,
   PlayCircleOutlined,
+  SearchOutlined,
+  ApiOutlined,
+  ToolOutlined,
+  PictureOutlined,
+  AppstoreOutlined,
+  FileOutlined,
+  ThunderboltOutlined,
+  HeartOutlined,
+  WarningOutlined,
+  NotificationOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/lib/api/auth';
+import styles from './layout.module.css';
 
 const { Sider, Content, Header } = Layout;
 
@@ -34,12 +44,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, token, initialize, setUser, logout } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { message } = App.useApp();
 
   useEffect(() => {
-    // 初始化token（从localStorage加载）
-    initialize();
-  }, [initialize]);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    initialize(pathname ?? '/admin');
+  }, [initialize, pathname, mounted]);
 
   useEffect(() => {
     // 跳过登录页面的检查
@@ -63,7 +78,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (savedUser && !user) {
           try {
             const userData = JSON.parse(savedUser);
-            setUser(userData);
+            setUser(userData, true);
             console.log('[AdminLayout] User info restored from sessionStorage:', userData.email);
           } catch (e) {
             console.error('[AdminLayout] Failed to parse saved user:', e);
@@ -85,7 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (savedToken && currentUser) {
           console.log('[AdminLayout] Token and user ready, skipping auth check');
           if (!user && currentUser) {
-            setUser(currentUser);
+            setUser(currentUser, true);
           }
           setAuthChecked(true);
           return;
@@ -145,7 +160,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (savedUser) {
           try {
             const userData = JSON.parse(savedUser);
-            setUser(userData);
+            setUser(userData, true);
             console.log('[AdminLayout] User info restored from sessionStorage:', userData.email);
             setAuthChecked(true);
             return;
@@ -182,7 +197,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       console.log('[AdminLayout] Loading user info...');
       const userInfo = await authApi.getAdminMe();
       console.log('[AdminLayout] User info loaded:', userInfo?.email);
-      setUser(userInfo);
+      setUser(userInfo, true);
       setAuthChecked(true);
     } catch (error: any) {
       console.error('[AdminLayout] Failed to load user info:', error);
@@ -262,145 +277,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const menuItems = [
     {
-      key: '/admin',
-      icon: <DashboardOutlined />,
-      label: '数据看板',
-      onClick: () => router.push('/admin'),
-    },
-    {
-      type: 'divider' as const,
-    },
-    {
-      key: 'paper-management',
-      icon: <FileTextOutlined />,
-      label: '论文',
-      children: [
-        {
-          key: '/admin/content/papers',
-          icon: <FileTextOutlined />,
-          label: '论文管理',
-          onClick: () => router.push('/admin/content/papers'),
-        },
-        {
-          key: '/admin/paper-search-keywords',
-          icon: <FileTextOutlined />,
-          label: '论文搜索关键词管理',
-          onClick: () => router.push('/admin/paper-search-keywords'),
-        },
-      ],
-    },
-    {
-      key: 'news-management',
-      icon: <FileTextOutlined />,
-      label: '新闻',
-      children: [
-        {
-          key: '/admin/content/news',
-          icon: <FileTextOutlined />,
-          label: '新闻管理',
-          onClick: () => router.push('/admin/content/news'),
-        },
-        {
-          key: '/admin/news-search-keywords',
-          icon: <FileTextOutlined />,
-          label: '新闻搜索关键词管理',
-          onClick: () => router.push('/admin/news-search-keywords'),
-        },
-      ],
-    },
-    {
-      key: 'github-management',
-      icon: <GithubOutlined />,
-      label: 'GitHub',
-      children: [
-        {
-          key: '/admin/content/repos',
-          icon: <GithubOutlined />,
-          label: 'GitHub项目管理',
-          onClick: () => router.push('/admin/content/repos'),
-        },
-      ],
-    },
-    {
-      key: 'content-management',
-      icon: <FileTextOutlined />,
-      label: '内容管理',
-      children: [
-        {
-          key: '/admin/content/huggingface',
-          icon: <RobotOutlined />,
-          label: 'HuggingFace模型',
-          onClick: () => router.push('/admin/content/huggingface'),
-        },
-        {
-          key: '/admin/content/jobs',
-          icon: <TeamOutlined />,
-          label: '招聘岗位管理',
-          onClick: () => router.push('/admin/content/jobs'),
-        },
-        {
-          key: '/admin/subscriptions',
-          icon: <BellOutlined />,
-          label: '订阅管理',
-          onClick: () => router.push('/admin/subscriptions'),
-        },
-      ],
-    },
-    {
-      key: 'bilibili-management',
-      icon: <PlayCircleOutlined />,
-      label: 'B站',
-      children: [
-        {
-          key: '/admin/content/videos',
-          icon: <PlayCircleOutlined />,
-          label: '视频管理',
-          onClick: () => router.push('/admin/content/videos'),
-        },
-        {
-          key: '/admin/bilibili-uploaders',
-          icon: <UserOutlined />,
-          label: 'UP主订阅',
-          onClick: () => router.push('/admin/bilibili-uploaders'),
-        },
-        {
-          key: '/admin/bilibili-search-keywords',
-          icon: <FileTextOutlined />,
-          label: '搜索词管理',
-          onClick: () => router.push('/admin/bilibili-search-keywords'),
-        },
-      ],
-    },
-    {
-      key: 'operations-management',
+      key: 'site-data',
       icon: <BarChartOutlined />,
-      label: '运营管理',
+      label: '网站数据',
       children: [
         {
-          key: '/admin/banners',
-          icon: <FileTextOutlined />,
-          label: 'Banner管理',
-          onClick: () => router.push('/admin/banners'),
+          key: '/admin',
+          icon: <DashboardOutlined />,
+          label: '数据看板',
+          onClick: () => router.push('/admin'),
         },
-        {
-          key: '/admin/home-modules',
-          icon: <FileTextOutlined />,
-          label: '首页模块',
-          onClick: () => router.push('/admin/home-modules'),
-        },
-        {
-          key: '/admin/pages',
-          icon: <FileTextOutlined />,
-          label: '自定义页面',
-          onClick: () => router.push('/admin/pages'),
-        },
-      ],
-    },
-    {
-      key: 'user-management',
-      icon: <UserOutlined />,
-      label: '用户管理',
-      children: [
         {
           key: '/admin/users',
           icon: <UserOutlined />,
@@ -410,15 +296,112 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ],
     },
     {
-      key: 'community-management',
-      icon: <CommentOutlined />,
-      label: '市集管理',
+      key: 'content-management',
+      icon: <AppstoreOutlined />,
+      label: '内容管理',
       children: [
+        {
+          key: '/admin/content/papers',
+          icon: <FileTextOutlined />,
+          label: '论文管理',
+          onClick: () => router.push('/admin/content/papers'),
+        },
+        {
+          key: '/admin/paper-search-keywords',
+          icon: <SearchOutlined />,
+          label: '论文搜索关键词',
+          onClick: () => router.push('/admin/paper-search-keywords'),
+        },
+        {
+          key: '/admin/content/repos',
+          icon: <GithubOutlined />,
+          label: 'Github代码管理',
+          onClick: () => router.push('/admin/content/repos'),
+        },
+        {
+          key: '/admin/content/huggingface',
+          icon: <RobotOutlined />,
+          label: 'Huggingface管理',
+          onClick: () => router.push('/admin/content/huggingface'),
+        },
+        {
+          key: '/admin/content/videos',
+          icon: <PlayCircleOutlined />,
+          label: '视频管理',
+          onClick: () => router.push('/admin/content/videos'),
+        },
+        {
+          key: '/admin/bilibili-uploaders',
+          icon: <TeamOutlined />,
+          label: 'UP管理',
+          onClick: () => router.push('/admin/bilibili-uploaders'),
+        },
+        {
+          key: '/admin/bilibili-search-keywords',
+          icon: <SearchOutlined />,
+          label: '视频搜索词管理',
+          onClick: () => router.push('/admin/bilibili-search-keywords'),
+        },
+        {
+          key: '/admin/content/jobs',
+          icon: <ThunderboltOutlined />,
+          label: '招聘管理',
+          onClick: () => router.push('/admin/content/jobs'),
+        },
+        {
+          key: '/admin/news',
+          icon: <NotificationOutlined />,
+          label: '新闻管理',
+          onClick: () => router.push('/admin/news'),
+        },
         {
           key: '/admin/community',
           icon: <CommentOutlined />,
           label: '市集管理',
           onClick: () => router.push('/admin/community'),
+        },
+        {
+          key: '/admin/subscriptions',
+          icon: <BellOutlined />,
+          label: '订阅管理',
+          onClick: () => router.push('/admin/subscriptions'),
+        },
+        {
+          key: '/admin/data-sources',
+          icon: <ApiOutlined />,
+          label: '第三方API管理',
+          onClick: () => router.push('/admin/data-sources'),
+        },
+      ],
+    },
+    {
+      key: 'operations-tools',
+      icon: <ToolOutlined />,
+      label: '运营工具',
+      children: [
+        {
+          key: '/admin/banners',
+          icon: <PictureOutlined />,
+          label: 'Banner管理',
+          onClick: () => router.push('/admin/banners'),
+        },
+        {
+          key: '/admin/home-modules',
+          icon: <AppstoreOutlined />,
+          label: '首页模块管理',
+          onClick: () => router.push('/admin/home-modules'),
+        },
+        {
+          key: '/admin/pages',
+          icon: <FileOutlined />,
+          label: '自定义页面',
+          onClick: () => router.push('/admin/pages'),
+        },
+        {
+          key: '/admin/admins',
+          icon: <LockOutlined />,
+          label: '管理员',
+          onClick: () => router.push('/admin/admins'),
         },
       ],
     },
@@ -428,92 +411,155 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       label: '系统管理',
       children: [
         {
-          key: '/admin/admins',
-          icon: <LockOutlined />,
-          label: '管理员',
-          onClick: () => router.push('/admin/admins'),
+          key: '/admin/system',
+          icon: <HeartOutlined />,
+          label: '系统概览',
+          onClick: () => router.push('/admin/system'),
         },
         {
-          key: '/admin/data-sources',
-          icon: <ReloadOutlined />,
-          label: '第三方API管理',
-          onClick: () => router.push('/admin/data-sources'),
+          key: '/admin/system/health',
+          icon: <HeartOutlined />,
+          label: '健康状态',
+          onClick: () => router.push('/admin/system/health'),
+        },
+        {
+          key: '/admin/system/tech-debt',
+          icon: <WarningOutlined />,
+          label: '技术债务',
+          onClick: () => router.push('/admin/system/tech-debt'),
         },
       ],
     },
   ];
 
-  // 如果是登录页面，不显示侧边栏和布局
-  if (pathname === '/admin/login') {
+  const isLoginPage = pathname === '/admin/login';
+
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {children}
+      </div>
+    );
+  }
+
+  if (isLoginPage) {
     return <>{children}</>;
   }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={200} style={{ background: '#fff', boxShadow: '2px 0 8px rgba(0,0,0,0.08)' }}>
+      <Sider
+        width={216}
+        className={styles.sider}
+        style={{
+          background: '#fff',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
+          overflow: 'auto',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+        }}
+      >
+        {/* Logo 区域 */}
         <div
           style={{
-            padding: '16px',
+            padding: '14px 16px',
             borderBottom: '1px solid #f0f0f0',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            background: '#fff',
           }}
         >
-          <GithubOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-          <span style={{ fontSize: 16, fontWeight: 'bold', color: '#1890ff' }}>
-            Embodied Pulse
-          </span>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <ThunderboltOutlined style={{ fontSize: 14, color: '#fff' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', lineHeight: 1.2 }}>
+              Embodied Pulse
+            </div>
+            <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: 1.2, marginTop: 1 }}>
+              管理后台
+            </div>
+          </div>
         </div>
+
         <Menu
           mode="inline"
           selectedKeys={[pathname || '']}
-          defaultOpenKeys={['paper-management', 'news-management', 'github-management', 'content-management', 'bilibili-management', 'operations-management', 'user-management', 'community-management', 'system-management']}
-          style={{ height: '100%', borderRight: 0 }}
+          defaultOpenKeys={['site-data', 'content-management', 'operations-tools']}
+          style={{
+            borderRight: 0,
+            fontSize: 13,
+            paddingTop: 4,
+          }}
           items={menuItems}
         />
       </Sider>
-      <Layout style={{ background: '#f0f2f5' }}>
+
+      <Layout style={{ marginLeft: 216, background: '#f5f6fa' }}>
         <Header
           style={{
             background: '#fff',
-            padding: '0 24px',
+            padding: '0 20px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            height: 52,
+            lineHeight: '52px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 'bold', color: '#1890ff' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
             管理后台
           </div>
-          <Space>
+          <Space size={4}>
             {user ? (
               <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-                <Space style={{ cursor: 'pointer', padding: '0 8px' }}>
+                <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 6, transition: 'background 0.2s' }}
+                  className="admin-user-dropdown"
+                >
                   <Avatar
                     src={user.avatarUrl}
                     icon={!user.avatarUrl && <UserOutlined />}
-                    size="default"
+                    size={28}
+                    style={{ background: '#1677ff' }}
                   />
-                  <span>{user.username || user.email}</span>
+                  <span style={{ fontSize: 13, color: '#333' }}>{user.username || user.email}</span>
                 </Space>
               </Dropdown>
             ) : (
-              <Button type="link" onClick={handleLogout} icon={<LogoutOutlined />}>
+              <Button size="small" type="text" onClick={handleLogout} icon={<LogoutOutlined />}>
                 退出登录
               </Button>
             )}
           </Space>
         </Header>
+
         <Content
           style={{
-            padding: 24,
+            padding: 20,
             margin: '16px',
             minHeight: 280,
             background: '#fff',
             borderRadius: 8,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           }}
         >
           {children}

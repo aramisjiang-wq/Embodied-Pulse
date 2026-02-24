@@ -218,7 +218,7 @@ async function main() {
     // 生成仓库数据
     const repoData = [
       {
-        repoId: 123456789,
+        repoId: '123456789',
         fullName: 'openai/embodied-ai',
         name: 'embodied-ai',
         description: 'OpenAI\'s embodied AI research and implementations.',
@@ -230,11 +230,11 @@ async function main() {
         homepageUrl: 'https://openai.com/research/embodied-ai',
         owner: 'openai',
         updatedDate: new Date('2024-01-20'),
-        view_count: 8900,
-        favorite_count: 156,
+        viewCount: 8900,
+        favoriteCount: 156,
       },
       {
-        repoId: 987654321,
+        repoId: '987654321',
         fullName: 'deepmind/robotics',
         name: 'robotics',
         description: 'DeepMind robotics research code and datasets.',
@@ -246,11 +246,11 @@ async function main() {
         homepageUrl: 'https://deepmind.com/research/robotics',
         owner: 'deepmind',
         updatedDate: new Date('2024-01-18'),
-        view_count: 6700,
-        favorite_count: 98,
+        viewCount: 6700,
+        favoriteCount: 98,
       },
       {
-        repoId: 456789123,
+        repoId: '456789123',
         fullName: 'facebookresearch/habitat',
         name: 'habitat',
         description: 'A platform for embodied AI research.',
@@ -262,8 +262,8 @@ async function main() {
         homepageUrl: 'https://ai.facebook.com/tools/habitat',
         owner: 'facebookresearch',
         updatedDate: new Date('2024-01-22'),
-        view_count: 12300,
-        favorite_count: 245,
+        viewCount: 12300,
+        favoriteCount: 245,
       },
     ];
 

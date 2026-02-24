@@ -71,6 +71,8 @@ export interface BilibiliUploaderVideo {
   favorites: number;
   pubdate: number;
   url: string;
+  author?: string;
+  mid?: number;
 }
 
 export interface BilibiliAPIResponse<T = any> {

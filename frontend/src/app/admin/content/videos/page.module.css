@@ -1,0 +1,191 @@
+/**
+ * 视频管理页 - 样式
+ * 与 variables.css 和 admin 看板风格统一
+ */
+
+.pageWrapper {
+  padding: var(--spacing-lg);
+  background: var(--color-bg-default);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pageTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.pageTitleIcon {
+  color: var(--color-primary);
+  font-size: 22px;
+}
+
+/* ── 统计卡片行 ──────────────────────────────────────────────────── */
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.statCard {
+  background: var(--color-bg-paper);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-normal), transform var(--transition-fast);
+}
+
+.statCard:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.statCardPrimary {
+  border-left: 4px solid var(--color-primary);
+}
+
+.statCardSuccess {
+  border-left: 4px solid var(--color-success);
+}
+
+.statCardWarning {
+  border-left: 4px solid var(--color-warning);
+}
+
+.statCardInfo {
+  border-left: 4px solid var(--color-info);
+}
+
+.statCardPurple {
+  border-left: 4px solid #722ed1;
+}
+
+.statCardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.statCardIcon {
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.statCardLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.statCardValue {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+}
+
+.statCardSub {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── 筛选区 ──────────────────────────────────────────────────────── */
+
+.filterCard {
+  background: var(--color-bg-paper);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── 表格容器 ────────────────────────────────────────────────────── */
+
+.tableCard {
+  background: var(--color-bg-paper);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.tableCard :global(.ant-table) {
+  font-size: var(--font-size-sm);
+}
+
+.tableCard :global(.ant-table-thead > tr > th) {
+  background: var(--table-header-bg) !important;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.tableCard :global(.ant-table-tbody > tr:hover > td) {
+  background: var(--color-bg-hover) !important;
+}
+
+/* ── 空状态 ───────────────────────────────────────────────────────── */
+
+.emptyWrap {
+  padding: 48px 24px;
+  background: var(--color-bg-paper);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+}
+
+/* ── 模态框 ───────────────────────────────────────────────────────── */
+
+.modalHeader {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-light);
+  margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .statsRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filterRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -28,7 +28,7 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
   const router = useRouter();
 
   const loadSubscriptions = useCallback(async () => {
-    if (!user) return;
+    if (!user || !user.id) return;
     
     setLoading(true);
     try {
@@ -38,9 +38,8 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
       });
       setSubscriptions(Array.isArray(data.items) ? data.items : []);
     } catch (error: unknown) {
-      console.error('Load subscriptions error:', error);
       const code = (error && typeof error === 'object' && 'code' in error) ? (error as { code?: string }).code : undefined;
-      if (code !== 'CONNECTION_REFUSED' && code !== 'TIMEOUT' && code !== 'NETWORK_ERROR') {
+      if (code !== 'UNAUTHORIZED' && code !== 'CONNECTION_REFUSED' && code !== 'TIMEOUT' && code !== 'NETWORK_ERROR') {
       }
       setSubscriptions([]);
     } finally {
@@ -49,7 +48,8 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
   }, [user]);
 
   useEffect(() => {
-    if (hydrated && user) {
+    if (!hydrated) return;
+    if (user && user.id) {
       loadSubscriptions();
     }
   }, [hydrated, user, loadSubscriptions]);

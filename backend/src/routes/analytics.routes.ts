@@ -1,44 +1,31 @@
 import { Router } from 'express';
 import { 
-  getBilibiliUploaders,
-  getOverview,
-  getPublishTrend,
-  getPlayHeatmap,
-  getRankings,
-  getUploaderDetail,
-  exportData,
   getPublicBilibiliUploaders,
   getPublicOverview,
   getPublicPublishTrend,
   getPublicPlayHeatmap,
   getPublicRankings,
-  getPublicUploaderDetail
+  getPublicUploaderDetail,
+  exportData
 } from '../controllers/analytics.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { checkVipPermission } from '../middleware/vip-permission.middleware';
 
 const router = Router();
 
-const publicRouter = Router();
-const privateRouter = Router();
+const vipRouter = Router();
 
-privateRouter.use(authenticate);
+vipRouter.use(authenticate);
+vipRouter.use(checkVipPermission('bilibili-analytics'));
 
-publicRouter.get('/bilibili/uploaders', getPublicBilibiliUploaders);
-publicRouter.get('/bilibili/overview', getPublicOverview);
-publicRouter.get('/bilibili/publish-trend', getPublicPublishTrend);
-publicRouter.get('/bilibili/play-heatmap', getPublicPlayHeatmap);
-publicRouter.get('/bilibili/rankings', getPublicRankings);
-publicRouter.get('/bilibili/uploader-detail', getPublicUploaderDetail);
+vipRouter.get('/bilibili/uploaders', getPublicBilibiliUploaders);
+vipRouter.get('/bilibili/overview', getPublicOverview);
+vipRouter.get('/bilibili/publish-trend', getPublicPublishTrend);
+vipRouter.get('/bilibili/play-heatmap', getPublicPlayHeatmap);
+vipRouter.get('/bilibili/rankings', getPublicRankings);
+vipRouter.get('/bilibili/uploader-detail', getPublicUploaderDetail);
+vipRouter.get('/bilibili/export', exportData);
 
-privateRouter.get('/bilibili/uploaders', getBilibiliUploaders);
-privateRouter.get('/bilibili/overview', getOverview);
-privateRouter.get('/bilibili/publish-trend', getPublishTrend);
-privateRouter.get('/bilibili/play-heatmap', getPlayHeatmap);
-privateRouter.get('/bilibili/rankings', getRankings);
-privateRouter.get('/bilibili/uploader-detail', getUploaderDetail);
-privateRouter.get('/bilibili/export', exportData);
-
-router.use('/', publicRouter);
-router.use('/user', privateRouter);
+router.use('/', vipRouter);
 
 export default router;

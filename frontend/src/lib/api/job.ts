@@ -46,7 +46,7 @@ export const jobApi = {
   createJob: async (data: Record<string, unknown>): Promise<Job | null> => {
     const response = await apiClient.post<ApiResponse<Job>>('/jobs', data);
     if (response && response.code === 0 && response.data) {
-      return response.data;
+      return response.data as unknown as Job;
     }
     return null;
   },
@@ -54,7 +54,7 @@ export const jobApi = {
   createJobSeekingPost: async (data: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
     const response = await apiClient.post<ApiResponse<Record<string, unknown>>>('/jobs/job-seeking-posts', data);
     if (response && response.code === 0 && response.data) {
-      return response.data;
+      return response.data as unknown as Record<string, unknown>;
     }
     return null;
   },

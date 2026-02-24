@@ -23,6 +23,9 @@ router.use(requireAdmin);
 // 获取关键词列表
 router.get('/', getKeywordsHandler);
 
+// 获取启用的关键词字符串（用于视频搜索）- 必须在 /:id 之前，否则 "active" 会被当作 id
+router.get('/active/string', getActiveKeywordsStringHandler);
+
 // 获取单个关键词
 router.get('/:id', getKeywordHandler);
 
@@ -34,9 +37,6 @@ router.put('/:id', updateKeywordHandler);
 
 // 删除关键词
 router.delete('/:id', deleteKeywordHandler);
-
-// 获取启用的关键词字符串（用于视频搜索）
-router.get('/active/string', getActiveKeywordsStringHandler);
 
 // 批量创建关键词（用于初始化）
 router.post('/batch', batchCreateKeywordsHandler);

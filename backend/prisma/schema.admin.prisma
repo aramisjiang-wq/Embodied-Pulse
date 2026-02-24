@@ -9,36 +9,34 @@ datasource db {
 }
 
 model admins {
-  id            String    @id
-  username      String    @unique
-  email         String    @unique
+  id            String              @id
+  username      String              @unique
+  email         String              @unique
   password_hash String
   avatar_url    String?
-  role          String    @default("admin")
-  is_active     Boolean   @default(true)
-  created_at    DateTime  @default(now())
+  role          String              @default("admin")
+  is_active     Boolean             @default(true)
+  created_at    DateTime            @default(now())
   updated_at    DateTime
   last_login_at DateTime?
   tags          String?
-  admin_number  String    @unique
-
+  admin_number  String              @unique
   permissions   admin_permissions[]
 
   @@index([is_active])
 }
 
 model admin_permissions {
-  id            String    @id
-  admin_id      String
-  module        String
-  can_view      Boolean   @default(false)
-  can_create    Boolean   @default(false)
-  can_update    Boolean   @default(false)
-  can_delete    Boolean   @default(false)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime
-
-  admin         admins    @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+  id         String   @id
+  admin_id   String
+  module     String
+  can_view   Boolean  @default(false)
+  can_create Boolean  @default(false)
+  can_update Boolean  @default(false)
+  can_delete Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime
+  admin      admins   @relation(fields: [admin_id], references: [id], onDelete: Cascade)
 
   @@unique([admin_id, module])
   @@index([admin_id])
@@ -94,8 +92,8 @@ model comments {
   like_count Int      @default(0)
   created_at DateTime @default(now())
   updated_at DateTime
-  posts      posts    @relation(fields: [post_id], references: [id], onDelete: Cascade)
   users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  posts      posts    @relation(fields: [post_id], references: [id], onDelete: Cascade)
 
   @@index([created_at(sort: Desc)])
   @@index([post_id])
@@ -135,10 +133,12 @@ model github_repos {
   favorite_count Int       @default(0)
   created_at     DateTime  @default(now())
   updated_at     DateTime
+  category       String?
 
   @@index([updated_date(sort: Desc)])
   @@index([stars_count(sort: Desc)])
   @@index([repo_id])
+  @@index([category])
 }
 
 model home_modules {
@@ -173,6 +173,20 @@ model huggingface_models {
   @@index([downloads(sort: Desc)])
 }
 
+model huggingface_author_subscriptions {
+  id           String    @id
+  author       String
+  author_url   String?   @map("author_url")
+  is_active    Int       @default(1) @map("is_active")
+  model_count  Int       @default(0) @map("model_count")
+  tags         String?
+  last_sync_at DateTime? @map("last_sync_at")
+  created_at   DateTime  @default(now()) @map("created_at")
+  updated_at   DateTime  @updatedAt @map("updated_at")
+
+  @@map("huggingface_author_subscriptions")
+}
+
 model jobs {
   id             String   @id
   title          String
@@ -194,14 +208,14 @@ model jobs {
 }
 
 model bilibili_search_keywords {
-  id          String    @id
-  keyword     String    @unique
+  id          String   @id @default(cuid())
+  keyword     String   @unique
   category    String?
-  is_active   Boolean   @default(true)
-  priority    Int       @default(0)
+  is_active   Boolean  @default(true)
+  priority    Int      @default(0)
   description String?
-  created_at  DateTime   @default(now())
-  updated_at  DateTime
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
   @@index([priority(sort: Desc)])
   @@index([is_active])
@@ -209,15 +223,15 @@ model bilibili_search_keywords {
 }
 
 model paper_search_keywords {
-  id          String    @id
-  keyword     String    @unique
+  id          String   @id
+  keyword     String   @unique
   category    String?
-  source_type String    @default("admin")
-  is_active   Boolean   @default(true)
-  priority    Int       @default(0)
+  source_type String   @default("admin")
+  is_active   Boolean  @default(true)
+  priority    Int      @default(0)
   description String?
   tags        String?
-  created_at  DateTime   @default(now())
+  created_at  DateTime @default(now())
   updated_at  DateTime
 
   @@index([priority(sort: Desc)])
@@ -246,15 +260,15 @@ model news {
 }
 
 model news_search_keywords {
-  id          String    @id
-  keyword     String    @unique
+  id          String   @id
+  keyword     String   @unique
   category    String?
-  source_type String    @default("admin")
-  is_active   Boolean   @default(true)
-  priority    Int       @default(0)
+  source_type String   @default("admin")
+  is_active   Boolean  @default(true)
+  priority    Int      @default(0)
   description String?
   tags        String?
-  created_at  DateTime   @default(now())
+  created_at  DateTime @default(now())
   updated_at  DateTime
 
   @@index([priority(sort: Desc)])
@@ -472,41 +486,104 @@ model videos {
 }
 
 model data_sources {
-  id               String    @id
-  name             String    @unique
-  display_name     String
-  enabled          Boolean   @default(true)
-  tags             String?
-  api_base_url     String
-  config           String
-  health_status    String    @default("unknown")
+  id                String    @id
+  name              String    @unique
+  display_name      String
+  enabled           Boolean   @default(true)
+  tags              String?
+  api_base_url      String
+  config            String
+  health_status     String    @default("unknown")
   last_health_check DateTime?
-  last_sync_status String?   @map("last_sync_status")
-  last_sync_result String?   @map("last_sync_result")
-  last_sync_at     DateTime? @map("last_sync_at")
-  created_at       DateTime  @default(now()) @map("created_at")
-  updated_at       DateTime  @updatedAt @map("updated_at")
+  last_sync_status  String?   @map("last_sync_status")
+  last_sync_result  String?   @map("last_sync_result")
+  last_sync_at      DateTime? @map("last_sync_at")
+  created_at        DateTime  @default(now()) @map("created_at")
+  updated_at        DateTime  @updatedAt @map("updated_at")
 
   @@index([enabled])
   @@index([health_status])
 }
 
 model data_source_logs {
-  id             String    @id
-  data_source_id String    @map("data_source_id")
+  id             String   @id
+  data_source_id String   @map("data_source_id")
   type           String
   status         String
-  request_url    String?   @map("request_url")
-  request_method String?   @map("request_method")
-  request_body   String?   @map("request_body")
-  response_code  Int?      @map("response_code")
-  response_body  String?   @map("response_body")
-  error_message  String?   @map("error_message")
+  request_url    String?  @map("request_url")
+  request_method String?  @map("request_method")
+  request_body   String?  @map("request_body")
+  response_code  Int?     @map("response_code")
+  response_body  String?  @map("response_body")
+  error_message  String?  @map("error_message")
   duration       Int?
-  synced_count   Int?      @map("synced_count")
-  error_count    Int?      @map("error_count")
-  created_at     DateTime  @default(now()) @map("created_at")
+  synced_count   Int?     @map("synced_count")
+  error_count    Int?     @map("error_count")
+  created_at     DateTime @default(now()) @map("created_at")
 
   @@index([data_source_id])
   @@index([created_at(sort: Desc)])
+}
+
+model tech_debts {
+  id          String    @id @default(cuid())
+  type        String
+  severity    String    @default("medium")
+  title       String
+  description String?
+  file_path   String?
+  line        Int?
+  column      Int?
+  rule_id     String?
+  status      String    @default("open")
+  assignee    String?
+  resolved_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+}
+
+model system_health {
+  id            String   @id @default(cuid())
+  component     String
+  status        String
+  response_time Int?
+  error_message String?
+  metadata      String?
+  checked_at    DateTime @default(now())
+
+  @@index([component])
+  @@index([checked_at(sort: Desc)])
+}
+
+model dependency_status {
+  id              String   @id @default(cuid())
+  name            String
+  current_version String
+  latest_version  String?
+  vulnerable      Boolean  @default(false)
+  severity        String?
+  recommendation  String?
+  checked_at      DateTime @default(now())
+
+  @@index([name])
+  @@index([vulnerable])
+}
+
+model admin_audit_logs {
+  id         String   @id @default(uuid())
+  admin_id   String
+  action     String
+  target     String?
+  details    String?
+  ip         String?
+  created_at DateTime @default(now())
+
+  @@index([admin_id])
+  @@index([created_at(sort: Desc)])
+  @@index([action])
 }

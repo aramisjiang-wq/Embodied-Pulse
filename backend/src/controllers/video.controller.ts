@@ -8,6 +8,7 @@ import { parsePaginationParams, buildPaginationResponse } from '../utils/paginat
 import { sendSuccess, sendError } from '../utils/response';
 import { getAllActiveUploaders } from '../services/bilibili-uploader.service';
 import { createUserAction } from '../services/user-action.service';
+import { logger } from '../utils/logger';
 
 export async function getVideoList(req: Request, res: Response, next: NextFunction) {
   try {
@@ -28,7 +29,15 @@ export async function getVideoList(req: Request, res: Response, next: NextFuncti
       pagination: buildPaginationResponse(page, size, total),
     });
   } catch (error) {
-    next(error);
+    logger.error('getVideoList 异常，返回空数据:', error);
+    // 兜底：任何未捕获异常也返回 200 + 空数据，避免 500 白屏
+    const { page = 1, size = 20 } = req.query;
+    const p = Math.max(1, Number(page) || 1);
+    const s = Math.min(100, Math.max(1, Number(size) || 20));
+    sendSuccess(res, {
+      items: [],
+      pagination: buildPaginationResponse(p, s, 0),
+    });
   }
 }
 
@@ -71,6 +80,7 @@ export async function getUploaders(req: Request, res: Response, next: NextFuncti
     const uploaders = await getAllActiveUploaders();
     sendSuccess(res, uploaders);
   } catch (error) {
-    next(error);
+    logger.error('getUploaders 异常，返回空列表:', error);
+    sendSuccess(res, []);
   }
 }

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>认证测试页面</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #1890ff; }
+    h2 { color: #333; margin-top: 0; }
+    button {
+      background: #1890ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover { background: #40a9ff; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .success { color: #52c41a; }
+    .error { color: #ff4d4f; }
+    .warning { color: #faad14; }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .log-entry { margin-bottom: 5px; }
+    .log-time { color: #6a9955; }
+    .log-info { color: #9cdcfe; }
+    .log-success { color: #4ec9b0; }
+    .log-error { color: #f14c4c; }
+    .log-warn { color: #cca700; }
+  </style>
+</head>
+<body>
+  <h1>🔐 认证测试页面</h1>
+  
+  <div class="card">
+    <h2>1. localStorage 状态</h2>
+    <button onclick="checkLocalStorage()">检查 localStorage</button>
+    <button onclick="clearLocalStorage()">清空 localStorage</button>
+    <pre id="localStorageStatus">点击按钮查看...</pre>
+  </div>
+
+  <div class="card">
+    <h2>2. 登录测试</h2>
+    <button onclick="testLogin()">测试登录 API</button>
+    <button onclick="simulateFrontendLogin()">模拟前端登录流程</button>
+    <pre id="loginResult">点击按钮测试...</pre>
+  </div>
+
+  <div class="card">
+    <h2>3. Token 验证</h2>
+    <button onclick="testToken()">验证当前 Token</button>
+    <button onclick="testFavorites()">测试 /favorites API</button>
+    <pre id="tokenResult">点击按钮测试...</pre>
+  </div>
+
+  <div class="card">
+    <h2>4. 完整日志</h2>
+    <button onclick="clearLog()">清空日志</button>
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3001/api/v1';
+    
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(`[${type.toUpperCase()}]`, message);
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    function checkLocalStorage() {
+      const status = document.getElementById('localStorageStatus');
+      const userToken = localStorage.getItem('user_token');
+      const adminToken = localStorage.getItem('admin_token');
+      const userUser = localStorage.getItem('user_user');
+      const adminUser = localStorage.getItem('admin_user');
+      
+      log('检查 localStorage...', 'info');
+      
+      status.innerHTML = `
+user_token: ${userToken ? userToken.substring(0, 50) + '...' : 'null'}
+admin_token: ${adminToken ? adminToken.substring(0, 50) + '...' : 'null'}
+user_user: ${userUser || 'null'}
+admin_user: ${adminUser || 'null'}
+      `.trim();
+      
+      if (userToken) {
+        log('✅ 发现 user_token', 'success');
+      } else {
+        log('⚠️ 未找到 user_token', 'warn');
+      }
+    }
+
+    function clearLocalStorage() {
+      localStorage.removeItem('user_token');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('user_user');
+      localStorage.removeItem('admin_user');
+      log('已清空 localStorage', 'warn');
+      checkLocalStorage();
+    }
+
+    async function testLogin() {
+      const resultDiv = document.getElementById('loginResult');
+      resultDiv.textContent = '登录中...';
+      log('开始登录测试...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'test@test.com', password: 'Test123456' })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.data?.token) {
+          log('✅ 登录成功！', 'success');
+          log(`Token: ${data.data.token.substring(0, 30)}...`, 'info');
+          log(`User: ${JSON.stringify(data.data.user)}`, 'info');
+          
+          // 保存到 localStorage
+          localStorage.setItem('user_token', data.data.token);
+          localStorage.setItem('user_user', JSON.stringify(data.data.user));
+          log('✅ 已保存到 localStorage', 'success');
+          
+          resultDiv.innerHTML = `<span class="success">登录成功！</span>
+Token: ${data.data.token.substring(0, 50)}...
+User: ${JSON.stringify(data.data.user, null, 2)}`;
+          
+          checkLocalStorage();
+        } else {
+          log('❌ 登录失败: ' + JSON.stringify(data), 'error');
+          resultDiv.innerHTML = `<span class="error">登录失败</span>
+${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        log('❌ 请求失败: ' + error.message, 'error');
+        resultDiv.innerHTML = `<span class="error">请求失败</span>
+${error.message}`;
+      }
+    }
+
+    async function simulateFrontendLogin() {
+      log('模拟前端登录流程...', 'info');
+      
+      // 1. 先清空
+      localStorage.removeItem('user_token');
+      localStorage.removeItem('user_user');
+      log('已清空旧 token', 'info');
+      
+      // 2. 登录
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test@test.com', password: 'Test123456' })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.data?.token) {
+        log('❌ 登录失败', 'error');
+        return;
+      }
+      
+      const { token, user } = data.data;
+      log(`登录成功，token: ${token.substring(0, 30)}...`, 'success');
+      
+      // 3. 模拟 authStore.setToken 的逻辑
+      const key = 'user_token';
+      const userKey = 'user_user';
+      
+      localStorage.setItem(key, token);
+      log(`已保存 token 到 ${key}`, 'success');
+      
+      localStorage.setItem(userKey, JSON.stringify(user));
+      log(`已保存 user 到 ${userKey}`, 'success');
+      
+      // 4. 立即验证
+      const savedToken = localStorage.getItem('user_token');
+      const savedUser = localStorage.getItem('user_user');
+      
+      log(`验证: savedToken = ${savedToken?.substring(0, 30)}...`, 'info');
+      log(`验证: savedUser = ${savedUser}`, 'info');
+      
+      // 5. 模拟页面跳转
+      log('模拟页面跳转 (300ms 后)...', 'info');
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // 6. 跳转后再次验证
+      const afterToken = localStorage.getItem('user_token');
+      const afterUser = localStorage.getItem('user_user');
+      
+      log(`跳转后验证: token = ${afterToken?.substring(0, 30)}...`, 'info');
+      log(`跳转后验证: user = ${afterUser}`, 'info');
+      
+      if (afterToken === token) {
+        log('✅ Token 在跳转后仍然存在！', 'success');
+      } else {
+        log('❌ Token 在跳转后丢失！', 'error');
+      }
+      
+      checkLocalStorage();
+    }
+
+    async function testToken() {
+      const token = localStorage.getItem('user_token');
+      const resultDiv = document.getElementById('tokenResult');
+      
+      if (!token) {
+        log('❌ 未找到 token，请先登录', 'error');
+        resultDiv.innerHTML = '<span class="error">未找到 token，请先登录</span>';
+        return;
+      }
+      
+      log('验证 token...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          log('✅ Token 有效！', 'success');
+          resultDiv.innerHTML = `<span class="success">Token 有效</span>
+${JSON.stringify(data, null, 2)}`;
+        } else {
+          log('❌ Token 无效: ' + JSON.stringify(data), 'error');
+          resultDiv.innerHTML = `<span class="error">Token 无效</span>
+${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        log('❌ 请求失败: ' + error.message, 'error');
+        resultDiv.innerHTML = `<span class="error">请求失败</span>
+${error.message}`;
+      }
+    }
+
+    async function testFavorites() {
+      const token = localStorage.getItem('user_token');
+      const resultDiv = document.getElementById('tokenResult');
+      
+      if (!token) {
+        log('❌ 未找到 token，请先登录', 'error');
+        resultDiv.innerHTML = '<span class="error">未找到 token，请先登录</span>';
+        return;
+      }
+      
+      log('测试 /favorites API...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/favorites?page=1&size=10`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await response.json();
+        
+        if (response.status === 401) {
+          log('❌ 401 未授权！Token 可能无效或请求未携带 Authorization header', 'error');
+          resultDiv.innerHTML = `<span class="error">401 未授权</span>
+${JSON.stringify(data, null, 2)}`;
+        } else if (response.ok) {
+          log('✅ /favorites API 正常！', 'success');
+          resultDiv.innerHTML = `<span class="success">API 正常</span>
+${JSON.stringify(data, null, 2)}`;
+        } else {
+          log('⚠️ API 返回非预期状态: ' + response.status, 'warn');
+          resultDiv.innerHTML = `<span class="warning">状态 ${response.status}</span>
+${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        log('❌ 请求失败: ' + error.message, 'error');
+        resultDiv.innerHTML = `<span class="error">请求失败</span>
+${error.message}`;
+      }
+    }
+
+    // 页面加载时自动检查
+    window.onload = () => {
+      log('页面加载完成', 'info');
+      checkLocalStorage();
+    };
+  </script>
+</body>
+</html>

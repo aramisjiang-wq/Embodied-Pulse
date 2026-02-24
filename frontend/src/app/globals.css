@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import '../styles/variables.css';
+
+@import "tailwindcss";
 
 /* 动画效果 */
 @keyframes pulse {
@@ -119,17 +119,17 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--color-bg-default);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--color-border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--color-text-tertiary);
 }
 
 /* 平滑滚动 */
@@ -398,7 +398,7 @@ img {
 
 /* 渐变文字效果 */
 .gradient-text {
-  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -473,7 +473,7 @@ img {
 /* Tab按钮容器 - 横向滚动优化 */
 .tab-buttons-container {
   scrollbar-width: thin;
-  scrollbar-color: #d9d9d9 transparent;
+  scrollbar-color: var(--color-border) transparent;
 }
 
 .tab-buttons-container::-webkit-scrollbar {
@@ -486,12 +486,12 @@ img {
 }
 
 .tab-buttons-container::-webkit-scrollbar-thumb {
-  background: #d9d9d9;
+  background: var(--color-border);
   border-radius: 3px;
 }
 
 .tab-buttons-container::-webkit-scrollbar-thumb:hover {
-  background: #bfbfbf;
+  background: var(--color-text-tertiary);
 }
 
 /* 论文卡片样式优化 */
@@ -502,7 +502,7 @@ img {
 .ant-card-hoverable:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   transform: translateY(-4px);
-  border-color: #d9d9d9;
+  border-color: var(--color-border);
 }
 
 /* 论文卡片内容优化 */
@@ -523,7 +523,7 @@ img {
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1) 0%, rgba(9, 109, 217, 0.1) 100%);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary-bg) 100%);
   border-radius: 12px;
   flex-shrink: 0;
 }
@@ -542,6 +542,57 @@ img {
 
 /* 自定义 Select 下拉菜单样式 */
 .custom-select-popup {
-  background: var(--bg-secondary, #fff) !important;
-  border: 1px solid var(--border-color, #d9d9d9) !important;
+  background: var(--color-bg-paper) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+/* 管理后台侧边栏紧凑样式 */
+.ant-layout-sider .ant-menu-item {
+  height: 34px !important;
+  line-height: 34px !important;
+  font-size: 13px !important;
+  margin: 1px 4px !important;
+  border-radius: 6px !important;
+  padding-left: 28px !important;
+}
+
+.ant-layout-sider .ant-menu-sub .ant-menu-item {
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 12.5px !important;
+}
+
+.ant-layout-sider .ant-menu-submenu-title {
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #595959 !important;
+  margin: 2px 4px !important;
+  border-radius: 6px !important;
+}
+
+.ant-layout-sider .ant-menu-submenu-title:hover {
+  color: #1677ff !important;
+  background: #f0f5ff !important;
+}
+
+.ant-layout-sider .ant-menu-item .ant-menu-item-icon,
+.ant-layout-sider .ant-menu-submenu-title .ant-menu-item-icon {
+  font-size: 13px !important;
+}
+
+.ant-layout-sider .ant-menu-inline .ant-menu-item::after {
+  display: none !important;
+}
+
+.ant-layout-sider .ant-menu-item-selected {
+  background: #e6f4ff !important;
+  color: #1677ff !important;
+  font-weight: 500 !important;
+}
+
+/* Header 用户下拉hover效果 */
+.admin-user-dropdown:hover {
+  background: #f5f5f5;
 }

@@ -21,7 +21,7 @@ import { logger } from '../utils/logger';
  */
 export async function getKeywordsHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { skip, take } = parsePaginationParams(req.query);
+    const { skip, take, page, size } = parsePaginationParams(req.query);
     const { isActive, category, keyword } = req.query;
 
     const result = await getAllKeywords({
@@ -46,7 +46,7 @@ export async function getKeywordsHandler(req: Request, res: Response, next: Next
 
     sendSuccess(res, {
       items,
-      pagination: buildPaginationResponse(result.total, skip, take),
+      pagination: buildPaginationResponse(page, size, result.total),
     });
   } catch (error: any) {
     logger.error('获取关键词列表失败:', error);

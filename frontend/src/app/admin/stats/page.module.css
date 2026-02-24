@@ -1,0 +1,11 @@
+.pageWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.loadingText {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}

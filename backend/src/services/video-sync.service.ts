@@ -59,7 +59,7 @@ export async function syncVideosForUploader(
       throw new Error(`UP主不存在: ${uploaderId}`);
     }
 
-    if (!uploader.isActive) {
+    if (!uploader.is_active) {
       logger.warn(`UP主未激活，跳过同步: ${uploader.name} (mid: ${uploader.mid})`);
       return {
         success: true,
@@ -106,8 +106,8 @@ export async function syncVideosForUploader(
     await prisma.bilibili_uploaders.update({
       where: { id: uploaderId },
       data: {
-        videoCount: stats.synced + stats.updated,
-        lastSyncAt: new Date()
+        video_count: stats.synced + stats.updated,
+        last_sync_at: new Date()
       }
     });
 
@@ -350,7 +350,7 @@ export async function syncAllUploadersVideos(
     logger.info('========== 开始同步所有UP主的视频数据 ==========');
 
     const uploaders = await prisma.bilibili_uploaders.findMany({
-      where: { isActive: true },
+      where: { is_active: true },
       select: { id: true, name: true, mid: true }
     });
 
@@ -435,13 +435,13 @@ export async function quickSyncRecentUploaders(
 
     const uploaders = await prisma.bilibili_uploaders.findMany({
       where: {
-        isActive: true,
-        lastSyncAt: {
+        is_active: true,
+        last_sync_at: {
           lt: cutoffDate
         }
       },
       select: { id: true, name: true, mid: true },
-      orderBy: { lastSyncAt: 'asc' }
+      orderBy: { last_sync_at: 'asc' }
     });
 
     logger.info(`找到 ${uploaders.length} 个需要同步的UP主`);

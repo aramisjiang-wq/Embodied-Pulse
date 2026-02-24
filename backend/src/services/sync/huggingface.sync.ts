@@ -231,6 +231,10 @@ export async function syncHuggingFaceModels(task?: string, maxResults: number = 
           downloads: model.downloads || 0,
           likes: model.likes || 0,
           lastModified: lastModified,
+          isPinned: false,
+          pinnedAt: null,
+          contentType: 'model',
+          category: null,
         });
 
         syncedCount++;

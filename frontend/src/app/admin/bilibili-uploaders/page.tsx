@@ -1,5 +1,5 @@
 /**
- * Bilibili UP主管理页面
+ * Bilibili UP主管理页面 - 科技极简风
  */
 
 'use client';
@@ -11,7 +11,6 @@ import {
   Input,
   Modal,
   Form,
-  message,
   Space,
   Tag,
   Popconfirm,
@@ -19,12 +18,12 @@ import {
   Card,
   Dropdown,
   MenuProps,
-  Checkbox,
   Row,
   Col,
   Statistic,
   Badge,
   Progress as AntProgress,
+  Select,
 } from 'antd';
 import {
   PlusOutlined,
@@ -42,6 +41,7 @@ import {
 import { bilibiliUploaderApi, BilibiliUploader } from '@/lib/api/bilibili-uploader';
 import dayjs from 'dayjs';
 import { App, Progress } from 'antd';
+import styles from './page.module.css';
 
 export default function BilibiliUploadersPage() {
   const { message } = App.useApp();
@@ -49,9 +49,10 @@ export default function BilibiliUploadersPage() {
   const [uploaders, setUploaders] = useState<BilibiliUploader[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(100);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [tagFilter, setTagFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>(''); // '' | '中国厂商' | '国外厂商'
   const [editTagsModalVisible, setEditTagsModalVisible] = useState(false);
   const [editingUploader, setEditingUploader] = useState<BilibiliUploader | null>(null);
   const [tagInput, setTagInput] = useState('');
@@ -68,7 +69,7 @@ export default function BilibiliUploadersPage() {
 
   useEffect(() => {
     loadUploaders();
-  }, [page, pageSize, tagFilter]);
+  }, [page, pageSize, tagFilter, categoryFilter]);
 
   useEffect(() => {
     loadSchedulerStatus();
@@ -113,22 +114,29 @@ export default function BilibiliUploadersPage() {
   const loadUploaders = async () => {
     setLoading(true);
     try {
+      const hasFilter = !!(tagFilter || categoryFilter);
+      const fetchSize = hasFilter ? 500 : pageSize;
+      const fetchPage = hasFilter ? 1 : page;
       const data = await bilibiliUploaderApi.getUploaders({
-        page,
-        size: pageSize,
+        page: fetchPage,
+        size: fetchSize,
         isActive: undefined,
       });
       let filteredItems = Array.isArray(data.items) ? data.items : [];
-      
       if (tagFilter) {
         filteredItems = filteredItems.filter(uploader => {
           const tags = uploader.tags || [];
           return tags.some(tag => tag.toLowerCase().includes(tagFilter.toLowerCase()));
         });
       }
-      
+      if (categoryFilter) {
+        filteredItems = filteredItems.filter(uploader => {
+          const tags = uploader.tags || [];
+          return tags.includes(categoryFilter);
+        });
+      }
       setUploaders(filteredItems);
-      setTotal(data.pagination?.total || 0);
+      setTotal(hasFilter ? filteredItems.length : (data.pagination?.total || 0));
     } catch (error: any) {
       console.error('Load uploaders error:', error);
       if (error.status === 401 || error.code === 'UNAUTHORIZED' || error.response?.data?.code === 1002 || error.response?.data?.code === 1003) {
@@ -463,200 +471,167 @@ export default function BilibiliUploadersPage() {
     }
   }, [syncPolling, syncModalVisible]);
 
+  const hasTag = (record: BilibiliUploader, tag: string) =>
+    (record.tags || []).includes(tag);
+
   const columns = [
     {
       title: 'UP主信息',
       key: 'uploader',
+      width: 320,
       render: (_: any, record: BilibiliUploader) => (
-        <Space direction="vertical" size={0}>
-          <Space>
+        <div className={styles.uploaderInfo}>
+          <div style={{ flexShrink: 0 }}>
             {record.avatar ? (
               <img
                 src={record.avatar}
                 alt={record.name}
-                style={{ width: 40, height: 40, borderRadius: '50%' }}
+                style={{ width: 36, height: 36, borderRadius: '8px' }}
                 referrerPolicy="no-referrer"
                 onError={(e: any) => {
                   e.target.onerror = null;
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(record.name || 'U')}&background=1890ff&color=fff&size=40`;
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(record.name || 'U')}&background=0ea5e9&color=fff&size=36`;
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  backgroundColor: '#1890ff',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 16,
-                  fontWeight: 500,
+                  fontSize: 13,
+                  fontWeight: 600,
                 }}
               >
                 {record.name?.charAt(0) || 'U'}
               </div>
             )}
-            <Space direction="vertical" size={0}>
-              <span style={{ 
-                fontSize: 14, 
-                fontWeight: 500,
-                color: record.name?.startsWith('UP主-') ? '#ff4d4f' : undefined 
-              }}>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span className={styles.uploaderName}>
                 {record.name}
                 {record.name?.startsWith('UP主-') && (
-                  <Tag color="orange" style={{ marginLeft: 8 }}>
-                    需更新
-                  </Tag>
+                  <Tag color="orange" style={{ marginLeft: 6, fontSize: 10 }}>需更新</Tag>
                 )}
               </span>
-              <span style={{ fontSize: 12, color: '#999' }}>
-                MID: {record.mid}
-              </span>
-            </Space>
-          </Space>
-          {record.description && (
-            <div style={{ 
-              fontSize: 12, 
-              color: '#666',
-              maxWidth: 400,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              marginTop: 4
-            }}>
-              {record.description}
+              {hasTag(record, '中国厂商') && (
+                <span className={`${styles.tagChip} ${styles.tagChipCn}`}>中国厂商</span>
+              )}
+              {hasTag(record, '国外厂商') && (
+                <span className={`${styles.tagChip} ${styles.tagChipIntl}`}>国外厂商</span>
+              )}
+              {hasTag(record, '媒体') && (
+                <span className={`${styles.tagChip} ${styles.tagChipMedia}`}>媒体</span>
+              )}
             </div>
-          )}
-        </Space>
+            <div className={styles.uploaderDescription}>
+              MID: {record.mid}
+              {record.description && ` · ${record.description.slice(0, 30)}${record.description.length > 30 ? '…' : ''}`}
+            </div>
+          </div>
+        </div>
       ),
     },
     {
-      title: 'Bilibili空间',
+      title: '空间',
       dataIndex: 'mid',
       key: 'mid',
+      width: 100,
       render: (mid: string) => (
         <a
           href={`https://space.bilibili.com/${mid}`}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: '#1890ff' }}
+          className={styles.linkBilibili}
         >
           <LinkOutlined style={{ marginRight: 4 }} />
-          访问主页
+          主页
         </a>
       ),
     },
     {
-      title: '视频统计',
+      title: '视频',
       key: 'stats',
+      width: 80,
       render: (_: any, record: BilibiliUploader) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 14, fontWeight: 500 }}>
-            {record.videoCount} 个视频
-          </span>
-          <span style={{ fontSize: 12, color: '#999' }}>
-            已同步
-          </span>
-        </Space>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--bp-text-primary, #0f172a)' }}>
+          {record.videoCount}
+        </span>
       ),
     },
     {
       title: '标签',
       key: 'tags',
-      width: 200,
+      width: 180,
       render: (_: any, record: BilibiliUploader) => (
-        <Space wrap>
+        <Space wrap size={[4, 4]}>
           {record.tags && record.tags.length > 0 ? (
-            record.tags.map((tag, index) => (
-              <Tag key={index} color="blue">
-                {tag}
-              </Tag>
-            ))
+            record.tags
+              .filter(t => t !== '中国厂商' && t !== '国外厂商' && t !== '媒体')
+              .slice(0, 4)
+              .map((tag, index) => (
+                <Tag key={index} style={{ fontSize: 11, margin: 0 }}>
+                  {tag}
+                </Tag>
+              ))
           ) : (
-            <span style={{ color: '#999', fontSize: 12 }}>暂无标签</span>
+            <span style={{ color: 'var(--bp-text-tertiary)', fontSize: 12 }}>—</span>
           )}
         </Space>
       ),
     },
     {
-      title: '同步状态',
+      title: '状态',
       key: 'syncStatus',
+      width: 120,
       render: (_: any, record: BilibiliUploader) => (
-        <Space direction="vertical" size={0}>
+        <div>
           <Switch
             checked={record.isActive}
             onChange={() => handleToggleStatus(record.id)}
-            checkedChildren="启用"
-            unCheckedChildren="禁用"
+            checkedChildren="开"
+            unCheckedChildren="关"
+            style={{ marginBottom: 4 }}
           />
-          <span style={{ fontSize: 12, color: '#999' }}>
-            {record.lastSyncAt 
-              ? `同步于 ${dayjs(record.lastSyncAt).format('MM-DD HH:mm')}`
-              : '从未同步'
-            }
-          </span>
-        </Space>
-      ),
-    },
-    {
-      title: '时间信息',
-      key: 'timeInfo',
-      render: (_: any, record: BilibiliUploader) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#666' }}>
-            创建: {dayjs(record.createdAt).format('YYYY-MM-DD')}
-          </span>
-          <span style={{ fontSize: 12, color: '#666' }}>
-            更新: {dayjs(record.updatedAt).format('YYYY-MM-DD')}
-          </span>
-        </Space>
+          <div className={styles.syncBadge}>
+            {record.lastSyncAt
+              ? dayjs(record.lastSyncAt).format('MM-DD HH:mm')
+              : '未同步'}
+          </div>
+        </div>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 320,
+      width: 260,
       render: (_: any, record: BilibiliUploader) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEditTags(record)}
-          >
+        <Space size={6} wrap>
+          <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} icon={<EditOutlined />} onClick={() => handleEditTags(record)}>
             标签
           </Button>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEditInfo(record)}
-          >
+          <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} icon={<EditOutlined />} onClick={() => handleEditInfo(record)}>
             编辑
           </Button>
-          <Button
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={() => handleRefreshInfo(record.id)}
-          >
+          <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} icon={<ReloadOutlined />} onClick={() => handleRefreshInfo(record.id)}>
             刷新
           </Button>
-          <Button
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={() => handleSync(record.mid)}
-          >
+          <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} icon={<SyncOutlined />} onClick={() => handleSync(record.mid)}>
             同步
           </Button>
           <Popconfirm
-            title="确定删除此UP主吗？"
-            description="删除后，该UP主的所有视频数据将不再更新"
+            title="确定删除？"
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
           >
-            <Button size="small" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger style={{ padding: 0, fontSize: 12 }} icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -666,144 +641,125 @@ export default function BilibiliUploadersPage() {
   ];
 
   return (
-    <div>
-      <Card>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>Bilibili UP主管理</h2>
-          <Space>
-            {schedulerStatus?.isRunning ? (
-              <Button
-                danger
-                icon={<StopOutlined />}
-                onClick={handleStopScheduler}
-                loading={loading}
-              >
-                停止定时同步
-              </Button>
-            ) : (
-              <Button
-                type="default"
-                icon={<PlayCircleOutlined />}
-                onClick={handleStartScheduler}
-                loading={loading}
-              >
-                启动定时同步
-              </Button>
-            )}
-            {schedulerStatus?.nextRun && (
-              <span style={{ fontSize: 12, color: '#999' }}>
-                下次运行: {dayjs(schedulerStatus.nextRun).format('MM-DD HH:mm')}
-              </span>
-            )}
-            <Button
-              type="primary"
-              icon={<PlayCircleOutlined />}
-              onClick={() => handleSyncAll(999999, true)}
-              loading={syncPolling}
-              disabled={syncPolling}
-            >
-              智能全量同步
-            </Button>
+    <div className={styles.pageWrapper}>
+      <Card className={styles.cardMain} bordered={false}>
+        <div className={styles.pageHeader}>
+          <div>
+            <h1 className={styles.pageTitle}>B站 UP主管理</h1>
+            <p className={styles.pageSubtitle}>
+              具身机器人厂商与媒体账号 · 与用户端「视频」页侧栏「具身机器人厂家」一致 · 支持按中国/国外厂商筛选
+            </p>
+          </div>
+          <Space size={12} wrap>
+            <Select
+              placeholder="分类"
+              allowClear
+              value={categoryFilter || undefined}
+              onChange={setCategoryFilter}
+              style={{ width: 120 }}
+              options={[
+                { value: '', label: '全部分类' },
+                { value: '中国厂商', label: '中国厂商' },
+                { value: '国外厂商', label: '国外厂商' },
+                { value: '媒体', label: '媒体' },
+              ]}
+            />
             <Input
-              placeholder="按标签筛选"
+              placeholder="按标签搜索"
               prefix={<TagOutlined />}
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
-              style={{ width: 200 }}
+              style={{ width: 160 }}
               allowClear
             />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setAddModalVisible(true)}
-            >
+            {schedulerStatus?.isRunning ? (
+              <Button size="small" danger icon={<StopOutlined />} onClick={handleStopScheduler} loading={loading}>
+                停止定时
+              </Button>
+            ) : (
+              <Button size="small" icon={<PlayCircleOutlined />} onClick={handleStartScheduler} loading={loading}>
+                定时同步
+              </Button>
+            )}
+            {schedulerStatus?.nextRun && (
+              <span className={styles.syncBadge}>下次: {dayjs(schedulerStatus.nextRun).format('MM-DD HH:mm')}</span>
+            )}
+            <Button size="small" type="primary" icon={<SyncOutlined />} onClick={() => handleSyncAll(999999, true)} loading={syncPolling} disabled={syncPolling}>
+              全量同步
+            </Button>
+            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setAddModalVisible(true)}>
               添加UP主
             </Button>
           </Space>
         </div>
 
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={12} md={6}>
+        <Row gutter={[12, 12]} className={styles.statsRow}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
-              <Statistic
-                title="总UP主数"
-                value={total}
-                prefix={<TagOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
+              <Statistic title="UP主" value={total} valueStyle={{ fontSize: 18 }} />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
-              <Statistic
-                title="启用中"
-                value={uploaders.filter(u => u.isActive).length}
-                prefix={<CheckSquareOutlined />}
-                valueStyle={{ color: '#52c41a' }}
-              />
+              <Statistic title="启用" value={uploaders.filter(u => u.isActive).length} valueStyle={{ fontSize: 18 }} />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
-              <Statistic
-                title="总视频数"
-                value={uploaders.reduce((sum, u) => sum + (u.videoCount || 0), 0)}
-                prefix={<PlayCircleOutlined />}
-                valueStyle={{ color: '#faad14' }}
-              />
+              <Statistic title="视频数" value={uploaders.reduce((sum, u) => sum + (u.videoCount || 0), 0)} valueStyle={{ fontSize: 18 }} />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
-              <Statistic
-                title="已同步"
-                value={uploaders.filter(u => u.lastSyncAt).length}
-                prefix={<SyncOutlined />}
-                valueStyle={{ color: '#722ed1' }}
-              />
+              <Statistic title="已同步" value={uploaders.filter(u => u.lastSyncAt).length} valueStyle={{ fontSize: 18 }} />
             </Card>
           </Col>
         </Row>
 
         {selectedRowKeys.length > 0 && (
-          <Card style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bp-bg-subtle, #f8fafc)', borderRadius: 8 }}>
             <Space>
-              <Badge count={selectedRowKeys.length} offset={[10, 0]}>
-                <Button>已选择</Button>
+              <Badge count={selectedRowKeys.length} offset={[8, 0]} size="small">
+                <Button size="small">已选</Button>
               </Badge>
               <Dropdown menu={{ items: getBatchMenuItems }}>
-                <Button icon={<MoreOutlined />}>
-                  批量操作
-                </Button>
+                <Button size="small" icon={<MoreOutlined />}>批量操作</Button>
               </Dropdown>
-              <Button onClick={() => setSelectedRowKeys([])}>
-                取消选择
-              </Button>
+              <Button size="small" onClick={() => setSelectedRowKeys([])}>取消</Button>
             </Space>
-          </Card>
+          </div>
         )}
 
+        <div className={styles.tableWrap}>
         <Table
           columns={columns}
           dataSource={uploaders}
           loading={loading}
           rowKey="id"
+          size="small"
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
           }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (newPage, newPageSize) => {
-              setPage(newPage);
-              if (newPageSize) setPageSize(newPageSize);
-            },
-          }}
+          pagination={
+            tagFilter || categoryFilter
+              ? { pageSize: Math.max(total, 10), total, showTotal: (t) => `共 ${t} 条`, size: 'small' }
+              : {
+                  current: page,
+                  pageSize,
+                  total,
+                  showSizeChanger: true,
+                  size: 'small',
+                  pageSizeOptions: ['20', '50', '100', '200'],
+                  showTotal: (t) => `共 ${t} 条`,
+                  onChange: (newPage, newPageSize) => {
+                    setPage(newPage);
+                    if (newPageSize) setPageSize(newPageSize);
+                  },
+                }
+          }
         />
+        </div>
       </Card>
 
       <Modal

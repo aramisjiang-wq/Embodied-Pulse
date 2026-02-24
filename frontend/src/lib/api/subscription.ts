@@ -4,7 +4,7 @@ import { PaginatedResponse } from './types';
 export interface Subscription {
   id: string;
   userId: string;
-  name: string;
+  name?: string;
   description?: string;
   contentType: 'paper' | 'video' | 'repo' | 'huggingface' | 'job' | 'post';
   keywords?: string;
@@ -27,6 +27,23 @@ export interface Subscription {
   lastSyncAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateSubscriptionParams {
+  contentType: 'paper' | 'video' | 'repo' | 'huggingface' | 'job' | 'post';
+  keywords: string[];
+  tags?: string[];
+  authors?: string[];
+  notifyEnabled?: boolean;
+}
+
+export interface UpdateSubscriptionParams {
+  contentType?: 'paper' | 'video' | 'repo' | 'huggingface' | 'job' | 'post';
+  keywords?: string[];
+  tags?: string[];
+  authors?: string[];
+  isActive?: boolean;
+  notifyEnabled?: boolean;
 }
 
 export const subscriptionApi = {
@@ -53,7 +70,7 @@ export const subscriptionApi = {
     }
   },
 
-  createSubscription: async (data: Partial<Subscription>): Promise<Subscription> => {
+  createSubscription: async (data: CreateSubscriptionParams): Promise<Subscription> => {
     const response = await apiClient.post<Subscription>('/subscriptions', data);
     if (response.code === 0) {
       return response.data;
@@ -62,7 +79,7 @@ export const subscriptionApi = {
     }
   },
 
-  updateSubscription: async (id: string, data: Partial<Subscription>): Promise<Subscription> => {
+  updateSubscription: async (id: string, data: UpdateSubscriptionParams): Promise<Subscription> => {
     const response = await apiClient.put<Subscription>(`/subscriptions/${id}`, data);
     if (response.code === 0) {
       return response.data;

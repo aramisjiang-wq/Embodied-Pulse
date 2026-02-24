@@ -12,8 +12,8 @@ async function diagnoseUploaderSync() {
     console.log('========================================\n');
 
     // 获取所有UP主
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
-      orderBy: { created_at: 'desc' },
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
+      orderBy: { createdAt: 'desc' },
     });
 
     console.log(`找到 ${uploaders.length} 个UP主\n`);
@@ -22,11 +22,11 @@ async function diagnoseUploaderSync() {
       console.log('----------------------------------------');
       console.log(`UP主: ${uploader.name}`);
       console.log(`MID: ${uploader.mid}`);
-      console.log(`激活状态: ${uploader.is_active ? '是' : '否'}`);
-      console.log(`视频数量: ${uploader.video_count}`);
-      console.log(`最后同步: ${uploader.last_sync_at || '从未同步'}`);
-      console.log(`创建时间: ${uploader.created_at}`);
-      console.log(`更新时间: ${uploader.updated_at}`);
+      console.log(`激活状态: ${uploader.isActive ? '是' : '否'}`);
+      console.log(`视频数量: ${uploader.videoCount}`);
+      console.log(`最后同步: ${uploader.lastSyncAt || '从未同步'}`);
+      console.log(`创建时间: ${uploader.createdAt}`);
+      console.log(`更新时间: ${uploader.updatedAt}`);
 
       // 检查数据库中实际有多少视频
       const videoCount = await userPrisma.video.count({
@@ -38,8 +38,8 @@ async function diagnoseUploaderSync() {
 
       console.log(`数据库中实际视频数: ${videoCount}`);
       
-      if (uploader.video_count !== videoCount) {
-        console.log(`⚠️  数据不一致！video_count=${uploader.video_count}, 实际=${videoCount}`);
+      if (uploader.videoCount !== videoCount) {
+        console.log(`⚠️  数据不一致！videoCount=${uploader.videoCount}, 实际=${videoCount}`);
       }
 
       console.log('----------------------------------------\n');

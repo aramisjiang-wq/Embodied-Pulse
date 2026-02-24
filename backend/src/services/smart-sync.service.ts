@@ -110,9 +110,11 @@ export async function smartSyncAllUploaders(
       };
     }
 
-    globalRateLimiter.setTotalCookies(BilibiliCookieManager.getActiveCount());
+    const activeCookieCount = await BilibiliCookieManager.getActiveCount();
+    const totalCount = await BilibiliCookieManager.getTotalCount();
+    globalRateLimiter.setTotalCookies(activeCookieCount);
     logger.info(`找到 ${uploaders.length} 个活跃UP主`);
-    logger.info(`可用Cookie: ${BilibiliCookieManager.getActiveCount()}/${BilibiliCookieManager.getTotalCount()}`);
+    logger.info(`可用Cookie: ${activeCookieCount}/${totalCount}`);
 
     smartSyncQueue.tasks = uploaders.map(uploader => ({
       mid: uploader.mid,

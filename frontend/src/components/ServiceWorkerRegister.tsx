@@ -4,6 +4,26 @@ import { useEffect } from 'react';
 
 export default function ServiceWorkerRegister() {
   useEffect(() => {
+    // 开发环境：取消已注册的Service Worker并跳过注册
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SW] Development mode: Service Worker registration skipped');
+      
+      // 清理已注册的Service Worker
+      if ('serviceWorker' in navigator && typeof window !== 'undefined') {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => {
+            registration.unregister().then((success) => {
+              if (success) {
+                console.log('[SW] Unregistered existing Service Worker');
+              }
+            });
+          });
+        });
+      }
+      
+      return;
+    }
+
     if ('serviceWorker' in navigator && typeof window !== 'undefined') {
       const registerSW = async () => {
         try {

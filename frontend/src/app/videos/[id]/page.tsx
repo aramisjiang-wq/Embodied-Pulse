@@ -1,64 +1,59 @@
-/**
- * 视频详情页
- */
-
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Layout, Card, Space, Tag, Spin, Button, App } from 'antd';
+import { useEffect, useState, useCallback } from 'react';
+import { Card, Space, Tag, Spin, Button, App } from 'antd';
 import { EyeOutlined, HeartOutlined, ShareAltOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { videoApi } from '@/lib/api/video';
 import { Video } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
-import ShareModal from '@/components/ShareModal';
+import { useFavorite } from '@/hooks/useFavorite';
+import { DynamicComponents } from '@/lib/dynamicComponents';
 import { communityApi } from '@/lib/api/community';
 import dayjs from 'dayjs';
 import JsonLd from '@/components/JsonLd';
 import { generateVideoObjectJsonLd, generateBreadcrumbListJsonLd } from '@/lib/metadata';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
-const { Content } = Layout;
-
-export default function VideoDetailPage({ params }: { params: { id: string } }) {
+export default function VideoDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [video, setVideo] = useState<Video | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const { user } = useAuthStore();
-  const [isFavorited, setIsFavorited] = useState(false);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadVideo();
-  }, [params.id]);
+  const { isFavorited, setIsFavorited } = useFavorite('video', id || '');
 
-  useEffect(() => {
-    if (user) {
-      loadFavoriteState();
-    } else {
-      setIsFavorited(false);
-    }
-  }, [user, params.id]);
-
-  const loadVideo = async () => {
+  const loadVideo = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await videoApi.getVideo(params.id);
-      setVideo(data);
+      const data = await videoApi.getVideo(id);
+      if (data) {
+        setVideo(data);
+      } else {
+        setVideo(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载失败');
+      console.error('Load video error:', error);
+      setVideo(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
 
-  const loadFavoriteState = async () => {
-    try {
-      const data = await communityApi.getFavorites({ page: 1, size: 200, contentType: 'video' });
-      const ids = new Set((data.items || []).map((fav: any) => fav.contentId));
-      setIsFavorited(ids.has(params.id));
-    } catch (error: any) {
-      message.error(error.message || '收藏状态获取失败');
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadVideo();
     }
-  };
+  }, [id, loadVideo]);
 
   const handleShare = () => {
     if (!user) {
@@ -70,17 +65,21 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
 
   if (loading) {
     return (
-      <div style={{ padding: 100, textAlign: 'center' }}>
-        <Spin size="large" />
-      </div>
+      <PageContainer loading={true}>
+        <div className={styles.loadingWrapper}>
+          <Spin size="large" />
+        </div>
+      </PageContainer>
     );
   }
 
   if (!video) {
     return (
-      <div style={{ padding: 100, textAlign: 'center', color: '#999' }}>
-        视频不存在
-      </div>
+      <PageContainer>
+        <div className={styles.notFoundWrapper}>
+          视频不存在
+        </div>
+      </PageContainer>
     );
   }
 
@@ -130,72 +129,71 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
     <>
       <JsonLd data={videoJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <Card>
-          <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>{video.title}</h1>
-          <Space wrap style={{ marginBottom: 16 }}>
-            <span style={{ color: '#666' }}>UP主: {video.uploader || '匿名'}</span>
-            <Tag color="blue">{video.platform.toUpperCase()}</Tag>
-            {video.publishedDate && <Tag>{dayjs(video.publishedDate).format('YYYY-MM-DD')}</Tag>}
-          </Space>
-
-          <div style={{ marginBottom: 16 }}>
-            <Space size="large">
-              {video.viewCount && video.viewCount > 0 && <span><EyeOutlined /> {video.viewCount} 浏览</span>}
-              {video.playCount && video.playCount > 0 && <span><PlayCircleOutlined /> {video.playCount} 播放</span>}
-              {video.favoriteCount && video.favoriteCount > 0 && <span><HeartOutlined /> {video.favoriteCount} 收藏</span>}
+      <PageContainer title={video.title}>
+        <div className={styles.container}>
+          <Card className={styles.videoCard}>
+            <h1 className={styles.videoTitle}>{video.title}</h1>
+            <Space wrap className={styles.metaSection}>
+              <span className={styles.uploaderText}>UP主: {video.uploader || '匿名'}</span>
+              <Tag color="blue">{video.platform.toUpperCase()}</Tag>
+              {video.publishedDate && <Tag>{dayjs(video.publishedDate).format('YYYY-MM-DD')}</Tag>}
             </Space>
-          </div>
 
-          <Space size="middle" style={{ marginBottom: 16 }}>
-            <Button type={isFavorited ? 'primary' : 'default'} onClick={handleFavorite}>
-              {isFavorited ? '已收藏' : '收藏'}
-            </Button>
-            <Button icon={<ShareAltOutlined />} onClick={handleShare}>
-              分享到市集
-            </Button>
-            <Button href={platformUrl} target="_blank" rel="noopener noreferrer">
-              打开原视频
-            </Button>
-          </Space>
-
-          {embedUrl ? (
-            <div style={{ marginTop: 16 }}>
-              <iframe
-                width="100%"
-                height="420"
-                src={embedUrl}
-                title={video.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{ border: 0, borderRadius: 8 }}
-              />
+            <div className={styles.statsSection}>
+              <Space size="large">
+                {video.viewCount && video.viewCount > 0 && <span><EyeOutlined /> {video.viewCount} 浏览</span>}
+                {video.playCount && video.playCount > 0 && <span><PlayCircleOutlined /> {video.playCount} 播放</span>}
+                {video.favoriteCount && video.favoriteCount > 0 && <span><HeartOutlined /> {video.favoriteCount} 收藏</span>}
+              </Space>
             </div>
-          ) : (
-            <div style={{ marginTop: 16, color: '#999' }}>
-              当前平台暂不支持嵌入播放，请点击“打开原视频”观看。
-            </div>
-          )}
 
-          {video.description && (
-            <div style={{ marginTop: 24, color: '#333' }}>
-              <h3 style={{ marginBottom: 12 }}>视频简介</h3>
-              <div style={{ whiteSpace: 'pre-wrap' }}>{video.description}</div>
-            </div>
-          )}
+            <Space size="middle" className={styles.actionButtons}>
+              <Button type={isFavorited ? 'primary' : 'default'} onClick={handleFavorite}>
+                {isFavorited ? '已收藏' : '收藏'}
+              </Button>
+              <Button icon={<ShareAltOutlined />} onClick={handleShare}>
+                分享到市集
+              </Button>
+              <Button href={platformUrl} target="_blank" rel="noopener noreferrer">
+                打开原视频
+              </Button>
+            </Space>
 
-          {video.tags && Array.isArray(video.tags) && video.tags.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              {video.tags.map((tag) => (
-                <Tag key={tag} color="blue">{tag}</Tag>
-              ))}
-            </div>
-          )}
-        </Card>
-      </Content>
+            {embedUrl ? (
+              <div className={styles.videoPlayer}>
+                <iframe
+                  className={styles.videoPlayerFrame}
+                  src={embedUrl}
+                  title={video.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div className={styles.videoPlayerPlaceholder}>
+                当前平台暂不支持嵌入播放，请点击"打开原视频"观看。
+              </div>
+            )}
 
-      <ShareModal
+            {video.description && (
+              <div className={styles.descriptionSection}>
+                <h3 className={styles.descriptionTitle}>视频简介</h3>
+                <div className={styles.descriptionText}>{video.description}</div>
+              </div>
+            )}
+
+            {video.tags && Array.isArray(video.tags) && video.tags.length > 0 && (
+              <div className={styles.tagsSection}>
+                {video.tags.map((tag) => (
+                  <Tag key={tag} color="blue">{tag}</Tag>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </PageContainer>
+
+      <DynamicComponents.ShareModal
         open={shareOpen}
         title={video.title}
         url={typeof window !== 'undefined' ? `${window.location.origin}/videos/${video.id}` : ''}
@@ -209,7 +207,6 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
         }}
         onClose={() => setShareOpen(false)}
       />
-    </div>
     </>
   );
 }

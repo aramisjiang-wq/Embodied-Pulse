@@ -26,7 +26,7 @@ export const search = async (req: Request, res: Response) => {
     const results: any[] = [];
     
     // 如果没有指定类型，搜索所有类型
-    const searchTypes = type ? [type] : ['paper', 'video', 'repo', 'job', 'huggingface', 'post', 'news'];
+    const searchTypes = type ? [type] : ['paper', 'video', 'repo', 'job', 'huggingface', 'post'];
 
     // 搜索论文（SQLite不支持mode: 'insensitive'，keyword已转换为小写）
     if (searchTypes.includes('paper')) {
@@ -130,29 +130,6 @@ export const search = async (req: Request, res: Response) => {
         metadata: { company: j.company, location: j.location },
         // 添加外部链接所需字段
         applyUrl: (j as any).applyUrl || null,
-      })));
-    }
-
-    // 搜索新闻（SQLite不支持mode: 'insensitive'，keyword已转换为小写）
-    if (searchTypes.includes('news')) {
-      const news = await userPrisma.news.findMany({
-        where: {
-          OR: [
-            { title: { contains: keyword } },
-            { description: { contains: keyword } },
-          ],
-        },
-        take: pageSize,
-        skip,
-        orderBy: { publishedDate: 'desc' },
-      });
-      
-      results.push(...news.map(n => ({
-        type: 'news',
-        id: n.id,
-        title: n.title,
-        description: n.description,
-        metadata: { platform: n.platform, score: n.score, url: n.url },
       })));
     }
 

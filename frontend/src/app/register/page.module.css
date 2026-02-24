@@ -1,0 +1,52 @@
+.pageWrapper {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f2f5 0%, #e8eaed 100%);
+}
+
+.registerCard {
+  width: 400px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  border: none;
+}
+
+.registerHeader {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.registerTitle {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.registerSubtitle {
+  color: #666;
+  margin-top: 8px;
+}
+
+.registerFooter {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.registerLink {
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .registerCard {
+    width: 100%;
+    max-width: 400px;
+    margin: 16px;
+  }
+
+  .registerTitle {
+    font-size: 24px;
+  }
+}

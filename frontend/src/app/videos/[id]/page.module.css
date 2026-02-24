@@ -1,0 +1,96 @@
+.pageWrapper {
+  background: var(--color-bg-default);
+  min-height: calc(100vh - 64px);
+}
+
+.container {
+  padding: var(--spacing-lg) 50px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.videoCard {
+  margin-bottom: var(--spacing-lg);
+}
+
+.videoTitle {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+}
+
+.metaSection {
+  margin-bottom: var(--spacing-md);
+}
+
+.uploaderText {
+  color: var(--color-text-secondary);
+}
+
+.statsSection {
+  margin-bottom: var(--spacing-md);
+}
+
+.actionButtons {
+  margin-bottom: var(--spacing-md);
+}
+
+.videoPlayer {
+  margin-top: var(--spacing-md);
+}
+
+.videoPlayerFrame {
+  width: 100%;
+  height: 420px;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.videoPlayerPlaceholder {
+  margin-top: var(--spacing-md);
+  color: var(--color-text-tertiary);
+}
+
+.descriptionSection {
+  margin-top: 24px;
+  color: var(--color-text-secondary);
+}
+
+.descriptionTitle {
+  margin-bottom: 12px;
+  color: var(--color-text-primary);
+}
+
+.descriptionText {
+  white-space: pre-wrap;
+}
+
+.tagsSection {
+  margin-top: var(--spacing-md);
+}
+
+.loadingWrapper {
+  padding: 100px;
+  text-align: center;
+}
+
+.notFoundWrapper {
+  padding: 100px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--spacing-md);
+  }
+
+  .videoTitle {
+    font-size: 22px;
+  }
+
+  .videoPlayerFrame {
+    height: 280px;
+  }
+}

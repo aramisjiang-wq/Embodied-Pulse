@@ -7,9 +7,9 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Table, Button, Space, message, Modal, Form, Input, Select, DatePicker, 
+  Table, Button, Space, Modal, Form, Input, Select, DatePicker, 
   Switch, Tag, Card, Row, Col, Divider, Tooltip, Popconfirm, Badge,
-  Tabs, InputNumber, Radio, Collapse, Alert
+  Tabs, InputNumber, Radio, Collapse, Alert, App
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, 
@@ -20,6 +20,7 @@ import { homeModuleApi } from '@/lib/api/home-module';
 import { HomeModule } from '@/lib/api/types';
 import dayjs, { Dayjs } from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -65,7 +66,7 @@ const MODULE_TEMPLATES = [
     content: 'Embodied Pulse 是专为具身智能领域打造的信息聚合平台。我们聚合了最新的论文、代码、模型、视频和求职信息，帮助您快速发现和获取具身智能领域的最新资源。与全球具身智能研究者、工程师和爱好者一起探索AI的未来。',
     linkUrl: '/community',
     buttonText: '立即加入市集 →',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    gradient: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
     textColor: '#fff',
   },
   {
@@ -113,7 +114,7 @@ const MODULE_TEMPLATES = [
     content: '汇聚全球顶尖研究者，探讨具身智能最新进展。会议将涵盖机器人学习、计算机视觉、自然语言处理等多个领域，欢迎报名参加。',
     linkUrl: '/events/spring-conference-2026',
     buttonText: '立即报名 →',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    gradient: 'linear-gradient(135deg, #fa8c16 0%, #d46b08 100%)',
     textColor: '#fff',
   },
   {
@@ -129,6 +130,7 @@ const MODULE_TEMPLATES = [
 ];
 
 export default function AdminHomeModulesPage() {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [modules, setModules] = useState<HomeModule[]>([]);
   const [filteredModules, setFilteredModules] = useState<HomeModule[]>([]);
@@ -391,7 +393,17 @@ export default function AdminHomeModulesPage() {
 
   const handlePreview = () => {
     const values = form.getFieldsValue();
-    setPreviewData(values);
+    const safeValues = JSON.parse(JSON.stringify(values, (key, value) => {
+      if (key === 'config' && typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      }
+      return value;
+    }));
+    setPreviewData(safeValues);
     setShowPreview(true);
   };
 
@@ -773,18 +785,18 @@ export default function AdminHomeModulesPage() {
                     <Button 
                       size="small"
                       onClick={() => {
-                        form.setFieldValue('gradient', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)');
+                        form.setFieldValue('gradient', 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)');
                         form.setFieldValue('textColor', '#fff');
                         form.setFieldValue('backgroundColor', '');
                         updateConfigFromForm();
                       }}
                       style={{ 
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
                         border: 'none',
                         color: '#fff'
                       }}
                     >
-                      紫色渐变
+                      蓝色渐变
                     </Button>
                     <Button 
                       size="small"
@@ -805,18 +817,18 @@ export default function AdminHomeModulesPage() {
                     <Button 
                       size="small"
                       onClick={() => {
-                        form.setFieldValue('gradient', 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)');
+                        form.setFieldValue('gradient', 'linear-gradient(135deg, #13c2c2 0%, #08979c 100%)');
                         form.setFieldValue('textColor', '#fff');
                         form.setFieldValue('backgroundColor', '');
                         updateConfigFromForm();
                       }}
                       style={{ 
-                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                        background: 'linear-gradient(135deg, #13c2c2 0%, #08979c 100%)',
                         border: 'none',
                         color: '#fff'
                       }}
                     >
-                      粉色渐变
+                      青色渐变
                     </Button>
                     <Button 
                       size="small"
@@ -1197,10 +1209,10 @@ export default function AdminHomeModulesPage() {
   ];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+    <div className={styles.pageWrapper}>
+      <div className={styles.pageHeader}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>首页运营模块管理</h1>
+          <h1 className={styles.pageTitle}>首页运营模块管理</h1>
           <p style={{ margin: '8px 0 0 0', color: '#666' }}>
             管理首页展示的各类运营模块，支持自定义配置和排序
           </p>

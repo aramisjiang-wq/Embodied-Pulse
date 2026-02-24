@@ -36,7 +36,9 @@ export const videoApi = {
     name: string;
     avatar?: string;
     description?: string;
+    tags: string[];
     videoCount: number;
+    lastSyncAt?: string | null;
   }>> => {
     const response = await apiClient.get<ApiResponse<Array<{
       id: string;
@@ -44,7 +46,9 @@ export const videoApi = {
       name: string;
       avatar?: string;
       description?: string;
+      tags: string[];
       videoCount: number;
+      lastSyncAt?: string | null;
     }>>>('/videos/uploaders');
     
     if (!response || typeof response !== 'object' || response.code !== 0) {

@@ -5,6 +5,53 @@
 import userPrisma from '../config/database.user';
 import { logger } from '../utils/logger';
 
+/** 市集统计 */
+export interface CommunityStats {
+  totalPosts: number;
+  activePosts: number;
+  deletedPosts: number;
+  pinnedPosts: number;
+  featuredPosts: number;
+  todayNewPosts: number;
+  totalComments: number;
+}
+
+/**
+ * 获取市集统计（管理端）
+ */
+export async function getCommunityStats(): Promise<CommunityStats> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const [
+    totalPosts,
+    activePosts,
+    deletedPosts,
+    pinnedPosts,
+    featuredPosts,
+    todayNewPosts,
+    totalComments,
+  ] = await Promise.all([
+    userPrisma.post.count(),
+    userPrisma.post.count({ where: { status: 'active' } }),
+    userPrisma.post.count({ where: { status: 'deleted' } }),
+    userPrisma.post.count({ where: { isTop: true, status: 'active' } }),
+    userPrisma.post.count({ where: { isFeatured: true, status: 'active' } }),
+    userPrisma.post.count({ where: { createdAt: { gte: todayStart }, status: 'active' } }),
+    userPrisma.comment.count(),
+  ]);
+
+  return {
+    totalPosts,
+    activePosts,
+    deletedPosts,
+    pinnedPosts,
+    featuredPosts,
+    todayNewPosts,
+    totalComments,
+  };
+}
+
 /**
  * 删除帖子（软删除，修改状态）
  */

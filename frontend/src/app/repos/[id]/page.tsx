@@ -4,58 +4,58 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Layout, Card, Space, Tag, Spin, Button, App } from 'antd';
 import { StarOutlined, ForkOutlined, EyeOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { repoApi } from '@/lib/api/repo';
 import { GithubRepo } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
-import ShareModal from '@/components/ShareModal';
+import { useFavorite } from '@/hooks/useFavorite';
+import { DynamicComponents } from '@/lib/dynamicComponents';
 import { communityApi } from '@/lib/api/community';
+import styles from './page.module.css';
 
 const { Content } = Layout;
 
-export default function RepoDetailPage({ params }: { params: { id: string } }) {
+export default function RepoDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [repo, setRepo] = useState<GithubRepo | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const { user } = useAuthStore();
-  const [isFavorited, setIsFavorited] = useState(false);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadRepo();
-  }, [params.id]);
+  const { isFavorited, setIsFavorited } = useFavorite('repo', id || '');
 
-  useEffect(() => {
-    if (user) {
-      loadFavoriteState();
-    } else {
-      setIsFavorited(false);
-    }
-  }, [user, params.id]);
-
-  const loadRepo = async () => {
+  const loadRepo = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await repoApi.getRepo(params.id);
-      setRepo(data);
+      const data = await repoApi.getRepo(id);
+      if (data) {
+        setRepo(data);
+      } else {
+        setRepo(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载失败');
+      console.error('Load repo error:', error);
+      setRepo(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
 
-  const loadFavoriteState = async () => {
-    try {
-      const data = await communityApi.getFavorites({ page: 1, size: 200, contentType: 'repo' });
-      const ids = new Set((data.items || []).map((fav: any) => fav.contentId));
-      setIsFavorited(ids.has(params.id));
-    } catch (error: any) {
-      message.error(error.message || '收藏状态获取失败');
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadRepo();
     }
-  };
+  }, [id, loadRepo]);
 
   const handleShare = () => {
     if (!user) {
@@ -100,16 +100,16 @@ export default function RepoDetailPage({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <Card>
-          <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>{repo.fullName}</h1>
+    <div className={styles.pageWrapper}>
+      <Content style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <Card className={styles.detailCard}>
+          <h1 className={styles.pageTitle}>{repo.fullName}</h1>
           <Space wrap style={{ marginBottom: 16 }}>
             {repo.language && <Tag color="geekblue">{repo.language}</Tag>}
             {repo.owner && <Tag>{repo.owner}</Tag>}
           </Space>
 
-          <div style={{ marginBottom: 16 }}>
+          <div className={styles.statsRow}>
             <Space size="large">
               <span><StarOutlined /> {repo.starsCount} Stars</span>
               <span><ForkOutlined /> {repo.forksCount} Forks</span>
@@ -117,7 +117,7 @@ export default function RepoDetailPage({ params }: { params: { id: string } }) {
             </Space>
           </div>
 
-          <Space size="middle" style={{ marginBottom: 16 }}>
+          <Space size="middle" className={styles.actionBar}>
             <Button type={isFavorited ? 'primary' : 'default'} onClick={handleFavorite}>
               {isFavorited ? '已收藏' : '收藏'}
             </Button>
@@ -132,7 +132,7 @@ export default function RepoDetailPage({ params }: { params: { id: string } }) {
             </Button>
           </Space>
 
-          <div style={{ color: '#333', marginBottom: 16 }}>
+          <div className={styles.description}>
             {repo.description || '暂无描述'}
           </div>
 
@@ -146,7 +146,7 @@ export default function RepoDetailPage({ params }: { params: { id: string } }) {
         </Card>
       </Content>
 
-      <ShareModal
+      <DynamicComponents.ShareModal
         open={shareOpen}
         title={repo.fullName}
         url={typeof window !== 'undefined' ? `${window.location.origin}/repos/${repo.id}` : ''}

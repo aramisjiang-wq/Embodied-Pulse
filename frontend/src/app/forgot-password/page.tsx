@@ -5,6 +5,7 @@ import { Card, Form, Input, Button, App } from 'antd';
 import { MailOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import apiClient from '@/lib/api/client';
+import styles from './page.module.css';
 
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
@@ -26,20 +27,13 @@ export default function ForgotPasswordPage() {
 
   if (submitted) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f0f2f5',
-        padding: '24px'
-      }}>
-        <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-          <div style={{ marginBottom: 24 }}>
+      <div className={styles.pageWrapper}>
+        <Card className={styles.formCard}>
+          <div className={styles.iconWrapper}>
             <MailOutlined style={{ fontSize: 48, color: '#52c41a' }} />
           </div>
-          <h2 style={{ marginBottom: 16 }}>邮件已发送</h2>
-          <p style={{ color: '#666', marginBottom: 24 }}>
+          <h2 className={styles.pageTitle}>邮件已发送</h2>
+          <p className={styles.pageDescription}>
             如果该邮箱已注册，您将收到密码重置链接。<br />
             链接有效期为 1 小时。
           </p>
@@ -52,15 +46,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f0f2f5',
-      padding: '24px'
-    }}>
-      <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+    <div className={styles.pageWrapper}>
+      <Card className={styles.formCard}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>找回密码</h1>
           <p style={{ color: '#666' }}>输入您的邮箱地址，我们将发送重置链接</p>

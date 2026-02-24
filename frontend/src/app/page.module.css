@@ -1,0 +1,254 @@
+.homeWrapper {
+  background: linear-gradient(180deg, var(--color-bg-default) 0%, #fafafa 100%);
+  min-height: calc(100vh - 64px);
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.container {
+  padding: var(--spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loadingWrapper {
+  background: linear-gradient(180deg, var(--color-bg-default) 0%, #fafafa 100%);
+  min-height: calc(100vh - 64px);
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bannerSection {
+  margin-bottom: var(--spacing-lg);
+}
+
+.bannerCarousel {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.bannerItem {
+  background-size: cover;
+  background-position: center;
+  height: 300px;
+  border-radius: var(--radius-lg);
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.bannerOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+  padding: 40px 50px 30px;
+  text-align: center;
+}
+
+.bannerContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.bannerTitle {
+  font-size: 42px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-text-white);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), 0 0 2px rgba(0, 0, 0, 0.3);
+  margin-bottom: var(--spacing-md);
+  line-height: 1.2;
+}
+
+.bannerDescription {
+  font-size: 18px;
+  color: var(--color-text-white);
+  font-weight: 400;
+  margin-top: 12px;
+  line-height: 1.6;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+.defaultBanner {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-lg);
+  padding: 60px 50px;
+  min-height: 300px;
+  box-shadow: 0 8px 24px rgba(24, 144, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.defaultBannerGlow {
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 300px;
+  height: 300px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  filter: blur(60px);
+}
+
+.defaultBannerContent {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.defaultBannerTitle {
+  font-size: 42px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-text-white);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.statsSpace {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+}
+
+.moduleSection {
+  margin-bottom: var(--spacing-lg);
+}
+
+.moduleCard {
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+}
+
+.moduleCard :global(.ant-card-body) {
+  padding: 0;
+}
+
+.closeButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-text-white);
+  border: none;
+}
+
+.moduleImage {
+  width: 100%;
+  display: block;
+}
+
+.announcementAlert {
+  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+}
+
+.mainContent {
+  margin-top: var(--spacing-lg);
+}
+
+.discoveryCol {
+  width: 100%;
+}
+
+.subscriptionCol {
+  width: 100%;
+}
+
+.subscriptionWrapper {
+  position: sticky;
+  top: 80px;
+  width: 100%;
+}
+
+.bottomModules {
+  margin-top: 48px;
+}
+
+.promotionCard {
+  margin-bottom: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: none;
+  position: relative;
+}
+
+.promotionContent {
+  font-size: 15px;
+  line-height: 1.8;
+  margin-bottom: var(--spacing-md);
+}
+
+.promotionLink {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.promotionLinkLight {
+  color: var(--color-primary);
+}
+
+.promotionLinkDark {
+  color: var(--color-text-white);
+}
+
+.customCard {
+  margin-bottom: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  position: relative;
+}
+
+.defaultCardContent {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--spacing-md);
+  }
+
+  .bannerItem {
+    height: 200px;
+  }
+
+  .bannerTitle {
+    font-size: 24px;
+  }
+
+  .bannerDescription {
+    font-size: 14px;
+  }
+
+  .defaultBanner {
+    padding: var(--spacing-xl);
+    min-height: 200px;
+  }
+
+  .defaultBannerTitle {
+    font-size: 24px;
+  }
+
+  .statsSpace {
+    font-size: 14px;
+  }
+}

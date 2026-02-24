@@ -20,6 +20,10 @@ const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITH
 
 export interface SyncJobsParams {
   maxResults?: number;
+  /** 仅同步指定年份的岗位，如 2026；不传则同步全部 */
+  year?: number;
+  /** 同步前是否清空现有岗位 */
+  clearExisting?: boolean;
 }
 
 export interface SyncJobsResult {
@@ -73,9 +77,15 @@ export async function syncJobsFromGithub(params: SyncJobsParams = {}): Promise<S
       }
     }
     
-    const jobs = parseJobsFromMarkdown(readme);
+    let jobs = parseJobsFromMarkdown(readme, params.year);
     
-    logger.info(`解析到${jobs.length}个岗位`);
+    logger.info(`解析到${jobs.length}个岗位${params.year ? `（仅${params.year}年）` : ''}`);
+    
+    // 同步前清空现有岗位
+    if (params.clearExisting) {
+      const deleted = await prisma.job.deleteMany({});
+      logger.info(`已清空现有岗位: ${deleted.count} 条`);
+    }
     
     // 限制数量
     const limitedJobs = params.maxResults 
@@ -131,6 +141,7 @@ export async function syncJobsFromGithub(params: SyncJobsParams = {}): Promise<S
               viewCount: 0,
               favoriteCount: 0,
               createdAt: job.publishDate || new Date(),
+              ...(job.applyUrl ? { apply_url: job.applyUrl } : {}),
             },
           });
         }
@@ -182,114 +193,109 @@ export async function syncJobsFromGithub(params: SyncJobsParams = {}): Promise<S
  * 从Markdown解析岗位信息
  * 格式: **\[日期\] 公司名 - 岗位描述**
  * 例如: **\[2025.3.10\] 星尘智能 - 2025校招/社招/实习集中招聘**
+ * @param year 仅解析该年份的岗位，如 2026；不传则解析全部
  */
-function parseJobsFromMarkdown(markdown: string) {
+function parseJobsFromMarkdown(markdown: string, yearFilter?: number) {
   const jobs: any[] = [];
   
-  // 查找"Rolling Recruitment | 滚动招聘"部分
-  const rollingRecruitmentMatch = markdown.match(/##\s*Rolling\s+Recruitment\s*\|?\s*滚动招聘[\s\S]*?(?=##|$)/i);
+  // 查找"Rolling Recruitment"部分（支持 "## 2. Rolling Recruitment | 滚动招聘" 等格式）
+  const rollingRecruitmentMatch = markdown.match(/##\s*(?:2\.\s*)?Rolling\s+Recruitment\s*\|?\s*滚动招聘[\s\S]*?(?=##\s|$)/i)
+    || markdown.match(/##\s*Rolling\s+Recruitment[\s\S]*?(?=##\s|$)/i);
   if (!rollingRecruitmentMatch) {
     logger.warn('未找到"Rolling Recruitment | 滚动招聘"部分');
-    // 如果找不到，尝试解析整个文档
-    return parseAllJobs(markdown);
+    return parseAllJobs(markdown, yearFilter);
   }
   
   const rollingSection = rollingRecruitmentMatch[0];
   const lines = rollingSection.split('\n');
+
+  const pushJob = (opts: {
+    dateStr: string;
+    company: string;
+    title: string;
+    applyUrl: string;
+    location: string;
+    description: string;
+  }) => {
+    const { dateStr, company, title, applyUrl, location, description } = opts;
+    if (yearFilter != null) {
+      const y = parseInt(dateStr.slice(0, 4), 10);
+      if (y !== yearFilter) return;
+    }
+    const [y, m, d] = dateStr.split('.').map(Number);
+    const publishDate = new Date(y, m - 1, d);
+    const jobTypes: string[] = [];
+    if (title.includes('实习') || title.includes('Intern')) jobTypes.push('实习');
+    if (title.includes('校招') || title.includes('应届')) jobTypes.push('校招');
+    if (title.includes('社招') || title.includes('全职')) jobTypes.push('全职');
+    if (title.includes('PhD') || title.includes('博士')) jobTypes.push('PhD');
+    if (title.includes('PostDoc') || title.includes('博士后')) jobTypes.push('博士后');
+    let fullDescription = description ? `岗位类型: ${jobTypes.join('、')}\n\n${description}` : (jobTypes.length ? `岗位类型: ${jobTypes.join('、')}` : '');
+    if (applyUrl) {
+      fullDescription += (fullDescription ? '\n\n' : '') + `申请链接: ${applyUrl}`;
+    } else {
+      fullDescription += (fullDescription ? '\n\n' : '') + `来源: https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+    }
+    jobs.push({
+      title: title.trim(),
+      company: company.trim(),
+      location: location || '不限',
+      salaryMin: null,
+      salaryMax: null,
+      description: fullDescription || `来自${company}的${title}，详见职位链接`,
+      requirements: description || '见职位描述',
+      publishDate,
+      applyUrl: applyUrl || '',
+    });
+  };
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // 匹配格式: **\[日期\] 公司名 - 岗位描述**
-    // 例如: **\[2025.3.10\] 星尘智能 - 2025校招/社招/实习集中招聘**
+    // 新格式（两行）：**\[2026.1.27]** 下一行 [公司 - 岗位 - 类型](url)
+    const dateOnlyMatch = line.match(/^\*\*\[(\d{4}\.\d{1,2}\.\d{1,2})\]\s*\*\*?$/);
+    if (dateOnlyMatch && i + 1 < lines.length) {
+      const dateStr = dateOnlyMatch[1];
+      const nextLine = lines[i + 1].trim();
+      const linkMatch = nextLine.match(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/);
+      if (linkMatch) {
+        const linkText = linkMatch[1];
+        const applyUrl = linkMatch[2].replace(/\)+$/, '');
+        const parts = linkText.split(/\s*-\s*/);
+        const company = parts[0]?.trim() || '';
+        const title = parts.slice(1).join(' - ').trim() || linkText;
+        let location = '';
+        const locInTitle = linkText.match(/[（(]([^）)]+)[）)]/);
+        if (locInTitle && /北京|上海|深圳|杭州|广州|成都|南京|武汉|西安|海外|美国|英国|德国|新加坡|香港|台湾/i.test(locInTitle[1])) {
+          location = locInTitle[1];
+        }
+        pushJob({ dateStr, company, title, applyUrl, location, description: '' });
+        i += 1;
+        continue;
+      }
+    }
+    
+    // 旧格式（一行）: **\[日期\] 公司名 - 岗位描述**
     const jobMatch = line.match(/\*\*\[(\d{4}\.\d{1,2}\.\d{1,2})\]\s*(.+?)\s*-\s*(.+?)\*\*/);
     if (jobMatch) {
       const [, dateStr, company, title] = jobMatch;
-      
-      // 解析日期
-      const [year, month, day] = dateStr.split('.').map(Number);
-      const publishDate = new Date(year, month - 1, day);
-      
-      // 提取链接（可能在当前行或后续行）
       let applyUrl = '';
       let location = '';
       let description = '';
-      
-      // 在当前行和后续几行中查找链接和详细信息
       for (let j = i; j < Math.min(i + 10, lines.length); j++) {
         const nextLine = lines[j].trim();
-        
-        // 查找链接
         const urlMatch = nextLine.match(/https?:\/\/[^\s\)]+/);
-        if (urlMatch && !applyUrl) {
-          applyUrl = urlMatch[0];
-        }
-        
-        // 查找地点信息（可能在括号中或单独行）
+        if (urlMatch && !applyUrl) applyUrl = urlMatch[0].replace(/\)+$/, '');
         const locationMatch = nextLine.match(/[（(]([^）)]+)[）)]/);
-        if (locationMatch && !location) {
-          const loc = locationMatch[1];
-          // 如果包含常见城市名，认为是地点
-          if (loc.match(/北京|上海|深圳|杭州|广州|成都|南京|武汉|西安|海外|美国|英国|德国|新加坡|香港|台湾/i)) {
-            location = loc;
-          }
+        if (locationMatch && !location && /北京|上海|深圳|杭州|广州|成都|南京|武汉|西安|海外|美国|英国|德国|新加坡|香港|台湾/i.test(locationMatch[1])) {
+          location = locationMatch[1];
         }
-        
-        // 累积描述（非标题行）
         if (nextLine && !nextLine.match(/^\*\*\[/) && !nextLine.startsWith('#')) {
           const cleanLine = nextLine.replace(/\*\*/g, '').replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1').trim();
-          if (cleanLine && cleanLine.length > 5) {
-            if (description) {
-              description += '\n' + cleanLine;
-            } else {
-              description = cleanLine;
-            }
-          }
+          if (cleanLine.length > 5) description = description ? description + '\n' + cleanLine : cleanLine;
         }
       }
-      
-      // 解析岗位类型（添加到description中）
-      const jobTypes: string[] = [];
-      if (title.includes('实习') || title.includes('Intern')) {
-        jobTypes.push('实习');
-      }
-      if (title.includes('校招') || title.includes('应届')) {
-        jobTypes.push('校招');
-      }
-      if (title.includes('社招') || title.includes('全职')) {
-        jobTypes.push('全职');
-      }
-      if (title.includes('PhD') || title.includes('博士')) {
-        jobTypes.push('PhD');
-      }
-      if (title.includes('PostDoc') || title.includes('博士后')) {
-        jobTypes.push('博士后');
-      }
-      
-      // 构建完整描述（包含类型、链接等信息）
-      let fullDescription = description || '';
-      if (jobTypes.length > 0) {
-        fullDescription = `岗位类型: ${jobTypes.join('、')}\n\n${fullDescription}`;
-      }
-      if (applyUrl) {
-        fullDescription += (fullDescription ? '\n\n' : '') + `申请链接: ${applyUrl}`;
-      } else {
-        fullDescription += (fullDescription ? '\n\n' : '') + `来源: https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
-      }
-      
-      const job = {
-        title: title.trim(),
-        company: company.trim(),
-        location: location || '不限',
-        salaryMin: null,
-        salaryMax: null,
-        description: fullDescription || `来自${company}的${title}，详见职位链接`,
-        requirements: description || '见职位描述',
-        publishDate,
-        applyUrl: applyUrl || '', // 添加applyUrl字段
-      };
-      
-      jobs.push(job);
+      pushJob({ dateStr, company, title, applyUrl, location, description });
     }
   }
   
@@ -298,7 +304,7 @@ function parseJobsFromMarkdown(markdown: string) {
   // 如果解析失败，尝试解析整个文档
   if (jobs.length === 0) {
     logger.warn('从"Rolling Recruitment"部分解析失败，尝试解析整个文档');
-    return parseAllJobs(markdown);
+    return parseAllJobs(markdown, yearFilter);
   }
   
   return jobs;
@@ -307,7 +313,7 @@ function parseJobsFromMarkdown(markdown: string) {
 /**
  * 解析整个文档中的岗位（备用方案）
  */
-function parseAllJobs(markdown: string) {
+function parseAllJobs(markdown: string, yearFilter?: number) {
   const jobs: any[] = [];
   const lines = markdown.split('\n');
   
@@ -318,6 +324,11 @@ function parseAllJobs(markdown: string) {
     const jobMatch = line.match(/\*\*\[(\d{4}\.\d{1,2}\.\d{1,2})\]\s*(.+?)\s*-\s*(.+?)\*\*/);
     if (jobMatch) {
       const [, dateStr, company, title] = jobMatch;
+      
+      if (yearFilter != null) {
+        const y = parseInt(dateStr.slice(0, 4), 10);
+        if (y !== yearFilter) continue;
+      }
       
       const [year, month, day] = dateStr.split('.').map(Number);
       const publishDate = new Date(year, month - 1, day);

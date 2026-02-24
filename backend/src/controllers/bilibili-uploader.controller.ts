@@ -91,11 +91,11 @@ export async function getUploaders(req: Request, res: Response, next: NextFuncti
 
     try {
       const result = await Promise.all([
-        userPrisma.bilibili_uploaders.findMany({
+        userPrisma.bilibiliUploader.findMany({
           where,
           skip,
           take,
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
         }).catch((error: any) => {
           if (error.code === 'P2021' || error.code === 'P2023' || error.message?.includes('does not exist') || error.message?.includes('DateTime') || error.message?.includes('Could not convert')) {
             logger.warn('Prisma查询失败，尝试使用raw SQL查询UP主列表:', error.message);
@@ -103,7 +103,7 @@ export async function getUploaders(req: Request, res: Response, next: NextFuncti
           }
           throw error;
         }),
-        userPrisma.bilibili_uploaders.count({ where }).catch(() => 0),
+        userPrisma.bilibiliUploader.count({ where }).catch(() => 0),
       ]);
       
       // 如果Prisma查询失败，使用raw SQL
@@ -299,17 +299,34 @@ export async function syncUploader(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * 删除UP主
+ * 删除UP主（同时删除关联的视频）
  */
 export async function deleteUploader(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
 
-    await userPrisma.bilibili_uploaders.delete({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id },
     });
 
-    sendSuccess(res, { message: '删除成功' });
+    if (!uploader) {
+      return sendError(res, 1005, 'UP主不存在', 404);
+    }
+
+    const deletedVideos = await userPrisma.video.deleteMany({
+      where: { uploaderId: uploader.mid },
+    });
+
+    logger.info(`删除UP主 ${uploader.name}(${uploader.mid}) 的 ${deletedVideos.count} 个关联视频`);
+
+    await userPrisma.bilibiliUploader.delete({
+      where: { id },
+    });
+
+    sendSuccess(res, { 
+      message: '删除成功',
+      deletedVideos: deletedVideos.count,
+    });
   } catch (error) {
     next(error);
   }
@@ -322,7 +339,7 @@ export async function toggleUploaderStatus(req: Request, res: Response, next: Ne
   try {
     const { id } = req.params;
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id },
     });
 
@@ -330,9 +347,9 @@ export async function toggleUploaderStatus(req: Request, res: Response, next: Ne
       return sendError(res, 1005, 'UP主不存在', 404);
     }
 
-    const updated = await userPrisma.bilibili_uploaders.update({
+    const updated = await userPrisma.bilibiliUploader.update({
       where: { id },
-      data: { is_active: !uploader.is_active },
+      data: { isActive: !uploader.isActive },
     });
 
     sendSuccess(res, updated);
@@ -349,7 +366,7 @@ export async function updateUploaderTags(req: Request, res: Response, next: Next
     const { id } = req.params;
     const { tags } = req.body;
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id },
     });
 
@@ -357,7 +374,7 @@ export async function updateUploaderTags(req: Request, res: Response, next: Next
       return sendError(res, 1005, 'UP主不存在', 404);
     }
 
-    const updated = await userPrisma.bilibili_uploaders.update({
+    const updated = await userPrisma.bilibiliUploader.update({
       where: { id },
       data: { tags: Array.isArray(tags) ? JSON.stringify(tags) : null },
     });
@@ -376,7 +393,7 @@ export async function updateUploaderInfo(req: Request, res: Response, next: Next
     const { id } = req.params;
     const { name, avatar, description } = req.body;
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id },
     });
 
@@ -384,7 +401,7 @@ export async function updateUploaderInfo(req: Request, res: Response, next: Next
       return sendError(res, 1005, 'UP主不存在', 404);
     }
 
-    const updated = await userPrisma.bilibili_uploaders.update({
+    const updated = await userPrisma.bilibiliUploader.update({
       where: { id },
       data: {
         ...(name && { name }),
@@ -406,7 +423,7 @@ export async function refreshUploaderInfo(req: Request, res: Response, next: Nex
   try {
     const { id } = req.params;
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id },
     });
 
@@ -422,7 +439,7 @@ export async function refreshUploaderInfo(req: Request, res: Response, next: Nex
       return sendError(res, 1006, '无法从Bilibili API获取UP主信息，可能需要配置Cookie', 400);
     }
 
-    const updated = await userPrisma.bilibili_uploaders.update({
+    const updated = await userPrisma.bilibiliUploader.update({
       where: { id },
       data: {
         name: uploaderInfo.name,

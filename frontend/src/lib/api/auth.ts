@@ -24,12 +24,14 @@ export const authApi = {
     password: string;
   }): Promise<LoginResponse> => {
     const response = await apiClient.post<LoginResponse>('/auth/login', data);
-    // apiClient的响应拦截器已经返回了response.data，所以response就是ApiResponse
-    if (response.code === 0) {
-      return response.data;
-    } else {
-      throw new Error(response.message || '登录失败');
+    if (response?.code !== 0) {
+      throw new Error(response?.message ?? '登录失败');
     }
+    const payload = response.data;
+    if (!payload?.token || !payload?.user) {
+      throw new Error('登录返回数据异常，请重试');
+    }
+    return payload;
   },
 
   // 管理员登录（管理端）
@@ -68,15 +70,13 @@ export const authApi = {
     }
   },
 
-  // 刷新Token
-  refreshToken: async (): Promise<{ token: string }> => {
-    const response = await apiClient.post<{ token: string }>('/auth/refresh');
-    // apiClient的响应拦截器已经返回了response.data，所以response就是ApiResponse
-    if (response.code === 0) {
+  // 刷新Token（用于长久登录，access 过期时自动换新）
+  refreshToken: async (): Promise<{ token: string; refreshToken: string }> => {
+    const response = await apiClient.post<{ token: string; refreshToken: string }>('/auth/refresh');
+    if (response.code === 0 && response.data?.token) {
       return response.data;
-    } else {
-      throw new Error(response.message || '刷新Token失败');
     }
+    throw new Error(response.message || '刷新Token失败');
   },
 
   // 登出

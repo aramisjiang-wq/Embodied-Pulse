@@ -1,0 +1,82 @@
+.pageWrapper {
+  padding: var(--spacing-lg, 24px);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, rgba(0, 0, 0, 0.88));
+}
+
+.statsRow {
+  margin-bottom: 20px;
+}
+
+.statCard {
+  height: 100%;
+}
+
+.statCard .ant-statistic-title {
+  font-size: 13px;
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.65));
+}
+
+.tableCard {
+  margin-top: 0;
+}
+
+.tableCard .ant-card-head {
+  min-height: 48px;
+}
+
+.emptyState {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  margin-bottom: 16px;
+}
+
+.emptyTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary, rgba(0, 0, 0, 0.88));
+}
+
+.emptyDesc {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.65));
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md, 16px);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .pageTitle {
+    font-size: 20px;
+  }
+
+  .emptyState {
+    padding: 32px 16px;
+  }
+}

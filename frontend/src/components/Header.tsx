@@ -15,8 +15,7 @@ import {
   RobotOutlined,
   RiseOutlined,
   TeamOutlined,
-  ReadOutlined,
-  BarChartOutlined
+  HomeOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
@@ -60,7 +59,8 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
   }, []);
 
   useEffect(() => {
-    if (hydrated && user) {
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('user_token');
+    if (hydrated && user && hasToken) {
       fetchUnreadCount();
       const interval = setInterval(fetchUnreadCount, 60000);
       return () => clearInterval(interval);
@@ -169,6 +169,27 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
           />
           
           <div className="desktop-nav-tabs" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#FFF7ED';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+              >
+                <HomeOutlined style={{ fontSize: 16, color: '#EA580C' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>首页</span>
+              </div>
+            </Link>
             <Link href="/papers" style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex',
@@ -180,35 +201,14 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#e6f7ff';
+                e.currentTarget.style.background = '#EFF6FF';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <FileTextOutlined style={{ fontSize: 16, color: '#1890ff' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>论文</span>
-              </div>
-            </Link>
-            <Link href="/videos" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#fff0f6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-              >
-                <PlayCircleOutlined style={{ fontSize: 16, color: '#eb2f96' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>视频</span>
+                <FileTextOutlined style={{ fontSize: 16, color: token.colorPrimary }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>论文</span>
               </div>
             </Link>
             <Link href="/repos" style={{ textDecoration: 'none' }}>
@@ -222,14 +222,14 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f9f0ff';
+                e.currentTarget.style.background = '#FAF5FF';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <GithubOutlined style={{ fontSize: 16, color: '#722ed1' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>代码</span>
+                <GithubOutlined style={{ fontSize: 16, color: '#9333EA' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>Github</span>
               </div>
             </Link>
             <Link href="/huggingface" style={{ textDecoration: 'none' }}>
@@ -243,14 +243,35 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#e6fffb';
+                e.currentTarget.style.background = '#ECFDF5';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <RobotOutlined style={{ fontSize: 16, color: '#13c2c2' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>模型</span>
+                <RobotOutlined style={{ fontSize: 16, color: '#10B981' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>Huggingface</span>
+              </div>
+            </Link>
+            <Link href="/videos" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#FDF2F8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+              >
+                <PlayCircleOutlined style={{ fontSize: 16, color: '#EC4899' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>视频</span>
               </div>
             </Link>
             <Link href="/jobs" style={{ textDecoration: 'none' }}>
@@ -264,14 +285,14 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#fff7e6';
+                e.currentTarget.style.background = '#FFFBEB';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <RiseOutlined style={{ fontSize: 16, color: '#fa8c16' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>招聘</span>
+                <RiseOutlined style={{ fontSize: 16, color: '#F59E0B' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>招聘</span>
               </div>
             </Link>
             <Link href="/community" style={{ textDecoration: 'none' }}>
@@ -285,56 +306,14 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f6ffed';
+                e.currentTarget.style.background = '#F0FDF4';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <TeamOutlined style={{ fontSize: 16, color: '#52c41a' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>市集</span>
-              </div>
-            </Link>
-            <Link href="/pages" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#fff1b8';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-              >
-                <ReadOutlined style={{ fontSize: 16, color: '#faad14' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>资讯</span>
-              </div>
-            </Link>
-            <Link href="/bilibili-analytics" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#e6f7ff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-              >
-                <BarChartOutlined style={{ fontSize: 16, color: '#1890ff' }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>数据分析</span>
+                <TeamOutlined style={{ fontSize: 16, color: '#22C55E' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>市集</span>
               </div>
             </Link>
           </div>

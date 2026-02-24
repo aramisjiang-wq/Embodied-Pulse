@@ -6,8 +6,8 @@
 import userPrisma from '../config/database.user';
 import { logger } from '../utils/logger';
 
-export type ActionType = 'view' | 'favorite' | 'unfavorite' | 'comment' | 'share' | 'like' | 'unlike';
-export type ContentType = 'paper' | 'video' | 'repo' | 'huggingface' | 'job' | 'post' | 'news';
+export type ActionType = 'view' | 'favorite' | 'unfavorite' | 'comment' | 'share' | 'like' | 'unlike' | 'submit';
+export type ContentType = 'paper' | 'video' | 'repo' | 'huggingface' | 'job' | 'post';
 
 export interface CreateUserActionData {
   userId: string;

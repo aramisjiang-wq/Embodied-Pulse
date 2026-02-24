@@ -1,21 +1,18 @@
-/**
- * 全站搜索页面 - 优化版
- */
-
 'use client';
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { Layout, Tabs, Input, Spin, List, Space, Tag, Select, DatePicker, Button, App } from 'antd';
+import { Tabs, Input, Spin, List, Space, Tag, Select, DatePicker, Button, App } from 'antd';
 import type { InputRef } from 'antd';
-import { SearchOutlined, ClockCircleOutlined, FireOutlined, FilterOutlined } from '@ant-design/icons';
+import { SearchOutlined, ClockCircleOutlined, FilterOutlined } from '@ant-design/icons';
 import { searchApi, SearchResult } from '@/lib/api/search';
 import { cleanText } from '@/lib/utils/htmlUtils';
 import { searchUtils } from '@/lib/utils/searchUtils';
 import Link from 'next/link';
 import SearchSuggestions from '@/components/SearchSuggestions';
+import PageContainer from '@/components/PageContainer';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
-const { Content } = Layout;
 const { RangePicker } = DatePicker;
 
 export default function SearchPage() {
@@ -153,9 +150,13 @@ export default function SearchPage() {
       case 'job':
         return item.applyUrl || 'https://github.com/StarCycle/Awesome-Embodied-AI-Job';
       case 'huggingface':
+        const hfContentType = item.contentType || 'model';
+        if (hfContentType === 'dataset') {
+          return item.fullName ? `https://huggingface.co/datasets/${item.fullName}` : (item.hfId ? `https://huggingface.co/datasets/${item.hfId}` : '#');
+        } else if (hfContentType === 'space') {
+          return item.fullName ? `https://huggingface.co/spaces/${item.fullName}` : (item.hfId ? `https://huggingface.co/spaces/${item.hfId}` : '#');
+        }
         return item.fullName ? `https://huggingface.co/${item.fullName}` : (item.hfId ? `https://huggingface.co/${item.hfId}` : '#');
-      case 'news':
-        return item.url || '#';
       case 'post':
         return `/community/${item.id}`;
       default:
@@ -170,17 +171,16 @@ export default function SearchPage() {
       repo: { label: 'GitHub', color: 'purple' },
       huggingface: { label: 'HF模型', color: 'orange' },
       job: { label: '岗位', color: 'red' },
-      news: { label: '新闻', color: 'cyan' },
       post: { label: '帖子', color: 'geekblue' },
     };
     return labels[type] || { label: type, color: 'default' };
   };
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ background: '#fff', padding: 24, borderRadius: 8 }}>
-          <div style={{ position: 'relative', marginBottom: 16 }}>
+    <PageContainer title="搜索" loading={loading && items.length === 0}>
+      <div className={styles.container}>
+        <div className={styles.searchCard}>
+          <div className={styles.searchInputWrapper}>
             <Input.Search
               ref={searchInputRef}
               size="large"
@@ -205,7 +205,7 @@ export default function SearchPage() {
             />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
+          <div className={styles.filterSection}>
             <Space>
               <Button
                 icon={<FilterOutlined />}
@@ -268,27 +268,21 @@ export default function SearchPage() {
                   const typeInfo = getTypeLabel(itemType);
                   
                   return (
-                    <List.Item style={{ padding: '16px 0', borderBottom: '1px solid #f0f0f0' }}>
-                      <div style={{ width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                          <Tag color={typeInfo.color} style={{ flexShrink: 0, marginTop: 2 }}>
+                    <List.Item className={styles.resultItem}>
+                      <div className={styles.resultContent}>
+                        <div className={styles.resultHeader}>
+                          <Tag color={typeInfo.color} className={styles.typeTag}>
                             {typeInfo.label}
                           </Tag>
                           
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className={styles.resultBody}>
                             <div style={{ marginBottom: 8 }}>
                               {isExternal ? (
                                 <a
                                   href={linkUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  style={{ 
-                                    fontSize: 16, 
-                                    fontWeight: 600, 
-                                    color: '#1890ff',
-                                    textDecoration: 'none',
-                                    display: 'block'
-                                  }}
+                                  className={styles.resultTitle}
                                   dangerouslySetInnerHTML={{
                                     __html: searchUtils.highlightText(
                                       cleanText(item.title || item.fullName || item.name || ''),
@@ -299,13 +293,7 @@ export default function SearchPage() {
                               ) : (
                                 <Link
                                   href={linkUrl}
-                                  style={{ 
-                                    fontSize: 16, 
-                                    fontWeight: 600, 
-                                    color: '#1890ff',
-                                    textDecoration: 'none',
-                                    display: 'block'
-                                  }}
+                                  className={styles.resultTitle}
                                   dangerouslySetInnerHTML={{
                                     __html: searchUtils.highlightText(
                                       cleanText(item.title || item.fullName || item.name || ''),
@@ -317,15 +305,7 @@ export default function SearchPage() {
                             </div>
                             
                             <div
-                              style={{
-                                color: '#595959',
-                                fontSize: 13,
-                                lineHeight: 1.6,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              }}
+                              className={styles.resultDescription}
                               dangerouslySetInnerHTML={{
                                 __html: searchUtils.highlightText(
                                   cleanText(item.description || item.abstract || ''),
@@ -335,9 +315,9 @@ export default function SearchPage() {
                             />
                             
                             {item.tags && Array.isArray(item.tags) && item.tags.length > 0 && (
-                              <div style={{ marginTop: 8 }}>
+                              <div className={styles.resultTags}>
                                 {item.tags.slice(0, 3).map((tag: string, idx: number) => (
-                                  <Tag key={idx} color="blue" style={{ fontSize: 11, padding: '2px 8px', marginRight: 4 }}>
+                                  <Tag key={idx} color="blue" className={styles.resultTag}>
                                     {tag}
                                   </Tag>
                                 ))}
@@ -345,7 +325,7 @@ export default function SearchPage() {
                             )}
                             
                             {item.createdAt && (
-                              <div style={{ marginTop: 8, fontSize: 12, color: '#999', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <div className={styles.resultMeta}>
                                 <ClockCircleOutlined />
                                 {dayjs(item.createdAt).fromNow()}
                               </div>
@@ -358,21 +338,21 @@ export default function SearchPage() {
                 }}
               />
             ) : keyword.trim() ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
-                <SearchOutlined style={{ fontSize: 48, marginBottom: 16, color: '#d9d9d9' }} />
-                <div style={{ fontSize: 16, marginBottom: 8 }}>未找到相关结果</div>
-                <div style={{ fontSize: 14 }}>试试其他关键词或调整筛选条件</div>
+              <div className={styles.emptyState}>
+                <SearchOutlined className={styles.emptyIcon} />
+                <div className={styles.emptyTitle}>未找到相关结果</div>
+                <div className={styles.emptyDescription}>试试其他关键词或调整筛选条件</div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
-                <SearchOutlined style={{ fontSize: 48, marginBottom: 16, color: '#d9d9d9' }} />
-                <div style={{ fontSize: 16, marginBottom: 8 }}>搜索论文、视频、项目、模型、岗位</div>
-                <div style={{ fontSize: 14 }}>输入关键词开始探索具身智能领域</div>
+              <div className={styles.emptyState}>
+                <SearchOutlined className={styles.emptyIcon} />
+                <div className={styles.emptyTitle}>搜索论文、视频、项目、模型、岗位</div>
+                <div className={styles.emptyDescription}>输入关键词开始探索具身智能领域</div>
               </div>
             )}
           </Spin>
         </div>
-      </Content>
-    </div>
+      </div>
+    </PageContainer>
   );
 }

@@ -1,65 +1,53 @@
+/**
+ * 页面容器组件
+ * 统一页面布局、间距和样式
+ * 注意：布局由 GlobalSidebarWrapper 处理，此组件只负责内容区域样式
+ */
+
 'use client';
 
-import { theme, Layout } from 'antd';
-import { ReactNode } from 'react';
-
-const { Content } = Layout;
+import React from 'react';
+import { Spin } from 'antd';
+import styles from './PageContainer.module.css';
 
 interface PageContainerProps {
-  children: ReactNode;
+  children: React.ReactNode;
   title?: string;
-  subtitle?: string;
-  extra?: ReactNode;
+  loading?: boolean;
+  showSidebar?: boolean;
+  maxWidth?: string;
+  className?: string;
+  contentClassName?: string;
 }
 
-export default function PageContainer({ children, title, subtitle, extra }: PageContainerProps) {
-  const { token } = theme.useToken();
-
+export default function PageContainer({
+  children,
+  title,
+  loading = false,
+  showSidebar = true,
+  maxWidth = 'var(--content-max-width)',
+  className = '',
+  contentClassName = '',
+}: PageContainerProps) {
   return (
-    <Layout style={{ background: token.colorBgLayout, minHeight: '100%' }}>
-      <Content style={{ padding: 24, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
-        {(title || extra) && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 24,
-              flexWrap: 'wrap',
-              gap: 16,
-            }}
-          >
-            <div>
-              {title && (
-                <h1
-                  style={{
-                    fontSize: token.fontSizeHeading2,
-                    fontWeight: 600,
-                    margin: 0,
-                    color: token.colorText,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {title}
-                </h1>
-              )}
-              {subtitle && (
-                <p
-                  style={{
-                    fontSize: token.fontSize,
-                    color: token.colorTextSecondary,
-                    margin: '4px 0 0',
-                  }}
-                >
-                  {subtitle}
-                </p>
-              )}
-            </div>
-            {extra && <div>{extra}</div>}
+    <div className={`${styles.pageWrapper} ${className}`}>
+      <main
+        className={`${styles.contentArea} ${contentClassName}`}
+        style={{ maxWidth }}
+      >
+        {title && (
+          <div className={styles.pageHeader}>
+            <h1 className={styles.pageTitle}>{title}</h1>
           </div>
         )}
-        {children}
-      </Content>
-    </Layout>
+        {loading ? (
+          <div className={styles.loadingWrapper}>
+            <Spin size="large" />
+          </div>
+        ) : (
+          children
+        )}
+      </main>
+    </div>
   );
 }

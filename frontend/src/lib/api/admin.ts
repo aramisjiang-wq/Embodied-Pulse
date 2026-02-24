@@ -63,6 +63,60 @@ export const adminApi = {
   },
 
   /**
+   * 市集帖子列表（管理端，与用户端同源数据，支持 status 筛选）
+   */
+  getCommunityPosts: async (params: {
+    page?: number;
+    size?: number;
+    sort?: 'hot' | 'latest';
+    status?: string;
+  }): Promise<{ items: unknown[]; pagination: { page: number; size: number; total: number; totalPages?: number; hasNext?: boolean; hasPrev?: boolean } }> => {
+    const response = await apiClient.get<{ items: unknown[]; pagination: Record<string, unknown> }>('/admin/posts', { params });
+    const data = response?.data;
+    if (!data) {
+      return { items: [], pagination: { page: 1, size: params.size ?? 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
+    }
+    const defaultPagination = { page: 1, size: params.size ?? 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false };
+    return {
+      items: data.items ?? [],
+      pagination: (data.pagination as typeof defaultPagination | undefined) ?? defaultPagination,
+    };
+  },
+
+  /**
+   * 市集统计（管理端）
+   */
+  getCommunityStats: async (): Promise<{
+    totalPosts: number;
+    activePosts: number;
+    deletedPosts: number;
+    pinnedPosts: number;
+    featuredPosts: number;
+    todayNewPosts: number;
+    totalComments: number;
+  }> => {
+    const response = await apiClient.get<{
+      totalPosts: number;
+      activePosts: number;
+      deletedPosts: number;
+      pinnedPosts: number;
+      featuredPosts: number;
+      todayNewPosts: number;
+      totalComments: number;
+    }>('/admin/community/stats');
+    const data = response?.data;
+    return {
+      totalPosts: data?.totalPosts ?? 0,
+      activePosts: data?.activePosts ?? 0,
+      deletedPosts: data?.deletedPosts ?? 0,
+      pinnedPosts: data?.pinnedPosts ?? 0,
+      featuredPosts: data?.featuredPosts ?? 0,
+      todayNewPosts: data?.todayNewPosts ?? 0,
+      totalComments: data?.totalComments ?? 0,
+    };
+  },
+
+  /**
    * 创建内容
    */
   createContent: async (type: string, data: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -96,9 +150,10 @@ export const adminApi = {
     isPublic?: boolean;
     isActive?: boolean;
     syncEnabled?: boolean;
-  }): Promise<PaginatedResponse<Record<string, unknown>>> => {
-    const response = await apiClient.get<PaginatedResponse<Record<string, unknown>>>('/admin/subscriptions', { params });
-    return response.data;
+  }): Promise<PaginatedResponse<unknown>> => {
+    const response = await apiClient.get<PaginatedResponse<unknown>>('/admin/subscriptions', { params });
+    const fallback: PaginatedResponse<unknown> = { items: [], pagination: { page: 1, size: 10, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
+    return (response?.code === 0 && response?.data ? response.data : fallback);
   },
 
   /**
@@ -116,8 +171,8 @@ export const adminApi = {
    * 获取订阅统计
    */
   getSubscriptionStats: async (): Promise<Record<string, unknown>> => {
-    const response = await apiClient.get<Record<string, unknown>>('/admin/subscriptions/stats');
-    return response.data;
+    const response = await apiClient.get<{ code?: number; data?: Record<string, unknown> }>('/admin/subscriptions/stats');
+    return (response?.code === 0 && response?.data) ? response.data : {};
   },
 
   /**
@@ -150,7 +205,7 @@ export const adminApi = {
    * 获取数据流动监控
    */
   getDataFlowMonitor: async (): Promise<Record<string, unknown>> => {
-    const response = await apiClient.get<Record<string, unknown>>('/admin/subscriptions/monitor');
-    return response.data;
+    const response = await apiClient.get<{ code?: number; data?: Record<string, unknown> }>('/admin/subscriptions/monitor');
+    return (response?.code === 0 && response?.data) ? response.data : {};
   },
 };

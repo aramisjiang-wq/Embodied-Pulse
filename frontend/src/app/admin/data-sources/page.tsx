@@ -1,5 +1,5 @@
 /**
- * 管理端 - 第三方API管理页面
+ * 管理端 - 数据源管理（第三方 API 配置、同步与运行规则）
  */
 
 'use client';
@@ -20,6 +20,8 @@ import {
   InputNumber,
   Tabs,
   Select,
+  Collapse,
+  Typography,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -29,12 +31,61 @@ import {
   ClockCircleOutlined,
   ThunderboltOutlined,
   EyeOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { dataSourceApi, DataSource, DataSourceLog } from '@/lib/api/data-source';
 import { syncApi } from '@/lib/api/sync';
 import apiClient from '@/lib/api/client';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
 const { TabPane } = Tabs;
+const { Text } = Typography;
+
+/** 各数据源自动化/手动运行规则说明（与 backend sync/cron 一致） */
+const DATA_SOURCE_RULES: Array<{
+  key: string;
+  name: string;
+  auto: string;
+  manual: string;
+}> = [
+  {
+    key: 'arxiv',
+    name: 'arXiv',
+    auto: '每 6 小时同步一次（0、6、12、18 点）；另每 6 小时 30 分按「论文搜索关键词」同步最近 7 天',
+    manual: '本页点击该数据源「同步」按钮，或使用「全量同步所有数据源」',
+  },
+  {
+    key: 'github',
+    name: 'GitHub',
+    auto: '每 8 小时同步仓库（0、8、16 点）；每天凌晨 3 点同步岗位（Jobs）',
+    manual: '本页点击该数据源「同步」按钮，或使用「全量同步所有数据源」',
+  },
+  {
+    key: 'huggingface',
+    name: 'HuggingFace',
+    auto: '每 12 小时 30 分同步模型；每天凌晨 1 点同步论文',
+    manual: '本页点击该数据源「同步」按钮，或使用「全量同步所有数据源」',
+  },
+  {
+    key: 'bilibili',
+    name: 'Bilibili',
+    auto: '每 12 小时同步视频（0、12 点）；每 6 小时 30 分按「Bilibili 搜索关键词」同步最近 7 天',
+    manual: '本页点击该数据源「同步」按钮，或使用「全量同步所有数据源」',
+  },
+  {
+    key: 'youtube',
+    name: 'YouTube',
+    auto: '每 12 小时与 Bilibili 一起同步视频（0、12 点）',
+    manual: '本页点击该数据源「同步」按钮，或使用「全量同步所有数据源」',
+  },
+  {
+    key: 'semantic_scholar',
+    name: 'Semantic Scholar',
+    auto: '每 12 小时 30 分同步（补充 arXiv），遇限流会跳过',
+    manual: '本页点击该数据源「同步」按钮。免费 API：100 请求/5 分钟',
+  },
+];
 
 type ApiError = {
   message?: string;
@@ -322,44 +373,12 @@ export default function DataSourceManagementPage() {
         case 'youtube':
           result = await syncApi.syncYouTube(source.config);
           break;
-        case 'hot_news':
-          result = await syncApi.syncHotNews({
-            platform: source.config?.platform || 'baidu',
-            maxResults: source.config?.maxResults || 50,
-          });
-          break;
-        case 'dailyhot_api':
-          try {
-            result = await syncApi.syncDailyHotApi({
-              platform: source.config?.platform || 'baidu',
-              maxResults: source.config?.maxResults || 50,
-            });
-          } catch (error: unknown) {
-            // 显示详细的错误信息
-            const err = normalizeError(error);
-            const errorMsg = err.response?.data?.message || err.message || '同步失败';
-            message.error(`DailyHotApi同步失败: ${errorMsg}`, 5);
-            throw error; // 重新抛出以便外层处理
-          }
-          break;
-        case '36kr':
-          result = await syncApi.sync36kr({
-            maxResults: source.config?.maxResults || 100,
-            useApi: source.config?.useApi !== false,
-          });
-          break;
-        case 'tech_news':
-          result = await syncApi.syncTechNews({
-            maxResults: source.config?.maxResults || 50,
-            sources: source.config?.sources,
-          });
-          break;
         case 'semantic_scholar':
           result = await syncApi.syncSemanticScholar({
             query: source.config?.query || 'embodied AI OR robotics',
             maxResults: source.config?.maxResults || 100,
-            year: source.config?.year,
-            fieldsOfStudy: source.config?.fieldsOfStudy,
+            year: source.config?.year as number | undefined,
+            fieldsOfStudy: source.config?.fieldsOfStudy as string[] | undefined,
           });
           break;
         default:
@@ -577,9 +596,9 @@ export default function DataSourceManagementPage() {
   ];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>第三方API管理</h1>
+    <PageContainer loading={loading && dataSources.length === 0}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>数据源管理</h1>
         <Space>
           <Space>
             <span>排序：</span>
@@ -616,6 +635,7 @@ export default function DataSourceManagementPage() {
             icon={<ReloadOutlined />}
             onClick={handleSyncAll}
             loading={loading}
+            disabled={dataSources.length === 0}
           >
             全量同步所有数据源
           </Button>
@@ -623,16 +643,61 @@ export default function DataSourceManagementPage() {
             icon={<ThunderboltOutlined />}
             onClick={handleCheckAllHealth}
             loading={loading}
+            disabled={dataSources.length === 0}
           >
             检查所有健康状态
           </Button>
         </Space>
       </div>
 
-      <Card>
+      <Collapse
+        ghost
+        style={{ marginBottom: 16 }}
+        items={[
+          {
+            key: 'rules',
+            label: (
+              <Space>
+                <InfoCircleOutlined />
+                <Text strong>各数据源运行规则（自动化定时 / 手动触发）</Text>
+              </Space>
+            ),
+            children: (
+              <div style={{ padding: '8px 0' }}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                  以下规则与后端定时任务（Asia/Shanghai）一致。手动触发：本页「全量同步所有数据源」或每行「同步」按钮（需先启用该数据源）。
+                </Text>
+                <Table
+                  size="small"
+                  pagination={false}
+                  dataSource={DATA_SOURCE_RULES}
+                  rowKey="key"
+                  columns={[
+                    { title: '数据源', dataIndex: 'name', key: 'name', width: 140 },
+                    {
+                      title: '自动化（定时）',
+                      dataIndex: 'auto',
+                      key: 'auto',
+                      render: (t: string) => <Text style={{ fontSize: 13 }}>{t}</Text>,
+                    },
+                    {
+                      title: '手动',
+                      dataIndex: 'manual',
+                      key: 'manual',
+                      render: (t: string) => <Text type="secondary" style={{ fontSize: 13 }}>{t}</Text>,
+                    },
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <Card className={styles.contentCard}>
         {error && !loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <p style={{ fontSize: 16, color: '#ff4d4f', marginBottom: 16 }}>
+          <div className={styles.errorContainer}>
+            <p className={styles.errorText}>
               {error}
             </p>
             <Space>
@@ -645,8 +710,8 @@ export default function DataSourceManagementPage() {
             </Space>
           </div>
         ) : dataSources.length === 0 && !loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <p style={{ fontSize: 16, color: '#666', marginBottom: 16 }}>
+          <div className={styles.emptyContainer}>
+            <p className={styles.emptyText}>
               暂无数据源，请先初始化数据源
             </p>
             <Button type="primary" onClick={handleInit}>
@@ -687,7 +752,7 @@ export default function DataSourceManagementPage() {
           <Form.Item
             label="标签"
             name="tags"
-            tooltip="输入标签，用逗号分隔，例如：新闻,AI,机器人"
+            tooltip="输入标签，用逗号分隔，例如：AI,机器人,具身智能"
           >
             <Select
               mode="tags"
@@ -761,34 +826,6 @@ export default function DataSourceManagementPage() {
                 </Form.Item>
                 <Form.Item label="最大结果数" name="maxResults">
                   <InputNumber min={1} max={50} style={{ width: '100%' }} />
-                </Form.Item>
-              </TabPane>
-            )}
-
-            {selectedSource?.name === 'hot_news' && (
-              <TabPane tab="热点新闻配置" key="hot_news">
-                <Form.Item label="平台" name="platform">
-                  <Input placeholder="例如: baidu, weibo, zhihu, bilibili, douban, juejin" />
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    支持的平台：baidu, weibo, zhihu, bilibili, douban, juejin, sspai, tskr, ftpojie, hupu, tieba, douyin, vtex, jinritoutiao, stackoverflow, github, hackernews, sina_finance, eastmoney, xueqiu, cls, tenxunwang
-                  </div>
-                </Form.Item>
-                <Form.Item label="最大结果数" name="maxResults">
-                  <InputNumber min={1} max={100} style={{ width: '100%' }} />
-                </Form.Item>
-              </TabPane>
-            )}
-
-            {selectedSource?.name === 'dailyhot_api' && (
-              <TabPane tab="DailyHotApi配置" key="dailyhot_api">
-                <Form.Item label="平台" name="platform">
-                  <Input placeholder="例如: baidu, weibo, zhihu, bilibili, acfun, douyin, kuaishou, tieba, sspai, ithome, jianshu, juejin, qq-news, sina, netease-news, 52pojie, hupu, coolapk, v2ex" />
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    支持的平台：baidu, weibo, zhihu, bilibili, acfun, douyin, kuaishou, tieba, sspai, ithome, jianshu, juejin, qq-news, sina, netease-news, 52pojie, hupu, coolapk, v2ex, hellogithub, weatheralarm, earthquake, history等40+平台
-                  </div>
-                </Form.Item>
-                <Form.Item label="最大结果数" name="maxResults">
-                  <InputNumber min={1} max={100} style={{ width: '100%' }} />
                 </Form.Item>
               </TabPane>
             )}
@@ -901,6 +938,6 @@ export default function DataSourceManagementPage() {
           pagination={{ pageSize: 20 }}
         />
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

@@ -66,11 +66,15 @@ export async function createFavorite(data: CreateFavoriteData): Promise<Favorite
       data: favoriteData,
     });
 
-    // 增加内容的收藏数
-    await incrementContentFavoriteCount(data.contentType, data.contentId);
+    // 增加内容的收藏数（异步，不阻塞主流程）
+    incrementContentFavoriteCount(data.contentType, data.contentId).catch(err => {
+      logger.warn('Failed to increment favorite count:', err);
+    });
 
-    // 奖励积分
-    await updateUserPoints(data.userId, 5, 'favorite', '收藏内容');
+    // 奖励积分（异步，积分失败不影响收藏成功）
+    updateUserPoints(data.userId, 5, 'favorite', '收藏内容').catch(err => {
+      logger.warn('Failed to award points for favorite:', err);
+    });
 
     logger.info(`Favorite created: ${favorite.id} by user ${data.userId}`);
     return favorite;
@@ -181,12 +185,6 @@ async function incrementContentFavoriteCount(contentType: string, contentId: str
           data: { favoriteCount: { increment: 1 } },
         });
         break;
-      case 'news':
-        await userPrisma.news.update({
-          where: { id: contentId },
-          data: { favorite_count: { increment: 1 } },
-        });
-        break;
       default:
         logger.warn(`Unknown contentType for favorite increment: ${contentType}`);
     }
@@ -239,12 +237,6 @@ async function decrementContentFavoriteCount(contentType: string, contentId: str
         await mainPrisma.huggingFaceModel.update({
           where: { id: contentId },
           data: { favoriteCount: { decrement: 1 } },
-        });
-        break;
-      case 'news':
-        await userPrisma.news.update({
-          where: { id: contentId },
-          data: { favorite_count: { decrement: 1 } },
         });
         break;
       default:

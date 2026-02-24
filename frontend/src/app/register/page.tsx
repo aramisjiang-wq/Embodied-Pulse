@@ -12,12 +12,13 @@ import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import apiClient from '@/lib/api/client';
+import styles from './page.module.css';
 
 export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const { setUser, setToken } = useAuthStore();
+  const { setUser, setToken, setRefreshToken } = useAuthStore();
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -60,8 +61,10 @@ export default function RegisterPage() {
         password: values.password,
         verificationCode: values.verificationCode,
       });
-      setToken(response.token);
-      setUser(response.user);
+      // 先 setToken 再 setUser，确保 isAdmin=false 后再写 user，避免写入 admin_user
+      setToken(response.token, false);
+      if (response.refreshToken) setRefreshToken(response.refreshToken, false);
+      setUser(response.user, false);
       message.success('注册成功!');
       router.push('/');
     } catch (error: any) {
@@ -72,17 +75,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={{
-      minHeight: 'calc(100vh - 64px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f0f2f5'
-    }}>
-      <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 'bold', color: '#1890ff' }}>注册账号</h1>
-          <p style={{ color: '#666' }}>加入 Embodied Pulse 市集</p>
+    <div className={styles.pageWrapper}>
+      <Card className={styles.registerCard}>
+        <div className={styles.registerHeader}>
+          <h1 className={styles.registerTitle}>注册账号</h1>
+          <p className={styles.registerSubtitle}>加入 Embodied Pulse 市集</p>
         </div>
 
         <Form form={form} onFinish={handleRegister} layout="vertical">
@@ -191,8 +188,8 @@ export default function RegisterPage() {
           </Form.Item>
         </Form>
 
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          已有账号? <Link href="/login" style={{ color: '#1890ff' }}>立即登录</Link>
+        <div className={styles.registerFooter}>
+          已有账号? <Link href="/login" className={styles.registerLink}>立即登录</Link>
         </div>
       </Card>
     </div>

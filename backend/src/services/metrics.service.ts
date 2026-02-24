@@ -78,23 +78,6 @@ export const externalApiCallDuration = new Histogram({
   registers: [register],
 });
 
-// 新闻同步计数器
-export const newsSyncCounter = new Counter({
-  name: 'news_sync_total',
-  help: 'Total number of news sync operations',
-  labelNames: ['source', 'status'],
-  registers: [register],
-});
-
-// 新闻同步持续时间直方图
-export const newsSyncDuration = new Histogram({
-  name: 'news_sync_duration_seconds',
-  help: 'Duration of news sync operations in seconds',
-  labelNames: ['source'],
-  buckets: [10, 30, 60, 120, 300, 600],
-  registers: [register],
-});
-
 // 用户活跃度仪表盘
 export const activeUsersGauge = new Gauge({
   name: 'active_users',
@@ -114,13 +97,6 @@ export const dbConnectionPoolGauge = new Gauge({
 export const redisCacheHitRateGauge = new Gauge({
   name: 'redis_cache_hit_rate',
   help: 'Redis cache hit rate percentage',
-  registers: [register],
-});
-
-// 新闻总数仪表盘
-export const totalNewsGauge = new Gauge({
-  name: 'total_news_count',
-  help: 'Total number of news articles',
   registers: [register],
 });
 
@@ -202,14 +178,6 @@ export function observeExternalApiCallDuration(service: string, endpoint: string
   externalApiCallDuration.observe({ service, endpoint }, duration);
 }
 
-export function incrementNewsSyncCounter(source: string, status: string): void {
-  newsSyncCounter.inc({ source, status });
-}
-
-export function observeNewsSyncDuration(source: string, duration: number): void {
-  newsSyncDuration.observe({ source }, duration);
-}
-
 export function setActiveUsers(count: number): void {
   activeUsersGauge.set(count);
 }
@@ -220,10 +188,6 @@ export function setDbConnectionPoolSize(database: string, size: number): void {
 
 export function setRedisCacheHitRate(rate: number): void {
   redisCacheHitRateGauge.set(rate);
-}
-
-export function setTotalNewsCount(count: number): void {
-  totalNewsGauge.set(count);
 }
 
 export function setTotalPapersCount(count: number): void {
@@ -248,6 +212,14 @@ export function incrementScheduledTaskCounter(task: string, status: string): voi
 
 export function observeScheduledTaskDuration(task: string, duration: number): void {
   scheduledTaskDuration.observe({ task }, duration);
+}
+
+export function incrementNewsSyncCounter(source: string, status: string): void {
+  scheduledTaskCounter.inc({ task: `news_sync_${source}`, status });
+}
+
+export function observeNewsSyncDuration(source: string, duration: number): void {
+  scheduledTaskDuration.observe({ task: `news_sync_${source}` }, duration);
 }
 
 export { register };

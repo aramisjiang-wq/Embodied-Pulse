@@ -13,14 +13,10 @@ import {
   syncBilibili,
   syncYouTube,
   syncJobs,
-  syncHotNews,
-  syncDailyHotApi,
-  sync36kr,
-  syncTechNews,
   syncSemanticScholar,
-  smartFilterNews,
   syncPapersByKeywordsHandler,
   syncVideosByKeywordsHandler,
+  syncArxivCategoriesHandler,
 } from '../controllers/sync.controller';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 
@@ -44,12 +40,10 @@ router.post('/huggingface/papers', syncHuggingFacePapers);
 router.post('/bilibili', syncBilibili);
 router.post('/youtube', syncYouTube);
 router.post('/jobs', syncJobs);
-router.post('/hot-news', syncHotNews);
-router.post('/dailyhot-api', syncDailyHotApi);
-router.post('/36kr', sync36kr);
-router.post('/tech-news', syncTechNews);
 router.post('/semantic-scholar', syncSemanticScholar);
-router.post('/smart-filter-news', smartFilterNews);
+
+// 全量拉取 ArXiv 分类论文
+router.post('/arxiv-categories', syncArxivCategoriesHandler);
 
 // 根据关键词同步
 router.post('/papers-by-keywords', syncPapersByKeywordsHandler);

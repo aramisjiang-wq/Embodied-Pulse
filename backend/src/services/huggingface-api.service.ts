@@ -273,15 +273,40 @@ export async function testConnection(): Promise<boolean> {
 }
 
 /**
- * 从HuggingFace URL解析模型ID
+ * 从HuggingFace URL解析模型/数据集ID
  * 支持的URL格式:
  * - https://huggingface.co/author/model-name
+ * - https://huggingface.co/datasets/author/dataset-name
+ * - https://huggingface.co/spaces/author/space-name
  * - https://huggingface.co/author/model-name/tree/main
  * - author/model-name
  */
-export function parseHuggingFaceUrl(url: string): { author: string; model: string } | null {
+export function parseHuggingFaceUrl(url: string): { author: string; model: string; contentType?: 'model' | 'dataset' | 'space' } | null {
   if (!url) return null;
 
+  // 匹配 datasets/author/name 格式
+  const datasetPattern = /^https?:\/\/huggingface\.co\/datasets\/([^\/]+)\/([^\/\?#]+)/i;
+  const datasetMatch = url.match(datasetPattern);
+  if (datasetMatch) {
+    return {
+      author: datasetMatch[1],
+      model: datasetMatch[2],
+      contentType: 'dataset',
+    };
+  }
+
+  // 匹配 spaces/author/name 格式
+  const spacePattern = /^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/\?#]+)/i;
+  const spaceMatch = url.match(spacePattern);
+  if (spaceMatch) {
+    return {
+      author: spaceMatch[1],
+      model: spaceMatch[2],
+      contentType: 'space',
+    };
+  }
+
+  // 匹配普通 author/model-name 格式（默认是model）
   const patterns = [
     /^https?:\/\/huggingface\.co\/([^\/]+)\/([^\/\?#]+)/i,
     /^([^\/]+)\/([^\/\?#]+)/i,
@@ -293,6 +318,7 @@ export function parseHuggingFaceUrl(url: string): { author: string; model: strin
       return {
         author: match[1],
         model: match[2],
+        contentType: 'model',
       };
     }
   }
@@ -301,15 +327,88 @@ export function parseHuggingFaceUrl(url: string): { author: string; model: strin
 }
 
 /**
- * 从URL获取模型信息
+ * 获取数据集信息
  */
-export async function getModelFromUrl(url: string): Promise<HFModelInfo> {
+export async function getDatasetInfo(datasetId: string): Promise<any> {
+  try {
+    logger.info(`获取数据集详情: ${datasetId}`);
+
+    const response = await hfClient.get(`/datasets/${datasetId}`);
+
+    const datasetInfo: any = response.data;
+    logger.info(`获取数据集详情成功: ${datasetId}`);
+
+    return datasetInfo;
+  } catch (error: any) {
+    logger.error(`获取数据集详情失败 (${datasetId}):`, error.message);
+
+    if (error.response?.status === 404) {
+      throw new Error('数据集不存在');
+    } else if (error.response?.status === 403) {
+      throw new Error('API访问受限，请检查HuggingFace Token配置');
+    } else {
+      throw new Error('获取数据集详情失败');
+    }
+  }
+}
+
+/**
+ * 从URL获取模型/数据集信息
+ */
+export async function getModelFromUrl(url: string): Promise<HFModelInfo & { contentType?: 'model' | 'dataset' | 'space' }> {
   const parsed = parseHuggingFaceUrl(url);
 
   if (!parsed) {
-    throw new Error('无效的HuggingFace模型URL');
+    throw new Error('无效的HuggingFace URL');
   }
 
-  const modelId = `${parsed.author}/${parsed.model}`;
-  return await getModelInfo(modelId);
+  const itemId = `${parsed.author}/${parsed.model}`;
+  const contentType = parsed.contentType || 'model';
+
+  if (contentType === 'dataset') {
+    try {
+      const datasetInfo = await getDatasetInfo(itemId);
+      // 转换数据集信息为统一格式
+      return {
+        id: datasetInfo.id || itemId,
+        modelId: datasetInfo.id || itemId,
+        author: parsed.author,
+        downloads: datasetInfo.downloads || 0,
+        likes: datasetInfo.likes || 0,
+        lastModified: datasetInfo.lastModified || datasetInfo.last_modified || new Date().toISOString(),
+        tags: datasetInfo.tags || [],
+        pipeline_tag: '',
+        private: datasetInfo.private || false,
+        cardData: {
+          description: datasetInfo.description || '',
+          license: datasetInfo.license || '',
+          tags: datasetInfo.tags || [],
+        },
+        contentType: 'dataset',
+      } as any;
+    } catch (error: any) {
+      // 如果获取数据集失败，返回基础信息
+      logger.warn(`获取数据集信息失败，返回基础信息: ${error.message}`);
+      return {
+        id: itemId,
+        modelId: itemId,
+        author: parsed.author,
+        downloads: 0,
+        likes: 0,
+        lastModified: new Date().toISOString(),
+        tags: [],
+        pipeline_tag: '',
+        private: false,
+        cardData: {
+          description: '',
+          license: '',
+          tags: [],
+        },
+        contentType: 'dataset',
+      } as any;
+    }
+  }
+
+  const modelInfo = await getModelInfo(itemId);
+  return { ...modelInfo, contentType: parsed.contentType || 'model' };
 }

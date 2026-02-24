@@ -3,10 +3,11 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { createPost, getPosts, getPostById, likePost, getMyPosts } from '../services/post.service';
+import { createPost, getPosts, getPostById, likePost, getMyPosts, updatePost, deletePost } from '../services/post.service';
 import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
 import { sendSuccess, sendError } from '../utils/response';
 import { createUserAction } from '../services/user-action.service';
+import { logger } from '../utils/logger';
 
 export async function createPostHandler(req: Request, res: Response, next: NextFunction) {
   try {
@@ -17,7 +18,7 @@ export async function createPostHandler(req: Request, res: Response, next: NextF
 
     const { contentType, contentId, title, content, images, tags, topicId } = req.body;
 
-    console.log('[createPostHandler] Request body:', {
+    logger.debug('[createPostHandler] Request body:', {
       userId,
       contentType,
       contentId,
@@ -43,7 +44,7 @@ export async function createPostHandler(req: Request, res: Response, next: NextF
       topicId,
     });
 
-    console.log('[createPostHandler] Post created successfully:', post.id);
+    logger.info('[createPostHandler] Post created successfully:', post.id);
 
     // 如果帖子关联了内容（contentType和contentId），记录分享行为
     if (contentType && contentId) {
@@ -57,7 +58,7 @@ export async function createPostHandler(req: Request, res: Response, next: NextF
           title: title || null,
         },
       }).catch(err => {
-        console.error('[createPostHandler] Failed to create user action:', err);
+        logger.error('[createPostHandler] Failed to create user action:', err);
       });
     }
 
@@ -67,7 +68,7 @@ export async function createPostHandler(req: Request, res: Response, next: NextF
       estimatedViews: 500,
     });
   } catch (error) {
-    console.error('[createPostHandler] Error:', error);
+    logger.error('[createPostHandler] Error:', error);
     next(error);
   }
 }
@@ -131,6 +132,39 @@ export async function getMyPostsHandler(req: Request, res: Response, next: NextF
       pagination: buildPaginationResponse(page, size, total),
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+export async function updatePostHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return sendError(res, 1002, '未登录', 401);
+
+    const { postId } = req.params;
+    const { contentType, title, content, tags } = req.body;
+
+    const post = await updatePost(postId, userId, { contentType, title, content, tags });
+    sendSuccess(res, post);
+  } catch (error: any) {
+    if (error.message === 'POST_NOT_FOUND') return sendError(res, 1005, '帖子不存在', 404);
+    if (error.message === 'POST_PERMISSION_DENIED') return sendError(res, 1003, '无权操作', 403);
+    if (error.message === 'POST_CONTENT_INVALID') return sendError(res, 1001, '内容长度必须在1-5000字符之间', 400);
+    next(error);
+  }
+}
+
+export async function deletePostHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return sendError(res, 1002, '未登录', 401);
+
+    const { postId } = req.params;
+    await deletePost(postId, userId);
+    sendSuccess(res, null);
+  } catch (error: any) {
+    if (error.message === 'POST_NOT_FOUND') return sendError(res, 1005, '帖子不存在', 404);
+    if (error.message === 'POST_PERMISSION_DENIED') return sendError(res, 1003, '无权操作', 403);
     next(error);
   }
 }

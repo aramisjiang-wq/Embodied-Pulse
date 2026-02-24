@@ -15,6 +15,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import ForumFeed from './ForumFeed';
+import { getLevelProgress, getPointsToNextLevel, getNextLevel, getLevelByPoints } from '@/lib/utils/levelUtils';
 
 interface HomeSidebarProps {
   className?: string;
@@ -22,6 +23,9 @@ interface HomeSidebarProps {
 
 export default function HomeSidebar({ className }: HomeSidebarProps) {
   const { user } = useAuthStore();
+  
+  // 基于积分计算当前等级
+  const userLevel = user ? getLevelByPoints(user.points || 0) : null;
 
   // 模拟数据 - 后期从API获取
   const hotTopics = [
@@ -64,17 +68,17 @@ export default function HomeSidebar({ className }: HomeSidebarProps) {
                 {user.username}
               </div>
               <div style={{ marginTop: 4, color: '#8c8c8c', fontSize: 13 }}>
-                Level {user.level || 1} {'⭐'.repeat(Math.min(user.level || 1, 5))}
+                Level {userLevel?.level || 1} {'⭐'.repeat(Math.min(userLevel?.level || 1, 5))}
               </div>
               <Progress
-                percent={(user.points || 0) % 100}
+                percent={getLevelProgress(user.points || 0)}
                 size="small"
                 showInfo={false}
                 strokeColor="#52c41a"
                 style={{ marginTop: 8 }}
               />
               <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-                {user.points || 0} 积分 · 距离下一级还需 {100 - ((user.points || 0) % 100)} 积分
+                {user.points || 0} 积分 · 距离下一级还需 {getPointsToNextLevel(user.points || 0)} 积分
               </div>
               <div style={{ marginTop: 12 }}>
                 <Tag icon={<CheckCircleOutlined />} color="success">

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, Spin, Empty, Avatar, Space, Tag, Tabs, Button, List, Typography, Divider, Descriptions, Row, Col, App } from 'antd';
 import { UserOutlined, FileTextOutlined, CommentOutlined, StarOutlined, TrophyOutlined, FireOutlined, GithubOutlined, LinkOutlined, TwitterOutlined, GlobalOutlined, EnvironmentOutlined, TagOutlined, HeartOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { communityApi } from '@/lib/api/community';
 import { communityApi as api } from '@/lib/api/community';
@@ -11,38 +12,48 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import JsonLd from '@/components/JsonLd';
 import { generatePersonJsonLd, generateBreadcrumbListJsonLd } from '@/lib/metadata';
+import { getLevelByPoints } from '@/lib/utils/levelUtils';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 
 const { Title, Text, Paragraph } = Typography;
 
-export default function UserPage({ params }: { params: { id: string } }) {
+export default function UserPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('posts');
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadUser();
-    loadUserPosts();
-  }, [params.id]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await api.getUser(params.id);
-      setUser(data);
+      const data = await api.getUser(id);
+      if (data) {
+        setUser(data);
+      } else {
+        setUser(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载用户信息失败');
+      console.error('Load user error:', error);
+      setUser(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载用户信息失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
 
-  const loadUserPosts = async () => {
+  const loadUserPosts = useCallback(async () => {
+    if (!id) return;
     try {
-      const data = await api.getUserPosts(params.id);
+      const data = await api.getUserPosts(id);
       
       if (!data || !data.items || !Array.isArray(data.items)) {
         console.error('Invalid data structure:', data);
@@ -55,7 +66,14 @@ export default function UserPage({ params }: { params: { id: string } }) {
       console.error('Load user posts error:', error);
       setPosts([]);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadUser();
+      loadUserPosts();
+    }
+  }, [id, loadUser, loadUserPosts]);
 
   if (loading) {
     return (
@@ -94,16 +112,10 @@ export default function UserPage({ params }: { params: { id: string } }) {
     <>
       <JsonLd data={personJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <div style={{ background: '#fafafa', minHeight: '100%', padding: '0' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-        <Card
-          style={{
-            marginBottom: 24,
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24 }}>
+      <div className={styles.pageWrapper}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <Card className={styles.userCard}>
+          <div className={styles.userInfo}>
             <Avatar
               src={user.avatarUrl}
               size={120}
@@ -112,12 +124,12 @@ export default function UserPage({ params }: { params: { id: string } }) {
             />
             <div style={{ flex: 1 }}>
               <div style={{ marginBottom: 12 }}>
-                <Title level={2} style={{ margin: 0, marginBottom: 8 }}>
+                <Title level={2} className={styles.userName}>
                   {user.username}
                 </Title>
                 <Space size="middle">
                   <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
-                    LV{user.level}
+                    LV{getLevelByPoints(user.points || 0).level}
                   </Tag>
                   <Tag color="gold" style={{ fontSize: 14, padding: '4px 12px' }}>
                     <TrophyOutlined /> {user.points}积分
@@ -126,12 +138,12 @@ export default function UserPage({ params }: { params: { id: string } }) {
               </div>
 
               {user.bio && (
-                <Paragraph style={{ color: '#666', marginBottom: 16 }}>
+                <Paragraph className={styles.userBio}>
                   {user.bio}
                 </Paragraph>
               )}
 
-              <Space size="large" style={{ color: '#999', fontSize: 14, marginBottom: 16 }}>
+              <Space size="large" className={styles.userStats}>
                 <Space>
                   <FileTextOutlined />
                   <span>{user.postCount || 0} 帖子</span>

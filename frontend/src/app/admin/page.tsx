@@ -1,27 +1,72 @@
 /**
- * 管理端首页 - 数据看板（重新设计版）
- * 从管理员业务视角，按关注点分层展示数据
+ * 管理端首页 - 数据看板（重构版）
+ * 现代紧凑 SaaS 风格，按业务维度分层展示
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { 
-  Row, Col, Card, Statistic, Spin, Tag, Progress, 
-  Typography, Space, Divider, Badge, Tooltip, App 
-} from 'antd';
-import { 
-  UserOutlined, FileTextOutlined, CommentOutlined, 
-  GithubOutlined, RobotOutlined, TeamOutlined, 
-  HeartOutlined, ThunderboltOutlined, RiseOutlined, 
-  FallOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  WarningOutlined, DatabaseOutlined, SyncOutlined,
-  EyeOutlined, LikeOutlined, ShareAltOutlined
+import { useEffect, useState, useCallback } from 'react';
+import { Spin, Tag, Progress, App, Button } from 'antd';
+import {
+  UserOutlined, FileTextOutlined, CommentOutlined,
+  GithubOutlined, RiseOutlined, FallOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, WarningOutlined,
+  DatabaseOutlined, SyncOutlined, HeartOutlined, ReloadOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import apiClient from '@/lib/api/client';
-import type { StatisticProps } from 'antd';
+import styles from './page.module.css';
 
-const { Title, Text } = Typography;
+// ─────────────────────────── Types ─────────────────────────────────────
+
+interface ContentStats {
+  total: number;
+  newToday: number;
+  newThisWeek: number;
+}
+
+interface CommunityStats extends ContentStats {
+  growthRate: number;
+}
+
+interface DataSource {
+  id: string;
+  name: string;
+  displayName: string;
+  enabled: boolean;
+  healthStatus: string;
+  lastSyncAt?: string;
+}
+
+interface RepoItem {
+  id: string;
+  name: string;
+  fullName: string;
+  starsCount: number;
+  language: string | null;
+  viewCount: number;
+  description: string | null;
+  updatedDate?: string | null;
+  createdAt?: string;
+}
+
+interface PaperItem {
+  id: string;
+  title: string;
+  citationCount: number;
+  publishedDate: string | null;
+  viewCount: number;
+  createdAt?: string;
+}
+
+interface VideoItem {
+  id: string;
+  title: string;
+  playCount: number;
+  publishedDate: string | null;
+  viewCount: number;
+  createdAt?: string;
+}
 
 interface DashboardStats {
   users: {
@@ -36,641 +81,949 @@ interface DashboardStats {
   };
   content: {
     total: number;
-    papers: { total: number; newToday: number; newThisWeek: number };
-    videos: { total: number; newToday: number; newThisWeek: number };
-    repos: { total: number; newToday: number; newThisWeek: number };
+    papers: ContentStats;
+    videos: ContentStats;
+    repos: ContentStats;
     jobs: number;
     huggingface: number;
     banners: number;
-    distribution: any;
+    distribution: Record<string, number>;
   };
   community: {
-    posts: { total: number; newToday: number; newThisWeek: number; growthRate: number };
-    comments: { total: number; newToday: number; newThisWeek: number; growthRate: number };
-    favorites: { total: number; newToday: number; newThisWeek: number };
+    posts: CommunityStats;
+    comments: CommunityStats;
+    favorites: ContentStats;
   };
-  subscriptions: {
-    active: number;
-  };
+  subscriptions: { active: number };
   dataSources?: {
     total: number;
     enabled: number;
     healthy: number;
     unhealthy: number;
-    sources: Array<{
-      id: string;
-      name: string;
-      displayName: string;
-      enabled: boolean;
-      healthStatus: string;
-      lastSyncAt?: string;
-    }>;
+    sources: DataSource[];
   };
   recentItems?: {
-    repos?: Array<{
-      id: string;
-      name: string;
-      fullName: string;
-      starsCount: number;
-      language: string | null;
-      viewCount: number;
-      description: string | null;
-      updatedDate: Date | null;
-    }>;
-    papers?: Array<{
-      id: string;
-      title: string;
-      citationCount: number;
-      publishedDate: Date | null;
-      viewCount: number;
-    }>;
-    videos?: Array<{
-      id: string;
-      title: string;
-      playCount: number;
-      publishedDate: Date | null;
-      viewCount: number;
-    }>;
+    repos?: RepoItem[];
+    papers?: PaperItem[];
+    videos?: VideoItem[];
+  };
+  retention?: {
+    day1: { rate: number; users: number };
+    day7: { rate: number; users: number };
+    day30: { rate: number; users: number };
+    trend: Array<{ date: string; rate: number }>;
+  };
+  traffic?: {
+    pvToday: number;
+    uvToday: number;
+    pvThisWeek: number;
+    uvThisWeek: number;
+    topPages: Array<{ page: string; views: number }>;
+  };
+  contentQuality?: {
+    avgViewCount: number;
+    avgInteractionRate: number;
+    topPapers: Array<{ id: string; title: string; viewCount: number; citationCount: number; createdAt: string }>;
+    topVideos: Array<{ id: string; title: string; viewCount: number; playCount: number; createdAt: string }>;
+    topRepos: Array<{ id: string; name: string; fullName: string; viewCount: number; starsCount: number; createdAt: string }>;
   };
 }
+
+interface ApiResponse<T> {
+  code: number;
+  data: T;
+  message?: string;
+}
+
+/** 数据看板空结构兜底（API 返回 code=0 但 data 缺失时使用，避免一直 loading） */
+function getDefaultDashboardStats(): DashboardStats {
+  return {
+    users: {
+      total: 0,
+      newToday: 0,
+      newThisWeek: 0,
+      newThisMonth: 0,
+      activeToday: 0,
+      activeThisWeek: 0,
+      activeThisMonth: 0,
+      growthRate: 0,
+    },
+    content: {
+      total: 0,
+      papers: { total: 0, newToday: 0, newThisWeek: 0 },
+      videos: { total: 0, newToday: 0, newThisWeek: 0 },
+      repos: { total: 0, newToday: 0, newThisWeek: 0 },
+      jobs: 0,
+      huggingface: 0,
+      banners: 0,
+      distribution: {},
+    },
+    community: {
+      posts: { total: 0, newToday: 0, newThisWeek: 0, growthRate: 0 },
+      comments: { total: 0, newToday: 0, newThisWeek: 0, growthRate: 0 },
+      favorites: { total: 0, newToday: 0, newThisWeek: 0 },
+    },
+    subscriptions: { active: 0 },
+    retention: {
+      day1: { rate: 0, users: 0 },
+      day7: { rate: 0, users: 0 },
+      day30: { rate: 0, users: 0 },
+      trend: [],
+    },
+    traffic: {
+      pvToday: 0,
+      uvToday: 0,
+      pvThisWeek: 0,
+      uvThisWeek: 0,
+      topPages: [],
+    },
+    contentQuality: {
+      avgViewCount: 0,
+      avgInteractionRate: 0,
+      topPapers: [],
+      topVideos: [],
+      topRepos: [],
+    },
+  };
+}
+
+// ─────────────────────────── Sub Components ────────────────────────────
+
+function GrowthBadge({ rate }: { rate: number }) {
+  const isPos = rate >= 0;
+  return (
+    <span className={`${styles.growthBadge} ${isPos ? styles.growthPos : styles.growthNeg}`}>
+      {isPos ? <RiseOutlined /> : <FallOutlined />}
+      {' '}{Math.abs(rate).toFixed(1)}%
+    </span>
+  );
+}
+
+interface KpiCardProps {
+  title: string;
+  value: number;
+  trend?: number;
+  sub: string;
+  color: string;
+  icon: React.ReactNode;
+}
+
+function KpiCard({ title, value, trend, sub, color, icon }: KpiCardProps) {
+  const colorMap: Record<string, { main: string; light: string }> = {
+    '#0052D9': { main: '#0052D9', light: '#4096ff' },
+    '#1677ff': { main: '#1677ff', light: '#4096ff' },
+    '#366EF4': { main: '#366EF4', light: '#69b1ff' },
+    '#00A870': { main: '#00A870', light: '#52c41a' },
+    '#E37318': { main: '#E37318', light: '#fa8c16' },
+  };
+  const colors = colorMap[color] || { main: color, light: color };
+  
+  return (
+    <div 
+      className={styles.kpiCard} 
+      style={{ 
+        '--card-color': colors.main, 
+        '--card-color-light': colors.light 
+      } as React.CSSProperties}
+    >
+      <div className={styles.kpiTop}>
+        <span className={styles.kpiIcon} style={{ color }}>{icon}</span>
+        <span className={styles.kpiTitle}>{title}</span>
+        {trend !== undefined && <GrowthBadge rate={trend} />}
+      </div>
+      <div className={styles.kpiValue} style={{ color }}>{value.toLocaleString()}</div>
+      <div className={styles.kpiSub}>{sub}</div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 用户增长 ─────────────────────────────────────
+
+function UserGrowthPanel({ users }: { users: DashboardStats['users'] }) {
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <UserOutlined style={{ color: '#0052D9' }} />
+        <span>用户增长</span>
+        <GrowthBadge rate={users.growthRate} />
+      </div>
+      <div className={styles.metricGrid3}>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>今日新增</div>
+          <div className={styles.metricCellVal} style={{ color: '#0052D9' }}>
+            +{users.newToday}
+          </div>
+        </div>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>本周新增</div>
+          <div className={styles.metricCellVal} style={{ color: '#0052D9' }}>
+            +{users.newThisWeek}
+          </div>
+        </div>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>本月新增</div>
+          <div className={styles.metricCellVal} style={{ color: '#0052D9' }}>
+            +{users.newThisMonth}
+          </div>
+        </div>
+      </div>
+      <div className={styles.panelDivider} />
+      <div className={styles.userTotalRow}>
+        <span className={styles.userTotalLabel}>注册总用户</span>
+        <span className={styles.userTotalVal}>{users.total.toLocaleString()}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 用户活跃度 ───────────────────────────────────
+
+function UserActivityPanel({ users }: { users: DashboardStats['users'] }) {
+  const pct = (n: number) =>
+    users.total > 0 ? parseFloat(((n / users.total) * 100).toFixed(1)) : 0;
+  const dauPct = pct(users.activeToday);
+  const wauPct = pct(users.activeThisWeek);
+  const mauPct = pct(users.activeThisMonth);
+  const stickiness =
+    users.activeThisMonth > 0
+      ? ((users.activeToday / users.activeThisMonth) * 100).toFixed(1)
+      : '—';
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <EyeOutlined style={{ color: '#0052D9' }} />
+        <span>用户活跃度</span>
+        <span className={styles.panelMeta}>DAU/MAU 粘性 {stickiness}%</span>
+      </div>
+      <div className={styles.activityList}>
+        {[
+          { label: 'DAU 今日', value: users.activeToday, pct: dauPct },
+          { label: 'WAU 7天', value: users.activeThisWeek, pct: wauPct },
+          { label: 'MAU 30天', value: users.activeThisMonth, pct: mauPct },
+        ].map((row) => (
+          <div key={row.label} className={styles.activityRow}>
+            <span className={styles.activityLabel}>{row.label}</span>
+            <span className={styles.activityVal}>{row.value.toLocaleString()}</span>
+            <div className={styles.activityBarWrap}>
+              <Progress
+                percent={row.pct}
+                strokeColor="#0052D9"
+                showInfo={false}
+                size="small"
+              />
+            </div>
+            <span className={styles.activityPct}>{row.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 社区互动 ─────────────────────────────────────
+
+function CommunityPanel({ community }: { community: DashboardStats['community'] }) {
+  const { posts, comments, favorites } = community;
+  const total = posts.total + comments.total + favorites.total;
+  const rows = [
+    { icon: '💬', label: '帖子', data: posts, showRate: true },
+    { icon: '📝', label: '评论', data: comments, showRate: true },
+    { icon: '❤️', label: '收藏', data: favorites as CommunityStats, showRate: false },
+  ];
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <CommentOutlined style={{ color: '#00A870' }} />
+        <span>社区互动</span>
+        <span className={styles.panelMeta}>{total.toLocaleString()} 总互动</span>
+      </div>
+      <div className={styles.communityList}>
+        {rows.map((row) => (
+          <div key={row.label} className={styles.communityRow}>
+            <span className={styles.communityEmoji}>{row.icon}</span>
+            <div className={styles.communityInfo}>
+              <span className={styles.communityName}>{row.label}</span>
+              <span className={styles.communityMeta}>
+                今日 +{row.data.newToday} · 本周 +{row.data.newThisWeek}
+              </span>
+            </div>
+            <span className={styles.communityVal}>{row.data.total.toLocaleString()}</span>
+            {row.showRate && (
+              <GrowthBadge rate={(row.data as CommunityStats).growthRate} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 内容健康度 ───────────────────────────────────
+
+interface ContentTypeCardProps {
+  label: string;
+  total: number;
+  color: string;
+  icon: React.ReactNode;
+  newToday?: number;
+  newThisWeek?: number;
+  pct: number;
+}
+
+function ContentTypeCard({ label, total, color, icon, newToday, newThisWeek, pct }: ContentTypeCardProps) {
+  const colorMap: Record<string, { main: string; light: string }> = {
+    '#0052D9': { main: '#0052D9', light: '#4096ff' },
+    '#1677ff': { main: '#1677ff', light: '#4096ff' },
+    '#366EF4': { main: '#366EF4', light: '#69b1ff' },
+    '#00A870': { main: '#00A870', light: '#52c41a' },
+    '#E37318': { main: '#E37318', light: '#fa8c16' },
+  };
+  const colors = colorMap[color] || { main: color, light: color };
+  
+  return (
+    <div 
+      className={styles.contentCard} 
+      style={{ 
+        '--card-color': colors.main, 
+        '--card-color-light': colors.light 
+      } as React.CSSProperties}
+    >
+      <div className={styles.contentCardTop}>
+        <span className={styles.contentCardIcon} style={{ color }}>{icon}</span>
+        <span className={styles.contentCardLabel}>{label}</span>
+      </div>
+      <div className={styles.contentCardVal} style={{ color }}>{total.toLocaleString()}</div>
+      {(newToday !== undefined || newThisWeek !== undefined) && (
+        <div className={styles.contentCardGrowth}>
+          {newToday !== undefined && <span>今日 +{newToday}</span>}
+          {newThisWeek !== undefined && <span>本周 +{newThisWeek}</span>}
+        </div>
+      )}
+      <Progress percent={parseFloat(pct.toFixed(1))} strokeColor={color} showInfo={false} size="small" style={{ marginTop: 6 }} />
+      <div className={styles.contentCardPct}>{pct.toFixed(1)}%</div>
+    </div>
+  );
+}
+
+function ContentHealthPanel({ content }: { content: DashboardStats['content'] }) {
+  const p = (n: number) => (content.total > 0 ? (n / content.total) * 100 : 0);
+  const items = [
+    { label: '论文', total: content.papers.total, color: '#0052D9', icon: <FileTextOutlined />, newToday: content.papers.newToday, newThisWeek: content.papers.newThisWeek },
+    { label: '视频', total: content.videos.total, color: '#00A870', icon: <FileTextOutlined />, newToday: content.videos.newToday, newThisWeek: content.videos.newThisWeek },
+    { label: 'GitHub', total: content.repos.total, color: '#E37318', icon: <GithubOutlined />, newToday: content.repos.newToday, newThisWeek: content.repos.newThisWeek },
+    { label: 'HuggingFace', total: content.huggingface, color: '#366EF4', icon: <DatabaseOutlined /> },
+    { label: '招聘岗位', total: content.jobs, color: '#E37318', icon: <DatabaseOutlined /> },
+  ];
+
+  return (
+    <div className={styles.widePanel}>
+      <div className={styles.panelHeader}>
+        <DatabaseOutlined style={{ color: '#E37318' }} />
+        <span>内容健康度</span>
+        <span className={styles.panelMeta}>{content.total.toLocaleString()} 条内容</span>
+      </div>
+      <div className={styles.contentGrid}>
+        {items.map((item) => (
+          <ContentTypeCard key={item.label} {...item} pct={p(item.total)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 数据源状态 ───────────────────────────────────
+
+function DataSourcePanel({ ds }: { ds: NonNullable<DashboardStats['dataSources']> }) {
+  const statusIcon = (s: string) => {
+    if (s === 'healthy') return <CheckCircleOutlined style={{ color: '#00A870' }} />;
+    if (s === 'unhealthy') return <CloseCircleOutlined style={{ color: '#D54941' }} />;
+    return <WarningOutlined style={{ color: '#E37318' }} />;
+  };
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <SyncOutlined style={{ color: '#0052D9' }} />
+        <span>数据源状态</span>
+        {ds.unhealthy > 0 && (
+          <Tag color="error" style={{ marginLeft: 'auto' }}>{ds.unhealthy} 异常</Tag>
+        )}
+      </div>
+      <div className={styles.sourceStats}>
+        {[
+          { label: '总数', val: ds.total, color: undefined },
+          { label: '已启用', val: ds.enabled, color: '#0052D9' },
+          { label: '健康', val: ds.healthy, color: '#00A870' },
+        ].map((s) => (
+          <div key={s.label} className={styles.sourceStat}>
+            <span className={styles.sourceStatVal} style={{ color: s.color }}>{s.val}</span>
+            <span className={styles.sourceStatLabel}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className={styles.sourceList}>
+        {ds.sources.map((src) => (
+          <div key={src.id} className={styles.sourceRow}>
+            {statusIcon(src.healthStatus)}
+            <span className={styles.sourceName}>{src.displayName}</span>
+            <Tag color={src.enabled ? 'success' : 'default'} style={{ marginLeft: 'auto', fontSize: 11 }}>
+              {src.enabled ? '启用' : '禁用'}
+            </Tag>
+            {src.lastSyncAt && (
+              <span className={styles.sourceTime}>
+                {new Date(src.lastSyncAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── Section: 近期内容 ─────────────────────────────────────
+
+function formatSyncTime(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+  if (diffH < 1) return '刚刚';
+  if (diffH < 24) return `${diffH}小时前`;
+  if (diffD < 7) return `${diffD}天前`;
+  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+}
+
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function RecentItemsPanel({ items }: { items: NonNullable<DashboardStats['recentItems']> }) {
+  const totalCount = (items.repos?.length ?? 0) + (items.papers?.length ?? 0) + (items.videos?.length ?? 0);
+
+  return (
+    <div className={styles.widePanel}>
+      <div className={styles.panelHeader}>
+        <SyncOutlined style={{ color: '#366EF4' }} />
+        <span>近期同步内容</span>
+        <span className={styles.panelMeta}>{totalCount} 条最新数据</span>
+      </div>
+      <div className={styles.recentTabs}>
+
+        {/* GitHub 仓库 */}
+        {items.repos && items.repos.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <GithubOutlined />
+              <span>GitHub 仓库</span>
+              <span className={styles.recentSectionCount}>{items.repos.length}</span>
+            </div>
+            <div className={styles.recentList}>
+              {items.repos.map((repo) => (
+                <div key={repo.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{repo.fullName || repo.name}</div>
+                    {repo.description && (
+                      <div className={styles.recentCardDesc}>{repo.description}</div>
+                    )}
+                    <div className={styles.recentCardMeta}>
+                      {repo.starsCount > 0 && (
+                        <span className={styles.recentBadge} style={{ color: '#E37318' }}>
+                          ⭐ {repo.starsCount.toLocaleString()}
+                        </span>
+                      )}
+                      {repo.language && (
+                        <span className={styles.recentBadge} style={{ color: '#0052D9' }}>
+                          {repo.language}
+                        </span>
+                      )}
+                      {repo.viewCount > 0 && (
+                        <span className={styles.recentBadge}>
+                          👁 {repo.viewCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.recentCardTime}>
+                    <div className={styles.recentTimeLabel}>入库时间</div>
+                    <div className={styles.recentTimeVal}>{formatSyncTime(repo.createdAt)}</div>
+                    {repo.updatedDate && (
+                      <>
+                        <div className={styles.recentTimeLabel} style={{ marginTop: 4 }}>GitHub更新</div>
+                        <div className={styles.recentTimeVal}>{formatDate(repo.updatedDate)}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 论文 */}
+        {items.papers && items.papers.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <FileTextOutlined />
+              <span>论文</span>
+              <span className={styles.recentSectionCount}>{items.papers.length}</span>
+            </div>
+            <div className={styles.recentList}>
+              {items.papers.map((paper) => (
+                <div key={paper.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{paper.title}</div>
+                    <div className={styles.recentCardMeta}>
+                      {paper.citationCount > 0 && (
+                        <span className={styles.recentBadge} style={{ color: '#0052D9' }}>
+                          📚 {paper.citationCount} 引用
+                        </span>
+                      )}
+                      {paper.viewCount > 0 && (
+                        <span className={styles.recentBadge}>
+                          👁 {paper.viewCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.recentCardTime}>
+                    <div className={styles.recentTimeLabel}>入库时间</div>
+                    <div className={styles.recentTimeVal}>{formatSyncTime(paper.createdAt)}</div>
+                    {paper.publishedDate && (
+                      <>
+                        <div className={styles.recentTimeLabel} style={{ marginTop: 4 }}>发布日期</div>
+                        <div className={styles.recentTimeVal}>{formatDate(paper.publishedDate)}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 视频 */}
+        {items.videos && items.videos.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <span>🎬</span>
+              <span>视频</span>
+              <span className={styles.recentSectionCount}>{items.videos.length}</span>
+            </div>
+            <div className={styles.recentList}>
+              {items.videos.map((video) => (
+                <div key={video.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{video.title}</div>
+                    <div className={styles.recentCardMeta}>
+                      {video.playCount > 0 && (
+                        <span className={styles.recentBadge} style={{ color: '#00A870' }}>
+                          ▶ {video.playCount.toLocaleString()} 播放
+                        </span>
+                      )}
+                      {video.viewCount > 0 && (
+                        <span className={styles.recentBadge}>
+                          👁 {video.viewCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.recentCardTime}>
+                    <div className={styles.recentTimeLabel}>入库时间</div>
+                    <div className={styles.recentTimeVal}>{formatSyncTime(video.createdAt)}</div>
+                    {video.publishedDate && (
+                      <>
+                        <div className={styles.recentTimeLabel} style={{ marginTop: 4 }}>发布日期</div>
+                        <div className={styles.recentTimeVal}>{formatDate(video.publishedDate)}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RetentionPanel({ retention }: { retention: NonNullable<DashboardStats['retention']> }) {
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <UserOutlined style={{ color: '#0052D9' }} />
+        <span>用户留存分析</span>
+        <span className={styles.panelMeta}>次日/7日/30日留存</span>
+      </div>
+      <div className={styles.metricGrid3}>
+        {[
+          { label: '次日留存', ...retention.day1 },
+          { label: '7日留存', ...retention.day7 },
+          { label: '30日留存', ...retention.day30 },
+        ].map((item) => (
+          <div key={item.label} className={styles.metricCell}>
+            <div className={styles.metricCellLabel}>{item.label}</div>
+            <div className={styles.metricCellVal} style={{ color: item.rate > 30 ? '#00A870' : item.rate > 10 ? '#E37318' : '#D54941' }}>
+              {item.rate}%
+            </div>
+            <div className={styles.metricCellLabel} style={{ fontSize: 10, marginTop: 2 }}>
+              {item.users} 用户
+            </div>
+          </div>
+        ))}
+      </div>
+      {retention.trend && retention.trend.length > 0 && (
+        <>
+          <div className={styles.panelDivider} />
+          <div className={styles.activityList}>
+            <div className={styles.activityRow} style={{ marginBottom: 4 }}>
+              <span className={styles.activityLabel} style={{ fontSize: 11, fontWeight: 600 }}>日期</span>
+              <span className={styles.activityPct} style={{ flex: 1, textAlign: 'center' }}>留存率</span>
+            </div>
+            {retention.trend.slice(-5).map((t) => (
+              <div key={t.date} className={styles.activityRow}>
+                <span className={styles.activityLabel}>{t.date.slice(5)}</span>
+                <div className={styles.activityBarWrap}>
+                  <Progress
+                    percent={t.rate}
+                    strokeColor={t.rate > 30 ? '#00A870' : t.rate > 10 ? '#E37318' : '#D54941'}
+                    showInfo={false}
+                    size="small"
+                  />
+                </div>
+                <span className={styles.activityPct}>{t.rate}%</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TrafficPanel({ traffic }: { traffic: NonNullable<DashboardStats['traffic']> }) {
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <EyeOutlined style={{ color: '#366EF4' }} />
+        <span>流量分析</span>
+        <span className={styles.panelMeta}>PV/UV</span>
+      </div>
+      <div className={styles.metricGrid3}>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>今日PV</div>
+          <div className={styles.metricCellVal} style={{ color: '#0052D9' }}>
+            {traffic.pvToday.toLocaleString()}
+          </div>
+        </div>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>今日UV</div>
+          <div className={styles.metricCellVal} style={{ color: '#0052D9' }}>
+            {traffic.uvToday.toLocaleString()}
+          </div>
+        </div>
+        <div className={styles.metricCell}>
+          <div className={styles.metricCellLabel}>人均浏览</div>
+          <div className={styles.metricCellVal} style={{ color: '#00A870' }}>
+            {traffic.uvToday > 0 ? (traffic.pvToday / traffic.uvToday).toFixed(1) : '0'}
+          </div>
+        </div>
+      </div>
+      {traffic.topPages && traffic.topPages.length > 0 && (
+        <>
+          <div className={styles.panelDivider} />
+          <div className={styles.activityList}>
+            <div className={styles.activityRow} style={{ marginBottom: 4 }}>
+              <span className={styles.activityLabel} style={{ fontSize: 11, fontWeight: 600 }}>热门页面</span>
+              <span className={styles.activityPct} style={{ flex: 1, textAlign: 'right' }}>浏览量</span>
+            </div>
+            {traffic.topPages.slice(0, 5).map((p, idx) => (
+              <div key={p.page} className={styles.activityRow}>
+                <span className={styles.activityLabel} style={{ color: '#1D2129' }}>
+                  {idx + 1}. {p.page}
+                </span>
+                <span className={styles.activityPct} style={{ flex: 1, textAlign: 'right', color: '#0052D9', fontWeight: 600 }}>
+                  {p.views.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ContentQualityPanel({ contentQuality }: { contentQuality: NonNullable<DashboardStats['contentQuality']> }) {
+  return (
+    <div className={styles.widePanel}>
+      <div className={styles.panelHeader}>
+        <DatabaseOutlined style={{ color: '#00A870' }} />
+        <span>内容质量指标</span>
+        <span className={styles.panelMeta}>
+          平均浏览 {contentQuality.avgViewCount} | 互动率 {contentQuality.avgInteractionRate}%
+        </span>
+      </div>
+      <div className={styles.recentTabs}>
+        {contentQuality.topPapers && contentQuality.topPapers.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <span>📚</span>
+              <span>热门论文</span>
+            </div>
+            <div className={styles.recentList}>
+              {contentQuality.topPapers.slice(0, 5).map((paper) => (
+                <div key={paper.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{paper.title}</div>
+                    <div className={styles.recentCardMeta}>
+                      <span className={styles.recentBadge} style={{ color: '#0052D9' }}>
+                        👁 {paper.viewCount}
+                      </span>
+                      {paper.citationCount > 0 && (
+                        <span className={styles.recentBadge} style={{ color: '#00A870' }}>
+                          📚 {paper.citationCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {contentQuality.topVideos && contentQuality.topVideos.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <span>🎬</span>
+              <span>热门视频</span>
+            </div>
+            <div className={styles.recentList}>
+              {contentQuality.topVideos.slice(0, 5).map((video) => (
+                <div key={video.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{video.title}</div>
+                    <div className={styles.recentCardMeta}>
+                      <span className={styles.recentBadge} style={{ color: '#00A870' }}>
+                        ▶ {video.playCount?.toLocaleString() || 0}
+                      </span>
+                      <span className={styles.recentBadge} style={{ color: '#366EF4' }}>
+                        👁 {video.viewCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {contentQuality.topRepos && contentQuality.topRepos.length > 0 && (
+          <div className={styles.recentSection}>
+            <div className={styles.recentSectionTitle}>
+              <span>💻</span>
+              <span>热门仓库</span>
+            </div>
+            <div className={styles.recentList}>
+              {contentQuality.topRepos.slice(0, 5).map((repo) => (
+                <div key={repo.id} className={styles.recentCard}>
+                  <div className={styles.recentCardMain}>
+                    <div className={styles.recentCardName}>{repo.fullName || repo.name}</div>
+                    <div className={styles.recentCardMeta}>
+                      <span className={styles.recentBadge} style={{ color: '#E37318' }}>
+                        ⭐ {repo.starsCount?.toLocaleString() || 0}
+                      </span>
+                      <span className={styles.recentBadge} style={{ color: '#366EF4' }}>
+                        👁 {repo.viewCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────── Main Component ────────────────────────────
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadStats();
-    // 每30秒自动刷新
-    const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     setLoading(true);
     try {
-      const response: any = await apiClient.get('/admin/stats');
-      if (response.code === 0) {
-        setStats(response.data);
+      const res = await apiClient.get('/admin/stats') as ApiResponse<DashboardStats>;
+      if (res.code === 0) {
+        setStats(res.data && typeof res.data === 'object' ? res.data : getDefaultDashboardStats());
+        setLastUpdated(new Date());
       } else {
-        message.error(response.message || '加载失败');
+        message.error(res.message || '加载失败');
       }
-    } catch (error: any) {
-      console.error('Load stats error:', error);
-      if (error.status === 401 || error.code === 'UNAUTHORIZED' || error.response?.data?.code === 1002 || error.response?.data?.code === 1003) {
+    } catch (err: unknown) {
+      const e = err as { status?: number; code?: string; message?: string };
+      setStats(getDefaultDashboardStats());
+      setLastUpdated(new Date());
+      if (e.status === 401 || e.code === 'UNAUTHORIZED') {
         message.error('未登录或登录已过期，请重新登录');
-      } else if (error.code === 'CONNECTION_REFUSED' || error.code === 'TIMEOUT' || error.code === 'NETWORK_ERROR') {
+      } else if (e.code === 'CONNECTION_REFUSED' || e.code === 'TIMEOUT') {
         message.error('后端服务未运行，请确保后端服务已启动');
       } else {
-        message.error(error.message || error.response?.data?.message || '加载失败');
+        message.error(e.message || '加载失败');
       }
-      // 设置默认值，避免页面崩溃
-      setStats(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [message]);
 
-  const formatGrowthRate = (rate: number) => {
-    const isPositive = rate >= 0;
-    return (
-      <Space>
-        {isPositive ? <RiseOutlined style={{ color: '#3f8600' }} /> : <FallOutlined style={{ color: '#cf1322' }} />}
-        <Text style={{ color: isPositive ? '#3f8600' : '#cf1322' }}>
-          {Math.abs(rate).toFixed(1)}%
-        </Text>
-      </Space>
-    );
-  };
-
-  const getHealthStatusTag = (status: string) => {
-    const statusMap: Record<string, { color: string; icon: any; text: string }> = {
-      healthy: { color: 'success', icon: <CheckCircleOutlined />, text: '健康' },
-      unhealthy: { color: 'error', icon: <CloseCircleOutlined />, text: '异常' },
-      unknown: { color: 'warning', icon: <WarningOutlined />, text: '未知' },
-    };
-    const config = statusMap[status] || statusMap.unknown;
-    return (
-      <Tag color={config.color} icon={config.icon}>
-        {config.text}
-      </Tag>
-    );
-  };
+  useEffect(() => {
+    loadStats();
+    const interval = setInterval(loadStats, 30000);
+    return () => clearInterval(interval);
+  }, [loadStats]);
 
   if (!stats) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div className={styles.spinWrap}>
         <Spin size="large" />
+        <span className={styles.spinText}>正在加载数据...</span>
       </div>
     );
   }
 
+  const communityTotal =
+    stats.community.posts.total +
+    stats.community.comments.total +
+    stats.community.favorites.total;
+
+  const isAllEmpty =
+    stats.users.total === 0 &&
+    stats.content.total === 0 &&
+    communityTotal === 0;
+
+  const weekContentNew =
+    stats.content.papers.newThisWeek +
+    stats.content.videos.newThisWeek +
+    stats.content.repos.newThisWeek;
+
   return (
-    <div>
-      <div style={{ marginBottom: 24 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          <DatabaseOutlined /> 数据看板
-        </Title>
-        <Text type="secondary">实时监控平台核心业务指标</Text>
+    <div className={styles.dashboard}>
+      {/* ── 顶部 Header ── */}
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <DatabaseOutlined className={styles.headerIcon} />
+          <div>
+            <h1 className={styles.headerTitle}>数据看板</h1>
+            <span className={styles.headerSub}>实时监控平台核心业务指标</span>
+          </div>
+        </div>
+        <div className={styles.headerRight}>
+          {lastUpdated && (
+            <span className={styles.lastUpdated}>
+              更新于 {lastUpdated.toLocaleTimeString('zh-CN')}
+            </span>
+          )}
+          <Button
+            icon={<ReloadOutlined spin={loading} />}
+            onClick={loadStats}
+            loading={loading}
+            size="small"
+          >
+            刷新
+          </Button>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-        {/* ========== 第一屏：核心业务指标 ========== */}
-        <Card 
-          title={
-            <Space>
-              <ThunderboltOutlined style={{ color: '#1890ff' }} />
-              <span>核心业务指标</span>
-            </Space>
-          }
-          style={{ marginBottom: 24 }}
-          extra={
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              最后更新: {new Date().toLocaleTimeString()}
-            </Text>
-          }
-        >
-          {/* 用户增长 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col span={24}>
-              <Title level={4} style={{ marginBottom: 16 }}>
-                <UserOutlined /> 用户增长
-              </Title>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="总用户数"
-                  value={stats.users.total}
-                  prefix={<UserOutlined />}
-                  valueStyle={{ color: '#1890ff', fontSize: 24 }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="今日新增"
-                  value={stats.users.newToday}
-                  prefix={<RiseOutlined />}
-                  valueStyle={{ color: '#3f8600', fontSize: 24 }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="本周新增"
-                  value={stats.users.newThisWeek}
-                  prefix={<RiseOutlined />}
-                  valueStyle={{ color: '#3f8600', fontSize: 24 }}
-                  suffix={formatGrowthRate(stats.users.growthRate)}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="本月新增"
-                  value={stats.users.newThisMonth}
-                  prefix={<RiseOutlined />}
-                  valueStyle={{ color: '#3f8600', fontSize: 24 }}
-                />
-              </Card>
-            </Col>
-          </Row>
+      {/* ── 暂无数据提示 ── */}
+      {isAllEmpty && (
+        <div className={styles.emptyHint}>
+          <DatabaseOutlined style={{ fontSize: 24, color: '#bfbfbf' }} />
+          <p>暂无数据</p>
+          <span>数据来自用户库（USER_DATABASE_URL / dev-user.db）。请先执行用户库迁移：npm run db:migrate:user，再进行内容同步或用户注册</span>
+        </div>
+      )}
 
-          {/* 用户活跃度 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col span={24}>
-              <Title level={4} style={{ marginBottom: 16 }}>
-                <EyeOutlined /> 用户活跃度
-              </Title>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="今日活跃"
-                  value={stats.users.activeToday}
-                  prefix={<UserOutlined />}
-                  valueStyle={{ color: '#722ed1', fontSize: 24 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    占总数: {stats.users.total > 0 
-                      ? ((stats.users.activeToday / stats.users.total) * 100).toFixed(1) 
-                      : 0}%
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="近7天活跃"
-                  value={stats.users.activeThisWeek}
-                  prefix={<UserOutlined />}
-                  valueStyle={{ color: '#722ed1', fontSize: 24 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    占总数: {stats.users.total > 0 
-                      ? ((stats.users.activeThisWeek / stats.users.total) * 100).toFixed(1) 
-                      : 0}%
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="近30天活跃"
-                  value={stats.users.activeThisMonth}
-                  prefix={<UserOutlined />}
-                  valueStyle={{ color: '#722ed1', fontSize: 24 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    占总数: {stats.users.total > 0 
-                      ? ((stats.users.activeThisMonth / stats.users.total) * 100).toFixed(1) 
-                      : 0}%
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-          </Row>
+      {/* ── KPI 行 ── */}
+      <div className={styles.kpiRow}>
+        <KpiCard
+          title="注册用户"
+          value={stats.users.total}
+          trend={stats.users.growthRate}
+          sub={`本周新增 +${stats.users.newThisWeek}`}
+          color="#0052D9"
+          icon={<UserOutlined />}
+        />
+        <KpiCard
+          title="今日活跃 DAU"
+          value={stats.users.activeToday}
+          sub={`占比 ${stats.users.total > 0 ? ((stats.users.activeToday / stats.users.total) * 100).toFixed(1) : 0}%`}
+          color="#366EF4"
+          icon={<EyeOutlined />}
+        />
+        <KpiCard
+          title="内容总量"
+          value={stats.content.total}
+          sub={`本周新增 +${weekContentNew}`}
+          color="#00A870"
+          icon={<DatabaseOutlined />}
+        />
+        <KpiCard
+          title="社区互动"
+          value={communityTotal}
+          sub={`帖 ${stats.community.posts.total} · 评 ${stats.community.comments.total}`}
+          color="#E37318"
+          icon={<CommentOutlined />}
+        />
+        <KpiCard
+          title="活跃订阅"
+          value={stats.subscriptions.active}
+          sub="邮件订阅用户"
+          color="#0052D9"
+          icon={<HeartOutlined />}
+        />
+      </div>
 
-          <Divider />
+      {/* ── 三栏分析区 ── */}
+      <div className={styles.tripleGrid}>
+        <UserGrowthPanel users={stats.users} />
+        <UserActivityPanel users={stats.users} />
+        <CommunityPanel community={stats.community} />
+      </div>
 
-          {/* 内容健康度 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col span={24}>
-              <Title level={4} style={{ marginBottom: 16 }}>
-                <FileTextOutlined /> 内容健康度
-              </Title>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="论文"
-                  value={stats.content.papers.total}
-                  prefix={<FileTextOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.content.papers.newToday} | 本周: +{stats.content.papers.newThisWeek}
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="视频"
-                  value={stats.content.videos.total}
-                  prefix={<FileTextOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.content.videos.newToday} | 本周: +{stats.content.videos.newThisWeek}
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="GitHub项目"
-                  value={stats.content.repos.total}
-                  prefix={<GithubOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.content.repos.newToday} | 本周: +{stats.content.repos.newThisWeek}
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="总内容数"
-                  value={stats.content.total}
-                  prefix={<DatabaseOutlined />}
-                  valueStyle={{ color: '#1890ff', fontSize: 24, fontWeight: 'bold' }}
-                />
-              </Card>
-            </Col>
-          </Row>
+      {/* ── 内容健康度 ── */}
+      <ContentHealthPanel content={stats.content} />
 
-          <Divider />
+      {/* ── 用户留存 & 流量分析 ── */}
+      <div className={styles.tripleGrid}>
+        {stats.retention && <RetentionPanel retention={stats.retention} />}
+        {stats.traffic && <TrafficPanel traffic={stats.traffic} />}
+        <UserGrowthPanel users={stats.users} />
+      </div>
 
-          {/* 市集活跃度 */}
-          <Row gutter={[16, 16]}>
-            <Col span={24}>
-              <Title level={4} style={{ marginBottom: 16 }}>
-                <CommentOutlined /> 市集活跃度
-              </Title>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="帖子总数"
-                  value={stats.community.posts.total}
-                  prefix={<CommentOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.community.posts.newToday} | 本周: +{stats.community.posts.newThisWeek}
-                  </Text>
-                  <div style={{ marginTop: 4 }}>
-                    {formatGrowthRate(stats.community.posts.growthRate)}
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="评论总数"
-                  value={stats.community.comments.total}
-                  prefix={<CommentOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.community.comments.newToday} | 本周: +{stats.community.comments.newThisWeek}
-                  </Text>
-                  <div style={{ marginTop: 4 }}>
-                    {formatGrowthRate(stats.community.comments.growthRate)}
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8} md={8}>
-              <Card size="small" hoverable>
-                <Statistic
-                  title="收藏总数"
-                  value={stats.community.favorites.total}
-                  prefix={<HeartOutlined />}
-                  valueStyle={{ fontSize: 20 }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    今日: +{stats.community.favorites.newToday} | 本周: +{stats.community.favorites.newThisWeek}
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </Card>
+      {/* ── 内容质量指标 ── */}
+      {stats.contentQuality && <ContentQualityPanel contentQuality={stats.contentQuality} />}
 
-        {/* ========== 第二屏：运营数据 ========== */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          {/* 订阅情况 */}
-          <Col xs={24} lg={12}>
-            <Card
-              title={
-                <Space>
-                  <SyncOutlined style={{ color: '#52c41a' }} />
-                  <span>订阅情况</span>
-                </Space>
-              }
-              hoverable
-            >
-              <Statistic
-                title="活跃订阅数"
-                value={stats.subscriptions.active}
-                prefix={<SyncOutlined />}
-                valueStyle={{ color: '#52c41a', fontSize: 32 }}
-              />
-            </Card>
-          </Col>
+      {/* ── 数据源状态（如有）── */}
+      {stats.dataSources && (
+        <div className={styles.dualGrid}>
+          <DataSourcePanel ds={stats.dataSources} />
+        </div>
+      )}
 
-          {/* 数据源状态 */}
-          {stats.dataSources && (
-            <Col xs={24} lg={12}>
-              <Card
-                title={
-                  <Space>
-                    <DatabaseOutlined style={{ color: '#1890ff' }} />
-                    <span>数据源状态</span>
-                  </Space>
-                }
-                hoverable
-              >
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Statistic
-                      title="总数"
-                      value={stats.dataSources.total}
-                      valueStyle={{ fontSize: 20 }}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic
-                      title="已启用"
-                      value={stats.dataSources.enabled}
-                      valueStyle={{ color: '#1890ff', fontSize: 20 }}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic
-                      title="健康"
-                      value={stats.dataSources.healthy}
-                      valueStyle={{ color: '#3f8600', fontSize: 20 }}
-                    />
-                  </Col>
-                </Row>
-                {stats.dataSources.unhealthy > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <Tag color="error">
-                      <WarningOutlined /> {stats.dataSources.unhealthy} 个数据源异常
-                    </Tag>
-                  </div>
-                )}
-                <Divider style={{ margin: '16px 0' }} />
-                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                  {stats.dataSources.sources.map((source) => (
-                    <div key={source.id} style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Space>
-                        <Text strong>{source.displayName}</Text>
-                        {getHealthStatusTag(source.healthStatus)}
-                        {source.enabled ? (
-                          <Tag color="success">已启用</Tag>
-                        ) : (
-                          <Tag>已禁用</Tag>
-                        )}
-                      </Space>
-                      {source.lastSyncAt && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {new Date(source.lastSyncAt).toLocaleString()}
-                        </Text>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </Col>
-          )}
-        </Row>
-
-        {/* ========== 内容分布可视化 ========== */}
-        <Card
-          title={
-            <Space>
-              <FileTextOutlined style={{ color: '#722ed1' }} />
-              <span>内容类型分布</span>
-            </Space>
-          }
-          style={{ marginBottom: 24 }}
-        >
-          <Row gutter={16}>
-            {[
-              { key: 'papers', label: '论文', value: stats.content.papers.total, color: '#1890ff' },
-              { key: 'videos', label: '视频', value: stats.content.videos.total, color: '#52c41a' },
-              { key: 'repos', label: 'GitHub项目', value: stats.content.repos.total, color: '#722ed1' },
-              { key: 'jobs', label: '招聘岗位', value: stats.content.jobs, color: '#fa8c16' },
-              { key: 'huggingface', label: 'HuggingFace模型', value: stats.content.huggingface, color: '#eb2f96' },
-            ].map((item) => {
-              const percentage = stats.content.total > 0 
-                ? (item.value / stats.content.total * 100).toFixed(1) 
-                : '0';
-              return (
-                <Col xs={24} sm={12} md={8} lg={6} key={item.key} style={{ marginBottom: 16 }}>
-                  <Card size="small" hoverable>
-                    <Statistic
-                      title={item.label}
-                      value={item.value}
-                      valueStyle={{ color: item.color, fontSize: 20 }}
-                    />
-                    <Progress
-                      percent={parseFloat(percentage)}
-                      strokeColor={item.color}
-                      showInfo={false}
-                      style={{ marginTop: 8 }}
-                    />
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {percentage}%
-                    </Text>
-                  </Card>
-                </Col>
-              );
-            })}
-          </Row>
-        </Card>
-
-        {/* ========== 最近同步的内容 ========== */}
-        {stats.recentItems && (
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            {/* 最近同步的GitHub仓库 */}
-            {stats.recentItems.repos && stats.recentItems.repos.length > 0 && (
-              <Col xs={24} lg={12}>
-                <Card
-                  title={
-                    <Space>
-                      <GithubOutlined style={{ color: '#722ed1' }} />
-                      <span>最近同步的GitHub仓库</span>
-                    </Space>
-                  }
-                  hoverable
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {stats.recentItems.repos.map((repo: any) => (
-                      <Card
-                        key={repo.id}
-                        size="small"
-                        hoverable
-                        style={{ marginBottom: 8 }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                          <div style={{ 
-                            fontSize: 32,
-                            lineHeight: 1,
-                            flexShrink: 0,
-                            color: '#722ed1',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <GithubOutlined style={{ fontSize: 32 }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {repo.fullName || repo.name}
-                            </div>
-                            {repo.description && (
-                              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {repo.description}
-                              </div>
-                            )}
-                            <Space size={12} style={{ fontSize: 12, color: '#666' }}>
-                              {repo.starsCount !== undefined && repo.starsCount > 0 && (
-                                <span>⭐ {repo.starsCount.toLocaleString()}</span>
-                              )}
-                              {repo.language && (
-                                <span>💻 {repo.language}</span>
-                              )}
-                              {repo.viewCount !== undefined && repo.viewCount > 0 && (
-                                <span>👁️ {repo.viewCount}</span>
-                              )}
-                            </Space>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </Card>
-              </Col>
-            )}
-
-            {/* 最近同步的论文 */}
-            {stats.recentItems.papers && stats.recentItems.papers.length > 0 && (
-              <Col xs={24} lg={12}>
-                <Card
-                  title={
-                    <Space>
-                      <FileTextOutlined style={{ color: '#1890ff' }} />
-                      <span>最近同步的论文</span>
-                    </Space>
-                  }
-                  hoverable
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {stats.recentItems.papers.map((paper: any) => (
-                      <Card
-                        key={paper.id}
-                        size="small"
-                        hoverable
-                        style={{ marginBottom: 8 }}
-                      >
-                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {paper.title}
-                        </div>
-                        <Space size={12} style={{ fontSize: 12, color: '#666' }}>
-                          {paper.citationCount !== undefined && paper.citationCount > 0 && (
-                            <span>📚 {paper.citationCount} 引用</span>
-                          )}
-                          {paper.viewCount !== undefined && paper.viewCount > 0 && (
-                            <span>👁️ {paper.viewCount}</span>
-                          )}
-                          {paper.publishedDate && (
-                            <span>📅 {new Date(paper.publishedDate).toLocaleDateString('zh-CN')}</span>
-                          )}
-                        </Space>
-                      </Card>
-                    ))}
-                  </div>
-                </Card>
-              </Col>
-            )}
-          </Row>
-        )}
-      </Spin>
+      {/* ── 近期同步内容（全宽）── */}
+      {stats.recentItems && <RecentItemsPanel items={stats.recentItems} />}
     </div>
   );
 }

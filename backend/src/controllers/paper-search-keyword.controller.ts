@@ -25,8 +25,8 @@ import { logger } from '../utils/logger';
  */
 export async function getKeywordsHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { skip, take } = parsePaginationParams(req.query);
-    const { isActive, category, sourceType, keyword } = req.query;
+    const { skip, take, page, size } = parsePaginationParams(req.query);
+    const { isActive, category, sourceType, keyword, withPaperCount } = req.query;
 
     const result = await getAllKeywords({
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
@@ -37,9 +37,20 @@ export async function getKeywordsHandler(req: Request, res: Response, next: Next
       take,
     });
 
+    let items: any[] = result.keywords;
+
+    if (withPaperCount === 'true' && items.length > 0) {
+      const counts = await Promise.all(
+        items.map((k: any) =>
+          getKeywordPapersCount(k.id).catch(() => 0)
+        )
+      );
+      items = items.map((k: any, i: number) => ({ ...k, paperCount: counts[i] }));
+    }
+
     sendSuccess(res, {
-      items: result.keywords,
-      pagination: buildPaginationResponse(result.total, skip, take),
+      items,
+      pagination: buildPaginationResponse(page, size, result.total),
     });
   } catch (error: any) {
     logger.error('获取论文搜索关键词列表失败:', error);

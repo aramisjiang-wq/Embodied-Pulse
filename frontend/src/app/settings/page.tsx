@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { Layout, Card, Form, Input, Button, Tabs, App } from 'antd';
 import { useAuthStore } from '@/store/authStore';
 import { userApi } from '@/lib/api/user';
+import styles from './page.module.css';
 
 const { Content } = Layout;
 
@@ -32,7 +33,7 @@ export default function SettingsPage() {
     setLoading(true);
     try {
       const updatedUser = await userApi.updateProfile(values);
-      setUser(updatedUser);
+      setUser(updatedUser, false);
       message.success('个人资料更新成功');
     } catch (error: any) {
       message.error(error.message || '更新失败');
@@ -153,9 +154,9 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1000, margin: '0 auto' }}>
-        <Card title="设置">
+    <div className={styles.pageWrapper}>
+      <Content style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <Card title="设置" className={styles.settingsCard}>
           <Tabs defaultActiveKey="profile" items={tabItems} />
         </Card>
       </Content>

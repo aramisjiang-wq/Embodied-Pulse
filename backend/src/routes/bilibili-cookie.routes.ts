@@ -12,6 +12,10 @@ import {
   toggleCookieStatus,
   resetCookieErrorCount,
   getCookieStats,
+  getSettings,
+  updateSettings,
+  rotateCookie,
+  checkSingleCookie,
 } from '../controllers/bilibili-cookie.controller';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 
@@ -48,11 +52,39 @@ router.get('/health', getHealthSummary);
 router.get('/stats', getCookieStats);
 
 /**
+ * @route   GET /api/admin/bilibili-cookies/settings
+ * @desc    获取Cookie设置
+ * @access  Admin
+ */
+router.get('/settings', getSettings);
+
+/**
+ * @route   PUT /api/admin/bilibili-cookies/settings
+ * @desc    更新Cookie设置
+ * @access  Admin
+ */
+router.put('/settings', updateSettings);
+
+/**
+ * @route   POST /api/admin/bilibili-cookies/rotate
+ * @desc    手动轮换Cookie
+ * @access  Admin
+ */
+router.post('/rotate', rotateCookie);
+
+/**
  * @route   POST /api/admin/bilibili-cookies
  * @desc    添加Cookie
  * @access  Admin
  */
 router.post('/', addCookie);
+
+/**
+ * @route   GET /api/admin/bilibili-cookies/:id/check
+ * @desc    检查单个Cookie健康状态
+ * @access  Admin
+ */
+router.get('/:id/check', checkSingleCookie);
 
 /**
  * @route   DELETE /api/admin/bilibili-cookies/:id

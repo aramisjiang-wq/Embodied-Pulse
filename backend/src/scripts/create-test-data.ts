@@ -60,7 +60,7 @@ const TEST_PAPERS = [
 
 const TEST_REPOS = [
   {
-    repo_id: BigInt(123456789),
+    repo_id: String(123456789),
     name: 'gym',
     fullName: 'openai/gym',
     owner: 'openai',
@@ -74,7 +74,7 @@ const TEST_REPOS = [
     updated_date: new Date('2024-01-15'),
   },
   {
-    repo_id: BigInt(987654321),
+    repo_id: String(987654321),
     name: 'tensorflow',
     fullName: 'tensorflow/tensorflow',
     owner: 'tensorflow',
@@ -88,7 +88,7 @@ const TEST_REPOS = [
     updated_date: new Date('2024-01-14'),
   },
   {
-    repo_id: BigInt(456789123),
+    repo_id: String(456789123),
     name: 'pytorch',
     fullName: 'pytorch/pytorch',
     owner: 'pytorch',
@@ -102,7 +102,7 @@ const TEST_REPOS = [
     updated_date: new Date('2024-01-13'),
   },
   {
-    repoId: BigInt(789012345),
+    repoId: String(789012345),
     fullName: 'huggingface/transformers',
     name: 'transformers',
     owner: 'huggingface',
@@ -116,7 +116,7 @@ const TEST_REPOS = [
     updatedDate: new Date('2024-01-12'),
   },
   {
-    repoId: BigInt(234567890),
+    repoId: String(234567890),
     fullName: 'microsoft/semantic-kernel',
     name: 'semantic-kernel',
     owner: 'microsoft',

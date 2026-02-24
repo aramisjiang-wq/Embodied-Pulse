@@ -5,6 +5,12 @@ export function useServiceWorker() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
+    // 开发环境：跳过Service Worker注册
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SW] Development mode: Service Worker registration skipped');
+      return;
+    }
+
     if ('serviceWorker' in navigator && typeof window !== 'undefined') {
       const registerSW = async () => {
         try {

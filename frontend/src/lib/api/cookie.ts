@@ -7,6 +7,11 @@ export interface BilibiliCookie {
   errorCount: number;
   lastUsed: string;
   lastError?: string;
+  lastCheckAt?: string;
+  checkResult?: string;
+  userMid?: string;
+  userName?: string;
+  source?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -15,42 +20,83 @@ export interface CookieStatus {
   cookies: BilibiliCookie[];
   activeCount: number;
   totalCount: number;
+  inactiveCount: number;
 }
 
 export interface CookieSettings {
   autoRotateEnabled: boolean;
   healthCheckInterval: number;
+  maxErrorCount: number;
+  alertEnabled: boolean;
+}
+
+export interface HealthCheckResult {
+  id: string;
+  name: string;
+  valid: boolean;
+  mid?: string;
+  userName?: string;
+  error?: string;
+  errorCode?: number;
 }
 
 export const cookieApi = {
-  addCookie: async (name: string, cookie: string) => {
-    return apiClient.post('/api/admin/cookies', { name, cookie });
+  addCookie: async (name: string, cookie: string, priority?: number) => {
+    return apiClient.post('/api/admin/bilibili-cookies', { name, cookie, priority });
   },
 
   removeCookie: async (id: string) => {
-    return apiClient.delete(`/api/admin/cookies/${id}`);
+    return apiClient.delete(`/api/admin/bilibili-cookies/${id}`);
   },
 
   getCookieStatus: async (): Promise<CookieStatus> => {
-    const response = await apiClient.get<CookieStatus>('/api/admin/cookies/status');
+    const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/status');
     return response.data;
   },
 
   rotateCookie: async () => {
-    return apiClient.post('/api/admin/cookies/rotate');
+    return apiClient.post('/api/admin/bilibili-cookies/rotate');
   },
 
-  getSettings: async () => {
-    const response = await apiClient.get<CookieSettings>('/api/admin/cookies/settings');
+  getSettings: async (): Promise<CookieSettings> => {
+    const response = await apiClient.get<CookieSettings>('/api/admin/bilibili-cookies/settings');
     return response.data;
   },
 
-  updateSettings: async (settings: { autoRotateEnabled: boolean; healthCheckInterval: number }) => {
-    return apiClient.put('/api/admin/cookies/settings', settings);
+  updateSettings: async (settings: Partial<CookieSettings>) => {
+    return apiClient.put('/api/admin/bilibili-cookies/settings', settings);
   },
 
-  checkHealth: async () => {
-    const response = await apiClient.get<CookieStatus>('/api/admin/cookies/health');
+  checkHealth: async (): Promise<CookieStatus> => {
+    const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/health');
+    return response.data;
+  },
+
+  checkAllCookies: async (): Promise<{
+    total: number;
+    valid: number;
+    invalid: number;
+    cookies: HealthCheckResult[];
+  }> => {
+    const response = await apiClient.get('/api/admin/bilibili-cookies/check');
+    return response.data;
+  },
+
+  checkSingleCookie: async (id: string): Promise<HealthCheckResult> => {
+    const response = await apiClient.get(`/api/admin/bilibili-cookies/${id}/check`);
+    return response.data;
+  },
+
+  toggleCookieStatus: async (id: string) => {
+    return apiClient.put(`/api/admin/bilibili-cookies/${id}/toggle`);
+  },
+
+  resetCookieErrorCount: async (id: string) => {
+    return apiClient.put(`/api/admin/bilibili-cookies/${id}/reset`);
+  },
+
+  getStats: async () => {
+    const response = await apiClient.get('/api/admin/bilibili-cookies/stats');
     return response.data;
   },
 };

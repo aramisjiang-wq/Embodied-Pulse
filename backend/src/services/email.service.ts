@@ -8,13 +8,18 @@ interface EmailOptions {
   text?: string;
 }
 
+const SMTP_HOST = process.env.SMTP_SERVER || 'smtp.feishu.cn';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.EMAIL_USER || 'gradmotion@limxdynamics.com';
+const SMTP_PASS = process.env.EMAIL_PASSWORD || 'FBmLigwJ6CSuiW3U';
+
 const transporter = nodemailer.createTransport({
-  host: 'smtp.qq.com',
-  port: 465,
-  secure: true,
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465,
   auth: {
-    user: process.env.SMTP_USER || '404777086@qq.com',
-    pass: process.env.SMTP_PASS || 'njyrjpkjmorbbgei',
+    user: SMTP_USER,
+    pass: SMTP_PASS,
   },
   tls: {
     rejectUnauthorized: false,
@@ -23,10 +28,12 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000,
 });
 
+logger.info(`[Email Service] SMTP配置: ${SMTP_HOST}:${SMTP_PORT}, 用户: ${SMTP_USER}`);
+
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const mailOptions = {
-      from: `"Embodied Pulse" <${process.env.SMTP_USER || '404777086@qq.com'}>`,
+      from: `"Embodied Pulse" <${SMTP_USER}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,

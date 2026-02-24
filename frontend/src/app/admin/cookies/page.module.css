@@ -1,0 +1,93 @@
+.pageWrapper {
+  padding: 0;
+}
+
+.mainCard {
+  border-radius: var(--radius-md);
+}
+
+.cardHeader {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.statsCard {
+  border-radius: var(--radius-md);
+}
+
+.statsLabel {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.errorText {
+  color: var(--color-error);
+}
+
+.alertContainer {
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.alertItem {
+  margin-bottom: 4px;
+}
+
+.alertMore {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.instructionCard {
+  margin-top: 16px;
+  border-radius: var(--radius-md);
+}
+
+.instructionTitle {
+  margin-top: 0;
+  color: var(--color-text-primary);
+}
+
+.instructionList {
+  padding-left: 20px;
+}
+
+.instructionList li {
+  margin-bottom: 8px;
+  color: var(--color-text-secondary);
+}
+
+.settingHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.timelineTime {
+  font-weight: 500;
+}
+
+.timelineDetails {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .cardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

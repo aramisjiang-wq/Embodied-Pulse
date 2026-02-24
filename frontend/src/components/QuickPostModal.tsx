@@ -19,58 +19,48 @@ interface QuickPostModalProps {
 const CATEGORIES = [
   { id: 'tech', name: '技术讨论', icon: '💻', description: '论文解读、技术探讨、问题求助' },
   { id: 'resource', name: '资源分享', icon: '📦', description: '项目、模型、工具、教程' },
-  { id: 'jobs', name: '求职招聘', icon: '💼', description: '招聘信息、求职需求' },
   { id: 'activity', name: '活动交流', icon: '🎯', description: '会议、比赛、线下活动' },
 ];
 
 const POST_TEMPLATES = [
   { 
     key: 'quick', 
-    label: '自由发帖', 
+    label: '快速发帖', 
     icon: 'SendOutlined',
-    placeholder: '分享你的想法、提问或讨论...'
+    placeholder: '分享你的想法、提问或讨论...',
+    minLength: 10
   },
   { 
     key: 'paper', 
     label: '论文解读', 
     icon: 'FileTextOutlined',
     placeholder: '论文标题\n\n核心观点：\n1. \n2. \n3. \n\n个人见解：',
-    category: 'tech'
+    category: 'tech',
+    minLength: 20
   },
   { 
     key: 'resource', 
     label: '资源分享', 
     icon: 'ShareAltOutlined',
     placeholder: '资源名称\n\n资源链接：\n\n推荐理由：\n1. \n2. \n3. \n\n适用场景：',
-    category: 'resource'
+    category: 'resource',
+    minLength: 20
   },
   { 
     key: 'question', 
     label: '技术求助', 
     icon: 'RocketOutlined',
     placeholder: '问题描述：\n\n已尝试的方法：\n\n期望的解决方案：',
-    category: 'tech'
-  },
-  { 
-    key: 'job', 
-    label: '招聘信息', 
-    icon: 'TeamOutlined',
-    placeholder: '公司名称\n\n职位名称：\n\n职位要求：\n\n薪资范围：\n\n联系方式：',
-    category: 'jobs'
-  },
-  { 
-    key: 'resume', 
-    label: '求职需求', 
-    icon: 'TeamOutlined',
-    placeholder: '个人简介\n\n求职岗位：\n\n技能特长：\n\n期望薪资：\n\n联系方式：',
-    category: 'jobs'
+    category: 'tech',
+    minLength: 15
   },
   { 
     key: 'activity', 
     label: '活动发布', 
     icon: 'CalendarOutlined',
     placeholder: '活动名称\n\n活动时间：\n\n活动地点：\n\n活动内容：\n\n报名方式：',
-    category: 'activity'
+    category: 'activity',
+    minLength: 20
   },
 ];
 
@@ -86,7 +76,6 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 const SUGGESTED_TAGS = {
   tech: ['具身智能', '机器人学习', '多模态', '强化学习', '计算机视觉', '自然语言处理', '深度学习', '论文解读'],
   resource: ['开源项目', '数据集', '预训练模型', '工具库', '教程', '文档', '代码示例'],
-  jobs: ['全职', '实习', '远程', '校招', '社招', '算法工程师', '研发工程师', '产品经理'],
   activity: ['学术会议', '技术沙龙', '黑客松', '比赛', '线下聚会', '线上直播'],
 };
 
@@ -129,21 +118,17 @@ export default function QuickPostModal({ open, onClose, onSuccess }: QuickPostMo
       return;
     }
 
-    if (content.trim().length < 10) {
-      message.warning('内容至少需要10个字符');
+    const currentTemplate = POST_TEMPLATES.find(t => t.key === activeTab);
+    const minLength = currentTemplate?.minLength || 10;
+    
+    if (content.trim().length < minLength) {
+      message.warning(`内容至少需要${minLength}个字符`);
       return;
     }
 
     if (content.trim().length > 5000) {
       message.warning('内容不能超过5000个字符');
       return;
-    }
-
-    if (activeTab === 'job' || activeTab === 'resume') {
-      if (!title.trim()) {
-        message.warning('请输入标题');
-        return;
-      }
     }
 
     setLoading(true);
@@ -176,65 +161,41 @@ export default function QuickPostModal({ open, onClose, onSuccess }: QuickPostMo
     <Modal
       title={
         <Space>
-          <SendOutlined style={{ color: '#1890ff' }} />
-          <span>发布内容</span>
+          <SendOutlined style={{ color: '#262626', fontSize: 16 }} />
+          <span style={{ fontSize: 15, fontWeight: 500 }}>发布内容</span>
         </Space>
       }
       open={open}
       onCancel={onClose}
       footer={
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 11 }}>
             发布可获得+10积分
           </Text>
           <Space>
-            <Button onClick={onClose}>取消</Button>
+            <Button onClick={onClose} size="small">取消</Button>
             <Button 
               type="primary" 
               onClick={handleSubmit} 
               loading={loading}
               icon={<SendOutlined />}
+              size="small"
+              style={{ background: '#262626', borderColor: '#262626' }}
             >
               发布
             </Button>
           </Space>
         </Space>
       }
-      width={680}
+      width={600}
+      styles={{
+        body: { padding: '20px' }
+      }}
       destroyOnHidden
     >
       <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          选择分类
-        </Text>
-        <Radio.Group
-          value={selectedCategory}
-          onChange={handleCategoryChange}
-          style={{ width: '100%' }}
-        >
-          <Space wrap size={8}>
-            {CATEGORIES.map((category) => (
-              <Radio.Button 
-                key={category.id} 
-                value={category.id}
-                style={{ borderRadius: 20 }}
-              >
-                {category.icon} {category.name}
-              </Radio.Button>
-            ))}
-          </Space>
-        </Radio.Group>
-        <Paragraph 
-          type="secondary" 
-          style={{ fontSize: 12, margin: '8px 0 0 0' }}
-        >
-          {CATEGORIES.find(c => c.id === selectedCategory)?.description}
-        </Paragraph>
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          选择模板
+        <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
+          选择模板（可选）
         </Text>
         <Space wrap size={8}>
           {POST_TEMPLATES.map((template) => (
@@ -243,73 +204,90 @@ export default function QuickPostModal({ open, onClose, onSuccess }: QuickPostMo
               type={activeTab === template.key ? 'primary' : 'default'}
               icon={ICON_MAP[template.icon] as React.ReactNode}
               onClick={() => handleTabChange(template.key)}
-              style={{ borderRadius: 20 }}
+              size="small"
+              style={{ borderRadius: 6, fontSize: 12 }}
             >
               {template.label}
             </Button>
           ))}
         </Space>
+        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+          提示：选择模板可快速填充内容格式，也可直接输入
+        </Text>
       </div>
 
-      {activeTab !== 'quick' && (
-        <div style={{ marginBottom: 12 }}>
-          <Text strong style={{ display: 'block', marginBottom: 8 }}>
-            标题
-          </Text>
-          <Input
-            placeholder={activeTab === 'job' ? '公司名称' : activeTab === 'resume' ? '个人简介' : '标题（可选）'}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={100}
-            showCount
-          />
-        </div>
-      )}
+      <div style={{ marginBottom: 12 }}>
+        <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
+          分类
+        </Text>
+        <Radio.Group
+          value={selectedCategory}
+          onChange={handleCategoryChange}
+          style={{ width: '100%' }}
+          size="small"
+        >
+          <Space wrap size={6}>
+            {CATEGORIES.map((category) => (
+              <Radio.Button 
+                key={category.id} 
+                value={category.id}
+                style={{ borderRadius: 6, fontSize: 12 }}
+              >
+                {category.icon} {category.name}
+              </Radio.Button>
+            ))}
+          </Space>
+        </Radio.Group>
+      </div>
 
       <div style={{ marginBottom: 12 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          内容
+        <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
+          内容 <Text type="secondary" style={{ fontSize: 11, fontWeight: 'normal' }}>（必填）</Text>
         </Text>
         <TextArea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder={POST_TEMPLATES.find(t => t.key === activeTab)?.placeholder}
-          rows={10}
+          placeholder={POST_TEMPLATES.find(t => t.key === activeTab)?.placeholder || '分享你的想法、提问或讨论...'}
+          rows={8}
           maxLength={5000}
           showCount
+          autoSize={{ minRows: 6, maxRows: 12 }}
+          style={{ fontSize: 14 }}
         />
       </div>
 
       <div>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          标签
+        <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
+          标签 <Text type="secondary" style={{ fontSize: 11, fontWeight: 'normal' }}>（可选，最多5个）</Text>
         </Text>
         <Select
           mode="tags"
-          placeholder="添加标签（最多5个）"
+          placeholder="输入标签后按回车添加"
           value={tags}
           onChange={(value) => {
             if (value.length <= 5) {
               setTags(value);
+            } else {
+              message.warning('最多只能添加5个标签');
             }
           }}
           options={currentSuggestedTags.map(tag => ({ label: tag, value: tag }))}
           style={{ width: '100%' }}
+          size="small"
           maxTagCount="responsive"
           filterOption={(input, option) =>
             (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
           }
         />
         {tags.length > 0 && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 6 }}>
             <Space wrap size={4}>
               {tags.map((tag) => (
                 <Tag 
                   key={tag} 
-                  color="blue" 
                   closable 
                   onClose={() => setTags(tags.filter(t => t !== tag))}
-                  style={{ borderRadius: 12 }}
+                  style={{ borderRadius: 4, fontSize: 11, margin: 0 }}
                 >
                   {tag}
                 </Tag>

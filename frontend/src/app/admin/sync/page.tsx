@@ -16,6 +16,8 @@ import {
   ThunderboltOutlined
 } from '@ant-design/icons';
 import { syncApi } from '@/lib/api/sync';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
 interface SyncResult {
   success: boolean;
@@ -37,7 +39,6 @@ export default function AdminSyncPage() {
     try {
       await syncApi.syncAll();
       message.success('全量数据同步任务已启动，请稍后查看结果');
-      // 注意：这是异步任务，实际结果需要查看日志或稍后刷新
     } catch (error: any) {
       console.error('Sync all error:', error);
       if (error.status === 401 || error.code === 'UNAUTHORIZED' || error.response?.data?.code === 1002 || error.response?.data?.code === 1003) {
@@ -67,11 +68,9 @@ export default function AdminSyncPage() {
           break;
         case 'huggingface':
           result = await syncApi.syncHuggingFace(params);
-          // 检查同步结果，即使API返回200，也可能success=false
           if (result && !result.success) {
             const errorMsg = result.message || 'HuggingFace同步失败';
-            message.error(errorMsg.replace(/\n/g, ' '), 8); // 显示8秒，将换行符替换为空格
-            // 不继续处理，因为同步失败
+            message.error(errorMsg.replace(/\n/g, ' '), 8);
             setSyncing(null);
             return;
           }
@@ -191,9 +190,9 @@ export default function AdminSyncPage() {
   ];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>数据同步</h1>
+    <PageContainer title="数据同步" loading={loading}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>数据同步</h1>
         <Button 
           type="primary" 
           size="large"
@@ -205,15 +204,15 @@ export default function AdminSyncPage() {
         </Button>
       </div>
 
-      <div style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
-        <p style={{ margin: 0, color: '#666' }}>
+      <div className={styles.infoBox}>
+        <p className={styles.infoText}>
           <strong>说明：</strong>
           数据同步会从第三方API抓取最新数据并存储到数据库。
           全量同步可能需要较长时间，建议在非高峰时段执行。
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+      <div className={styles.syncGrid}>
         {syncCards.map((card) => {
           const result = results[card.key];
           const isSyncing = syncing === card.key;
@@ -221,6 +220,7 @@ export default function AdminSyncPage() {
           return (
             <Card
               key={card.key}
+              className={styles.syncCard}
               title={
                 <Space>
                   <span style={{ color: card.color }}>{card.icon}</span>
@@ -237,32 +237,31 @@ export default function AdminSyncPage() {
                   同步
                 </Button>
               }
-              style={{ minHeight: 200 }}
             >
-              <p style={{ color: '#666', marginBottom: 16 }}>{card.description}</p>
+              <p className={styles.cardDescription}>{card.description}</p>
               
               {result && (
-                <div style={{ marginTop: 16 }}>
-                  <Divider style={{ margin: '12px 0' }} />
+                <div className={styles.resultSection}>
+                  <Divider className={styles.resultDivider} />
                   <Space direction="vertical" style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div className={styles.resultRow}>
                       <span>同步状态：</span>
                       <Tag color={result.success ? 'success' : 'error'}>
                         {result.success ? '成功' : '失败'}
                       </Tag>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div className={styles.resultRow}>
                       <span>成功数量：</span>
-                      <strong style={{ color: '#52c41a' }}>{result.synced}</strong>
+                      <strong className={styles.successCount}>{result.synced}</strong>
                     </div>
                     {result.errors > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div className={styles.resultRow}>
                         <span>失败数量：</span>
-                        <strong style={{ color: '#ff4d4f' }}>{result.errors}</strong>
+                        <strong className={styles.errorCount}>{result.errors}</strong>
                       </div>
                     )}
                     {result.total !== undefined && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div className={styles.resultRow}>
                         <span>总计：</span>
                         <strong>{result.total}</strong>
                       </div>
@@ -272,15 +271,15 @@ export default function AdminSyncPage() {
               )}
 
               {isSyncing && (
-                <div style={{ marginTop: 16 }}>
+                <div className={styles.syncingIndicator}>
                   <Spin size="small" />
-                  <span style={{ marginLeft: 8, color: '#666' }}>同步中...</span>
+                  <span className={styles.syncingText}>同步中...</span>
                 </div>
               )}
             </Card>
           );
         })}
       </div>
-    </div>
+    </PageContainer>
   );
 }

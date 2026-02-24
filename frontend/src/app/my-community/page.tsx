@@ -1,84 +1,129 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Spin, Empty, Space, Button, Tabs, Tag, Typography, Modal, Input, Select, App } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined, CommentOutlined, StarOutlined, EyeOutlined } from '@ant-design/icons';
+import { Spin, Modal, Input, Select, App } from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  MessageOutlined,
+  LikeOutlined,
+  EyeOutlined,
+  NumberOutlined,
+} from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import { communityApi } from '@/lib/api/community';
 import Link from 'next/link';
+import PageContainer from '@/components/PageContainer';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 
-const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
 const POST_TYPES = [
-  { value: 'tech', label: '💻 技术讨论' },
-  { value: 'resource', label: '📦 资源分享' },
-  { value: 'jobs', label: '💼 求职招聘' },
-  { value: 'activity', label: '🎯 活动交流' },
+  { value: 'tech',     label: '技术讨论', icon: '💻', color: '#1677ff', bg: '#e6f4ff' },
+  { value: 'resource', label: '资源分享', icon: '📦', color: '#389e0d', bg: '#f6ffed' },
+  { value: 'jobs',     label: '求职招聘', icon: '💼', color: '#d46b08', bg: '#fff7e6' },
+  { value: 'activity', label: '活动交流', icon: '🎯', color: '#cf1322', bg: '#fff1f0' },
+] as const;
+
+type PostTypeValue = typeof POST_TYPES[number]['value'];
+
+const TYPE_MAP = Object.fromEntries(POST_TYPES.map(t => [t.value, t])) as Record<
+  string,
+  { value: string; label: string; icon: string; color: string; bg: string }
+>;
+
+function getTypeConfig(contentType: string) {
+  return TYPE_MAP[contentType] ?? { value: contentType, label: contentType, icon: '📝', color: '#595959', bg: '#f5f5f5' };
+}
+
+function formatTime(date: string) {
+  const now = dayjs();
+  const d = dayjs(date);
+  const diffMin = now.diff(d, 'minute');
+  const diffH = now.diff(d, 'hour');
+  const diffD = now.diff(d, 'day');
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  if (diffH < 24) return `${diffH}小时前`;
+  if (diffD < 7) return `${diffD}天前`;
+  return d.format('MM-DD');
+}
+
+const ALL_FILTERS = [
+  { value: 'all', label: '全部', icon: '📋' },
+  ...POST_TYPES,
 ];
+
+function SkeletonList({ count }: { count: number }) {
+  return (
+    <div className={styles.listWrap}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className={styles.skeletonItem}>
+          <div className={styles.skBadge} />
+          <div className={styles.skBody}>
+            <div className={styles.skLine} style={{ width: '55%' }} />
+            <div className={styles.skLine} style={{ width: '35%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function MyCommunityPage() {
   const { user } = useAuthStore();
   const { message } = App.useApp();
-  const [loading, setLoading] = useState(false);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('posts');
+
+  const [loading, setLoading]               = useState(false);
+  const [posts, setPosts]                   = useState<any[]>([]);
+  const [filter, setFilter]                 = useState('all');
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingPost, setEditingPost] = useState<any>(null);
+  const [editingPost, setEditingPost]       = useState<any>(null);
+  const [saving, setSaving]                 = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
     content: '',
-    contentType: 'tech',
+    contentType: 'tech' as PostTypeValue,
     tags: [] as string[],
   });
 
   useEffect(() => {
-    if (user) {
-      loadMyPosts();
-    }
+    if (user) loadMyPosts();
   }, [user]);
 
   const loadMyPosts = async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
       const data = await communityApi.getMyPosts();
-      
-      if (!data || !data.items || !Array.isArray(data.items)) {
-        console.error('Invalid data structure:', data);
-        setPosts([]);
-        return;
-      }
-      
-      setPosts(data.items);
-    } catch (error: any) {
-      console.error('Load my posts error:', error);
+      setPosts(Array.isArray(data?.items) ? data.items : []);
+    } catch {
       setPosts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (post: any) => {
+  const openEdit = (post: any) => {
     setEditingPost(post);
     setEditForm({
-      title: post.title || '',
-      content: post.content || '',
+      title:       post.title       || '',
+      content:     post.content     || '',
       contentType: post.contentType || 'tech',
-      tags: post.tags || [],
+      tags:        Array.isArray(post.tags) ? post.tags : [],
     });
     setEditModalVisible(true);
   };
 
   const handleSaveEdit = async () => {
     if (!editingPost) return;
-
+    setSaving(true);
     try {
       await communityApi.updatePost(editingPost.id, editForm);
       message.success('更新成功');
@@ -86,20 +131,22 @@ export default function MyCommunityPage() {
       loadMyPosts();
     } catch (error: any) {
       message.error(error.message || '更新失败');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = (postId: string) => {
+  const handleDelete = (postId: string, title: string) => {
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除这条帖子吗？此操作不可恢复。',
-      okText: '确定',
+      content: `删除后不可恢复：「${title || '无标题'}」`,
+      okText: '删除',
       okType: 'danger',
       cancelText: '取消',
       onOk: async () => {
         try {
           await communityApi.deletePost(postId);
-          message.success('删除成功');
+          message.success('已删除');
           loadMyPosts();
         } catch (error: any) {
           message.error(error.message || '删除失败');
@@ -108,221 +155,226 @@ export default function MyCommunityPage() {
     });
   };
 
-  if (!user) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Empty
-          description="请先登录"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      </div>
-    );
-  }
+  const filteredPosts = filter === 'all'
+    ? posts
+    : posts.filter(p => p.contentType === filter);
+
+  const totalViews    = posts.reduce((s, p) => s + (p.viewCount    || 0), 0);
+  const totalLikes    = posts.reduce((s, p) => s + (p.likeCount    || 0), 0);
+  const totalComments = posts.reduce((s, p) => s + (p.commentCount || 0), 0);
+
+  if (!user) return null;
 
   return (
-    <div style={{ background: '#fafafa', minHeight: '100%', padding: '0' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={2} style={{ margin: 0, marginBottom: 8 }}>
-            我的市集
-          </Title>
-          <Text type="secondary">管理我在市集发布的帖子</Text>
+    <PageContainer>
+      <div className={styles.page}>
+
+        {/* ── Header ── */}
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <h1 className={styles.title}>我的市集</h1>
+            <span className={styles.subtitle}>
+              {loading ? '加载中…' : `共 ${posts.length} 篇`}
+            </span>
+          </div>
+          <Link href="/community" className={styles.newBtn}>
+            <PlusOutlined />
+            发布帖子
+          </Link>
         </div>
 
-        <Card
-          style={{
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          }}
-          tabList={[
-            {
-              key: 'posts',
-              tab: `我的帖子 (${posts.length})`,
-            },
-          ]}
-          activeTabKey={activeTab}
-          onTabChange={setActiveTab}
-          extra={
-            <Link href="/community">
-              <Button type="primary" icon={<PlusOutlined />}>
-                发布新帖
-              </Button>
-            </Link>
-          }
-        >
-          {activeTab === 'posts' && (
-            <>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                  <Spin size="large" />
-                </div>
-              ) : posts.length === 0 ? (
-                <Empty
-                  description="还没有发布过帖子"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                >
-                  <Link href="/community">
-                    <Button type="primary">立即发帖</Button>
-                  </Link>
-                </Empty>
-              ) : (
-                <Space direction="vertical" style={{ width: '100%' }} size={16}>
-                  {posts.map((post) => (
-                    <Card
-                      key={post.id}
-                      hoverable
-                      style={{
-                        borderRadius: 8,
-                        border: '1px solid #e8e8e8',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                        <div style={{ flex: 1 }}>
-                          <Link
-                            href={`/community/${post.id}`}
-                            style={{
-                              fontSize: 16,
-                              fontWeight: 600,
-                              color: '#262626',
-                              textDecoration: 'none',
-                            }}
-                          >
-                            {post.title || '无标题'}
-                          </Link>
-                          <div style={{ marginTop: 8 }}>
-                            <Tag color="blue">
-                              {POST_TYPES.find(t => t.value === post.contentType)?.label || post.contentType}
-                            </Tag>
-                            {post.isTop && <Tag color="red">置顶</Tag>}
-                            {post.isFeatured && <Tag color="gold">精华</Tag>}
-                          </div>
-                        </div>
-                        <Space>
-                          <Button
-                            type="text"
-                            icon={<EditOutlined />}
-                            onClick={() => handleEdit(post)}
-                          >
-                            编辑
-                          </Button>
-                          <Button
-                            type="text"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleDelete(post.id)}
-                          >
-                            删除
-                          </Button>
-                        </Space>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: 14,
-                          color: '#595959',
-                          lineHeight: 1.8,
-                          marginBottom: 12,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {post.content}
-                      </div>
-
-                      {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
-                        <div style={{ marginBottom: 12 }}>
-                          <Space size={6} wrap>
-                            {post.tags.map((tag: string) => (
-                              <Tag key={tag} style={{ fontSize: 12 }}>
-                                #{tag}
-                              </Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
-                        <Space size="large" style={{ fontSize: 13, color: '#999' }}>
-                          <Space>
-                            <CommentOutlined />
-                            <span>{post.commentCount || 0} 评论</span>
-                          </Space>
-                          <Space>
-                            <StarOutlined />
-                            <span>{post.likeCount || 0} 点赞</span>
-                          </Space>
-                          <Space>
-                            <EyeOutlined />
-                            <span>{post.viewCount || 0} 浏览</span>
-                          </Space>
-                        </Space>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {dayjs(post.createdAt).format('YYYY-MM-DD HH:mm')}
-                        </Text>
-                      </div>
-                    </Card>
-                  ))}
-                </Space>
-              )}
-            </>
-          )}
-        </Card>
-
-        <Modal
-          title="编辑帖子"
-          open={editModalVisible}
-          onCancel={() => setEditModalVisible(false)}
-          onOk={handleSaveEdit}
-          width={600}
-        >
-          <Space direction="vertical" style={{ width: '100%' }} size={16}>
-            <div>
-              <Text strong>标题</Text>
-              <Input
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                placeholder="请输入标题"
-                style={{ marginTop: 8 }}
-              />
+        {/* ── Stats row ── */}
+        <div className={styles.statsRow}>
+          {[
+            { label: '帖子',  value: posts.length,   icon: '📝' },
+            { label: '浏览',  value: totalViews,      icon: '👁' },
+            { label: '点赞',  value: totalLikes,      icon: '👍' },
+            { label: '评论',  value: totalComments,   icon: '💬' },
+          ].map(stat => (
+            <div key={stat.label} className={styles.statCard}>
+              <span className={styles.statIcon}>{stat.icon}</span>
+              <div className={styles.statInfo}>
+                <span className={styles.statValue}>{stat.value}</span>
+                <span className={styles.statLabel}>{stat.label}</span>
+              </div>
             </div>
-            <div>
-              <Text strong>类型</Text>
-              <Select
-                value={editForm.contentType}
-                onChange={(value) => setEditForm({ ...editForm, contentType: value })}
-                style={{ width: '100%', marginTop: 8 }}
+          ))}
+        </div>
+
+        {/* ── Filter tabs ── */}
+        <div className={styles.filterBar}>
+          {ALL_FILTERS.map(t => {
+            const cnt = t.value === 'all'
+              ? posts.length
+              : posts.filter(p => p.contentType === t.value).length;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                className={`${styles.tab} ${filter === t.value ? styles.tabActive : ''}`}
+                onClick={() => setFilter(t.value)}
               >
-                {POST_TYPES.map(type => (
-                  <Option key={type.value} value={type.value}>
-                    {type.label}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Text strong>内容</Text>
-              <TextArea
-                value={editForm.content}
-                onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                placeholder="请输入内容"
-                rows={6}
-                style={{ marginTop: 8 }}
-              />
-            </div>
-            <div>
-              <Text strong>标签</Text>
-              <Input
-                value={editForm.tags.join(',')}
-                onChange={(e) => setEditForm({ ...editForm, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-                placeholder="用逗号分隔多个标签"
-                style={{ marginTop: 8 }}
-              />
-            </div>
-          </Space>
-        </Modal>
+                {t.icon} {t.label}
+                {cnt > 0 && (
+                  <span className={styles.tabBadge}>{cnt}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Content ── */}
+        {loading ? (
+          <SkeletonList count={5} />
+        ) : filteredPosts.length === 0 ? (
+          <div className={styles.empty}>
+            <span className={styles.emptyIcon}>📭</span>
+            <p className={styles.emptyTitle}>
+              {filter === 'all' ? '还没有发布过帖子' : '该分类下暂无内容'}
+            </p>
+            <p className={styles.emptyHint}>前往市集发布你的第一篇帖子</p>
+            <Link href="/community" className={styles.emptyBtn}>
+              <PlusOutlined />
+              去发帖
+            </Link>
+          </div>
+        ) : (
+          <div className={styles.listWrap}>
+            {filteredPosts.map(post => {
+              const type = getTypeConfig(post.contentType);
+              return (
+                <div key={post.id} className={styles.listItem}>
+                  {/* 类型标签 */}
+                  <span
+                    className={styles.typeBadge}
+                    style={{ color: type.color, background: type.bg }}
+                  >
+                    {type.icon} {type.label}
+                  </span>
+
+                  {/* 主体 */}
+                  <div className={styles.listBody}>
+                    <div className={styles.listTitleRow}>
+                      <Link
+                        href={`/community/${post.id}`}
+                        className={styles.listTitle}
+                      >
+                        {post.title || '无标题'}
+                      </Link>
+                      {post.isTop     && <span className={styles.badgeTop}>置顶</span>}
+                      {post.isFeatured && <span className={styles.badgeFeatured}>精华</span>}
+                    </div>
+                    <div className={styles.listMeta}>
+                      {post.content && (
+                        <p className={styles.listDesc}>{post.content}</p>
+                      )}
+                      {Array.isArray(post.tags) && post.tags.length > 0 && (
+                        <span className={styles.listTags}>
+                          <NumberOutlined style={{ fontSize: 10 }} />
+                          {post.tags.slice(0, 3).join(' · ')}
+                        </span>
+                      )}
+                      <span className={styles.statsBadge}>
+                        <span><EyeOutlined />{post.viewCount    || 0}</span>
+                        <span><LikeOutlined />{post.likeCount    || 0}</span>
+                        <span><MessageOutlined />{post.commentCount || 0}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 右侧：时间 + 操作 */}
+                  <div className={styles.listRight}>
+                    <span className={styles.listTime}>{formatTime(post.createdAt)}</span>
+                    <div className={styles.actions}>
+                      <button
+                        type="button"
+                        className={styles.actionBtn}
+                        onClick={() => openEdit(post)}
+                      >
+                        <EditOutlined />
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                        onClick={() => handleDelete(post.id, post.title)}
+                      >
+                        <DeleteOutlined />
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
-    </div>
+
+      {/* ── Edit Modal ── */}
+      <Modal
+        title="编辑帖子"
+        open={editModalVisible}
+        onCancel={() => setEditModalVisible(false)}
+        onOk={handleSaveEdit}
+        okText="保存"
+        cancelText="取消"
+        okButtonProps={{ loading: saving }}
+        width={540}
+        styles={{ body: { paddingTop: 16 } }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#555', marginBottom: 6 }}>标题</div>
+            <Input
+              value={editForm.title}
+              onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+              placeholder="请输入标题"
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#555', marginBottom: 6 }}>分类</div>
+            <Select
+              value={editForm.contentType}
+              onChange={value => setEditForm({ ...editForm, contentType: value })}
+              style={{ width: '100%' }}
+            >
+              {POST_TYPES.map(type => (
+                <Option key={type.value} value={type.value}>
+                  {type.icon} {type.label}
+                </Option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#555', marginBottom: 6 }}>内容</div>
+            <TextArea
+              value={editForm.content}
+              onChange={e => setEditForm({ ...editForm, content: e.target.value })}
+              placeholder="请输入内容"
+              rows={5}
+              style={{ resize: 'none' }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#555', marginBottom: 6 }}>
+              标签
+              <span style={{ fontWeight: 400, color: '#bbb', marginLeft: 6 }}>逗号分隔</span>
+            </div>
+            <Input
+              value={editForm.tags.join(',')}
+              onChange={e =>
+                setEditForm({
+                  ...editForm,
+                  tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean),
+                })
+              }
+              placeholder="AI, 大模型, 工具"
+            />
+          </div>
+        </div>
+      </Modal>
+    </PageContainer>
   );
 }

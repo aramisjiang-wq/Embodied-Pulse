@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Table, Modal, Form, Input, Space, Tag, Popconfirm, Statistic, Row, Col, Switch, Progress, Alert, Badge, Dropdown, MenuProps, Drawer, Descriptions, Timeline, App } from 'antd';
 import { PlusOutlined, DeleteOutlined, ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, SettingOutlined, HistoryOutlined, BellOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons';
 import { cookieApi, BilibiliCookie, CookieStatus } from '@/lib/api/cookie';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 import dayjs from 'dayjs';
 
 export default function CookieManagementPage() {
@@ -293,10 +295,10 @@ export default function CookieManagementPage() {
   ];
 
   return (
-    <div>
-      <Card>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>Bilibili Cookie管理</h2>
+    <PageContainer title="Bilibili Cookie管理" loading={loading && !cookieStatus}>
+      <Card className={styles.mainCard}>
+        <div className={styles.cardHeader}>
+          <h2 className={styles.cardTitle}>Bilibili Cookie管理</h2>
           <Space>
             <Button
               icon={<SettingOutlined />}
@@ -336,9 +338,9 @@ export default function CookieManagementPage() {
           <Alert
             message={`有 ${alerts.filter(a => a.type === 'error').length} 个错误告警`}
             description={
-              <div style={{ maxHeight: 100, overflowY: 'auto' }}>
+              <div className={styles.alertContainer}>
                 {alerts.slice(0, 5).map((alert, index) => (
-                  <div key={index} style={{ marginBottom: 4 }}>
+                  <div key={index} className={styles.alertItem}>
                     <Tag color={alert.type === 'error' ? 'error' : 'warning'}>
                       {alert.type === 'error' ? '错误' : '警告'}
                     </Tag>
@@ -346,7 +348,7 @@ export default function CookieManagementPage() {
                   </div>
                 ))}
                 {alerts.length > 5 && (
-                  <div style={{ fontSize: 12, color: '#999' }}>
+                  <div className={styles.alertMore}>
                     还有 {alerts.length - 5} 条告警...
                   </div>
                 )}
@@ -361,9 +363,9 @@ export default function CookieManagementPage() {
         )}
 
         {cookieStatus && (
-          <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Row gutter={16} className={styles.statsRow}>
             <Col xs={24} sm={12} md={6}>
-              <Card size="small">
+              <Card size="small" className={styles.statsCard}>
                 <Statistic
                   title="总Cookie数"
                   value={cookieStatus.totalCount}
@@ -372,7 +374,7 @@ export default function CookieManagementPage() {
               </Card>
             </Col>
             <Col xs={24} sm={12} md={6}>
-              <Card size="small">
+              <Card size="small" className={styles.statsCard}>
                 <Statistic
                   title="活跃Cookie数"
                   value={cookieStatus.activeCount}
@@ -381,7 +383,7 @@ export default function CookieManagementPage() {
               </Card>
             </Col>
             <Col xs={24} sm={12} md={6}>
-              <Card size="small">
+              <Card size="small" className={styles.statsCard}>
                 <Statistic
                   title="健康Cookie数"
                   value={cookieStatus.cookies?.filter((c: any) => c.errorCount === 0).length || 0}
@@ -390,9 +392,9 @@ export default function CookieManagementPage() {
               </Card>
             </Col>
             <Col xs={24} sm={12} md={6}>
-              <Card size="small">
+              <Card size="small" className={styles.statsCard}>
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  <div style={{ fontSize: 12, color: '#999' }}>自动轮换</div>
+                  <div className={styles.statsLabel}>自动轮换</div>
                   <Switch
                     checked={autoRotateEnabled}
                     onChange={handleToggleAutoRotate}
@@ -449,8 +451,20 @@ export default function CookieManagementPage() {
           <li>系统会自动在多个Cookie之间轮换，避免单个Cookie被限流</li>
           <li>当某个Cookie错误次数达到3次时，会自动停用</li>
           <li>建议添加多个Cookie以提高稳定性</li>
-          <li>获取Cookie方式：登录 bilibili.com -{'>'} F12 -{'>'} Network -{'>'} 复制请求头中的 Cookie</li>
-          <li>Cookie可能会过期，请定期更新</li>
+          <li><strong>获取Cookie步骤：</strong>
+            <ol style={{ marginTop: 8, paddingLeft: 20 }}>
+              <li>打开浏览器，登录 <a href="https://www.bilibili.com" target="_blank" rel="noopener noreferrer">bilibili.com</a></li>
+              <li>按 <kbd>F12</kbd> 打开开发者工具</li>
+              <li>切换到 <strong>Network</strong> 标签页</li>
+              <li>刷新页面，点击任意请求</li>
+              <li>在 <strong>Headers</strong> 中找到 <code>Cookie</code>，复制整个值</li>
+            </ol>
+          </li>
+          <li><strong>必须包含的字段：</strong>
+            <code>SESSDATA</code>、<code>bili_jct</code>、<code>buvid3</code>、<code>DedeUserID</code>
+          </li>
+          <li>Cookie可能会过期，请定期更新（通常有效期1-3个月）</li>
+          <li><strong>无需申请官方API</strong>，只需从浏览器复制Cookie即可</li>
         </ul>
       </Card>
 
@@ -542,6 +556,6 @@ export default function CookieManagementPage() {
           </Descriptions>
         )}
       </Drawer>
-    </div>
+    </PageContainer>
   );
 }

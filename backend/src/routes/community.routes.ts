@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import userPrisma from '../config/database.user';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const prisma = userPrisma;
@@ -31,7 +32,7 @@ router.get('/hot-topics', async (req, res) => {
             topicCounts[tag] = (topicCounts[tag] || 0) + 1;
           });
         } catch (e) {
-          console.error('Failed to parse tags:', post.tags);
+          logger.error('Failed to parse tags:', post.tags);
         }
       }
     });
@@ -50,7 +51,7 @@ router.get('/hot-topics', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get hot topics error:', error);
+    logger.error('Get hot topics error:', error);
     res.status(500).json({
       code: 500,
       message: '获取热门话题失败',
@@ -109,7 +110,7 @@ router.get('/active-users', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get active users error:', error);
+    logger.error('Get active users error:', error);
     res.status(500).json({
       code: 500,
       message: '获取活跃用户失败',

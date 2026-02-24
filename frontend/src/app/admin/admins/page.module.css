@@ -1,0 +1,85 @@
+.pageWrapper {
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.templateSection {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: var(--radius-sm);
+}
+
+.templateLabel {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.quickActions {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #e6f7ff;
+  border-radius: var(--radius-sm);
+}
+
+.permissionModule {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: var(--radius-md);
+}
+
+.moduleTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.tagEditInput {
+  margin-bottom: 16px;
+}
+
+.tagEditLabel {
+  margin-bottom: 8px;
+}
+
+.tagEditHint {
+  margin-top: 8px;
+  color: #999;
+  font-size: 12px;
+}
+
+.visualizationHeader {
+  margin-bottom: 16px;
+}
+
+.auditLogDetails {
+  margin: 0;
+  font-size: 12px;
+  max-width: 300px;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md);
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}

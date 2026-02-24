@@ -9,9 +9,8 @@ import userPrisma from '../config/database.user';
 const prisma = userPrisma;
 
 export interface GetHomeModulesParams {
-  position?: string;
   isActive?: boolean;
-  skipTimeFilter?: boolean; // 是否跳过定时过滤（管理端使用）
+  skipTimeFilter?: boolean;
 }
 
 /**
@@ -22,11 +21,6 @@ export interface GetHomeModulesParams {
 export async function getHomeModules(params: GetHomeModulesParams = {}): Promise<HomeModule[]> {
   try {
     const where: any = {};
-    
-    // HomeModule模型中没有position字段，忽略该参数
-    // if (params.position) {
-    //   where.position = params.position;
-    // }
     
     if (params.isActive !== undefined) {
       where.isActive = params.isActive;
@@ -40,32 +34,27 @@ export async function getHomeModules(params: GetHomeModulesParams = {}): Promise
       ],
     });
 
-    // 如果skipTimeFilter为true（管理端查看所有模块），不过滤定时下线的模块
     if (params.skipTimeFilter) {
       return modules;
     }
 
-    // 过滤定时下线的模块（用户端使用）
     const now = new Date();
     return modules.filter((module) => {
       try {
         const config = module.config ? JSON.parse(module.config) : {};
         
-        // 检查开始时间
         if (config.startDate) {
           const startDate = new Date(config.startDate);
-          if (now < startDate) return false; // 未到开始时间
+          if (now < startDate) return false;
         }
         
-        // 检查结束时间
         if (config.endDate) {
           const endDate = new Date(config.endDate);
-          if (now > endDate) return false; // 已过结束时间
+          if (now > endDate) return false;
         }
         
         return true;
       } catch (e) {
-        // 解析失败，不过滤
         return true;
       }
     });
@@ -77,7 +66,6 @@ export async function getHomeModules(params: GetHomeModulesParams = {}): Promise
       meta: error.meta,
       name: error.name,
     });
-    // 如果是表不存在或其他数据库错误，返回空数组
     if (error.message?.includes('does not exist') || 
         error.code === 'P2021' || 
         error.code === 'P2001' ||

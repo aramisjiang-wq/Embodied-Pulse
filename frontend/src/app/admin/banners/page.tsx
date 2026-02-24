@@ -56,6 +56,7 @@ import { Banner } from '@/lib/api/types';
 import type { RcFile } from 'antd/es/upload';
 import type { UploadRequestOption, UploadRequestError } from 'rc-upload/lib/interface';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -425,12 +426,12 @@ export default function AdminBannersPage() {
   ];
 
   return (
-    <div>
-      <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className={styles.pageWrapper}>
+      <Card className={styles.headerCard}>
+        <div className={styles.headerContent}>
           <div>
-            <Title level={2} style={{ margin: 0 }}>Banner管理</Title>
-            <Text type="secondary" style={{ fontSize: 14, marginTop: 8, display: 'block' }}>
+            <Title level={2} className={styles.headerTitle}>Banner管理</Title>
+            <Text type="secondary" className={styles.headerSubtitle}>
               最多支持3个Banner轮播，当前：<Text strong>{banners.length}</Text>/3
               {banners.filter(b => b.isActive).length > 0 && (
                 <span style={{ marginLeft: 16 }}>

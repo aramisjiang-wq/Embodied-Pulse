@@ -41,7 +41,7 @@ export async function cachedGet<T = unknown>(
   if (pending) {
     console.log('[cachedGet] Found pending request for:', url);
     try {
-      const result = await pending;
+      const result = await pending as T;
       console.log('[cachedGet] Pending resolved for:', url, 'type:', typeof result, 'isArray:', Array.isArray(result), 'keys:', Object.keys(result || {}));
       return result;
     } catch (error) {

@@ -18,7 +18,7 @@ export async function getBilibiliUploaders(req: Request, res: Response, next: Ne
         userId,
         contentType: 'video',
         platform: 'bilibili',
-        is_active: true
+        isActive: true
       },
       select: {
         uploaders: true
@@ -38,12 +38,12 @@ export async function getBilibiliUploaders(req: Request, res: Response, next: Ne
 
     const uniqueUploaderIds = Array.from(new Set(uploaderIds));
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         mid: {
           in: uniqueUploaderIds
         },
-        is_active: true
+        isActive: true
       },
       select: {
         id: true,
@@ -51,7 +51,7 @@ export async function getBilibiliUploaders(req: Request, res: Response, next: Ne
         name: true,
         avatar: true,
         description: true,
-        video_count: true,
+        videoCount: true,
         tags: true
       }
     });
@@ -62,7 +62,7 @@ export async function getBilibiliUploaders(req: Request, res: Response, next: Ne
       name: uploader.name,
       avatar: uploader.avatar,
       description: uploader.description,
-      video_count: uploader.video_count,
+      videoCount: uploader.videoCount,
       tags: uploader.tags ? JSON.parse(uploader.tags) : []
     }));
 
@@ -86,7 +86,7 @@ export async function getOverview(req: Request, res: Response, next: NextFunctio
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -157,7 +157,7 @@ export async function getPublishTrend(req: Request, res: Response, next: NextFun
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -224,11 +224,11 @@ export async function getPublishTrend(req: Request, res: Response, next: NextFun
     });
 
     const data = Array.from(periodMap.entries()).flatMap(([period, uploaderMap]) =>
-      Array.from(uploaderMap.entries()).map(([uploaderId, video_count]) => ({
+      Array.from(uploaderMap.entries()).map(([uploaderId, videoCount]) => ({
         period,
         uploaderId,
         uploaderName: uploaderMap.get(uploaderId) || uploaderId,
-        video_count
+        videoCount
       }))
     );
 
@@ -252,7 +252,7 @@ export async function getPlayHeatmap(req: Request, res: Response, next: NextFunc
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -337,7 +337,7 @@ export async function getRankings(req: Request, res: Response, next: NextFunctio
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -374,7 +374,7 @@ export async function getRankings(req: Request, res: Response, next: NextFunctio
     });
 
     const uploaderStats = new Map<string, {
-      video_count: number;
+      videoCount: number;
       total_play_count: number;
       total_like_count: number;
       total_favorite_count: number;
@@ -388,13 +388,13 @@ export async function getRankings(req: Request, res: Response, next: NextFunctio
       if (!uploaderId) return;
 
       const stats = (uploaderStats.get(uploaderId) as any) || {
-        video_count: 0,
+        videoCount: 0,
         total_play_count: 0,
         total_like_count: 0,
         total_favorite_count: 0
       };
 
-      stats.video_count += 1;
+      stats.videoCount += 1;
       stats.total_play_count += video.playCount || 0;
       stats.total_like_count += video.likeCount || 0;
       stats.total_favorite_count += video.favoriteCount || 0;
@@ -410,9 +410,9 @@ export async function getRankings(req: Request, res: Response, next: NextFunctio
           uploaderId,
           uploaderName: String(uploader?.name || uploaderId),
           avatar: uploader?.avatar,
-          video_count: stats.video_count,
+          videoCount: stats.videoCount,
           total_play_count: stats.total_play_count,
-          avg_play_count: stats.video_count > 0 ? Math.round(stats.total_play_count / stats.video_count) : 0,
+          avg_play_count: stats.videoCount > 0 ? Math.round(stats.total_play_count / stats.videoCount) : 0,
           total_like_count: stats.total_like_count,
           total_favorite_count: stats.total_favorite_count,
           growth_rate: 0
@@ -421,7 +421,7 @@ export async function getRankings(req: Request, res: Response, next: NextFunctio
       .sort((a, b) => {
         switch (type) {
           case 'publishCount':
-            return b.video_count - a.video_count;
+            return b.videoCount - a.videoCount;
           case 'playCount':
             return b.total_play_count - a.total_play_count;
           case 'avg_play_count':
@@ -457,7 +457,7 @@ export async function getUploaderDetail(req: Request, res: Response, next: NextF
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id: uploaderId as string },
       select: {
         id: true,
@@ -466,7 +466,7 @@ export async function getUploaderDetail(req: Request, res: Response, next: NextF
         avatar: true,
         description: true,
         tags: true,
-        video_count: true,
+        videoCount: true,
         createdAt: true,
         updatedAt: true
       }
@@ -646,7 +646,7 @@ export async function exportData(req: Request, res: Response, next: NextFunction
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -715,9 +715,9 @@ export async function exportData(req: Request, res: Response, next: NextFunction
 
 export async function getPublicBilibiliUploaders(req: Request, res: Response, next: NextFunction) {
   try {
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
-        is_active: true
+        isActive: true
       },
       select: {
         id: true,
@@ -725,11 +725,11 @@ export async function getPublicBilibiliUploaders(req: Request, res: Response, ne
         name: true,
         avatar: true,
         description: true,
-        video_count: true,
+        videoCount: true,
         tags: true
       },
       orderBy: {
-        video_count: 'desc'
+        videoCount: 'desc'
       }
     });
 
@@ -739,7 +739,7 @@ export async function getPublicBilibiliUploaders(req: Request, res: Response, ne
       name: uploader.name,
       avatar: uploader.avatar,
       description: uploader.description,
-      video_count: uploader.video_count,
+      videoCount: uploader.videoCount,
       tags: uploader.tags ? JSON.parse(uploader.tags) : []
     }));
 
@@ -758,7 +758,7 @@ export async function getPublicOverview(req: Request, res: Response, next: NextF
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -824,7 +824,7 @@ export async function getPublicPublishTrend(req: Request, res: Response, next: N
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -891,11 +891,11 @@ export async function getPublicPublishTrend(req: Request, res: Response, next: N
     });
 
     const data = Array.from(periodMap.entries()).flatMap(([period, uploaderMap]) =>
-      Array.from(uploaderMap.entries()).map(([uploaderId, video_count]) => ({
+      Array.from(uploaderMap.entries()).map(([uploaderId, videoCount]) => ({
         period,
         uploaderId,
         uploaderName: uploaderMap.get(uploaderId) || uploaderId,
-        video_count
+        videoCount
       }))
     );
 
@@ -914,7 +914,7 @@ export async function getPublicPlayHeatmap(req: Request, res: Response, next: Ne
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -992,7 +992,7 @@ export async function getPublicRankings(req: Request, res: Response, next: NextF
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploaders = await userPrisma.bilibili_uploaders.findMany({
+    const uploaders = await userPrisma.bilibiliUploader.findMany({
       where: {
         id: {
           in: uploaderIds as string[]
@@ -1029,7 +1029,7 @@ export async function getPublicRankings(req: Request, res: Response, next: NextF
     });
 
     const uploaderStats = new Map<string, {
-      video_count: number;
+      videoCount: number;
       total_play_count: number;
       total_like_count: number;
       total_favorite_count: number;
@@ -1043,13 +1043,13 @@ export async function getPublicRankings(req: Request, res: Response, next: NextF
       if (!uploaderId) return;
 
       const stats = (uploaderStats.get(uploaderId) as any) || {
-        video_count: 0,
+        videoCount: 0,
         total_play_count: 0,
         total_like_count: 0,
         total_favorite_count: 0
       };
 
-      stats.video_count += 1;
+      stats.videoCount += 1;
       stats.total_play_count += video.playCount || 0;
       stats.total_like_count += video.likeCount || 0;
       stats.total_favorite_count += video.favoriteCount || 0;
@@ -1065,9 +1065,9 @@ export async function getPublicRankings(req: Request, res: Response, next: NextF
           uploaderId,
           uploaderName: uploader?.name || uploaderId,
           avatar: uploader?.avatar,
-          video_count: stats.video_count,
+          videoCount: stats.videoCount,
           total_play_count: stats.total_play_count,
-          avg_play_count: stats.video_count > 0 ? Math.round(stats.total_play_count / stats.video_count) : 0,
+          avg_play_count: stats.videoCount > 0 ? Math.round(stats.total_play_count / stats.videoCount) : 0,
           total_like_count: stats.total_like_count,
           total_favorite_count: stats.total_favorite_count,
           growth_rate: 0
@@ -1076,7 +1076,7 @@ export async function getPublicRankings(req: Request, res: Response, next: NextF
       .sort((a, b) => {
         switch (type) {
           case 'publishCount':
-            return b.video_count - a.video_count;
+            return b.videoCount - a.videoCount;
           case 'playCount':
             return b.total_play_count - a.total_play_count;
           case 'avg_play_count':
@@ -1107,7 +1107,7 @@ export async function getPublicUploaderDetail(req: Request, res: Response, next:
       return sendError(res, 400, '请选择UP主');
     }
 
-    const uploader = await userPrisma.bilibili_uploaders.findUnique({
+    const uploader = await userPrisma.bilibiliUploader.findUnique({
       where: { id: uploaderId as string },
       select: {
         id: true,
@@ -1116,7 +1116,7 @@ export async function getPublicUploaderDetail(req: Request, res: Response, next:
         avatar: true,
         description: true,
         tags: true,
-        video_count: true,
+        videoCount: true,
         createdAt: true,
         updatedAt: true
       }

@@ -1,202 +1,96 @@
-/**
- * 订阅管理页面
- */
-
 'use client';
 
+import React from 'react';
 import { useEffect, useState } from 'react';
-import { Layout, Card, Button, Space, Tag, Empty, Spin, Modal, Form, Input, Select, Switch, Tabs, Row, Col, Popconfirm, App, Dropdown, MenuProps, Badge, Checkbox } from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  StarOutlined,
+import {
+  Switch, Modal, Form, Input, Select, App, Card,
+  Dropdown, MenuProps, Badge, Checkbox, Popconfirm, Spin, Button,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
   FileTextOutlined,
   PlayCircleOutlined,
   GithubOutlined,
   RobotOutlined,
   TeamOutlined,
-  BellOutlined,
   SyncOutlined,
-  FolderOutlined,
-  FolderAddOutlined,
   MoreOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
+  StarOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { subscriptionApi, Subscription } from '@/lib/api/subscription';
-import apiClient from '@/lib/api/client';
 import dayjs from 'dayjs';
 import { SubscriptionRecommendations } from '@/components/SubscriptionRecommendations';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
-const { Content } = Layout;
 const { TextArea } = Input;
-const { TabPane } = Tabs;
 
-export interface SubscriptionGroup {
-  id: string;
-  name: string;
-  description?: string;
-  subscriptionIds: string[];
-  color?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+const FILTER_TABS = [
+  { key: 'all', label: '全部' },
+  { key: 'paper', label: '论文', icon: <FileTextOutlined /> },
+  { key: 'video', label: '视频', icon: <PlayCircleOutlined /> },
+  { key: 'repo', label: 'GitHub', icon: <GithubOutlined /> },
+  { key: 'huggingface', label: 'HF 模型', icon: <RobotOutlined /> },
+  { key: 'job', label: '招聘', icon: <TeamOutlined /> },
+];
+
+type TypeConfigEntry = { label: string; icon: React.ReactNode; cls: string };
+
+const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
+  paper: { label: '论文', icon: <FileTextOutlined />, cls: styles.typePaper },
+  video: { label: '视频', icon: <PlayCircleOutlined />, cls: styles.typeVideo },
+  repo: { label: 'GitHub', icon: <GithubOutlined />, cls: styles.typeRepo },
+  huggingface: { label: 'HF 模型', icon: <RobotOutlined />, cls: styles.typeHF },
+  job: { label: '招聘', icon: <TeamOutlined />, cls: styles.typeJob },
+};
 
 export default function SubscriptionsPage() {
   const { message } = App.useApp();
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [groups, setGroups] = useState<SubscriptionGroup[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('all');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [modalVisible, setModalVisible] = useState(false);
-  const [groupModalVisible, setGroupModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
-  const [editingGroup, setEditingGroup] = useState<SubscriptionGroup | null>(null);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [selectedSubscriptions, setSelectedSubscriptions] = useState<Set<string>>(new Set());
   const [form] = Form.useForm();
-  const [groupForm] = Form.useForm();
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user) {
       message.warning('请先登录');
       router.push('/login');
       return;
     }
     loadSubscriptions();
-    loadGroups();
-  }, [user, activeTab, selectedGroup]);
+  }, [hydrated, user, activeTab]);
 
   const loadSubscriptions = async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
-      const params: any = {
-        page: 1,
-        size: 100,
-      };
-      
-      if (activeTab !== 'all') {
-        params.contentType = activeTab;
-      }
-      
-      console.log('Loading subscriptions with params:', params);
+      const params: Record<string, unknown> = { page: 1, size: 100 };
+      if (activeTab !== 'all') params.contentType = activeTab;
       const data = await subscriptionApi.getSubscriptions(params);
-      console.log('Subscriptions API response:', data);
-      
-      let subscriptionsList: Subscription[] = [];
-      if (data && Array.isArray(data.items)) {
-        subscriptionsList = data.items;
-      } else if (Array.isArray(data)) {
-        subscriptionsList = data;
-      }
-      
-      console.log('Parsed subscriptions:', subscriptionsList);
-      setSubscriptions(subscriptionsList);
-    } catch (error: any) {
-      console.error('Load subscriptions error:', error);
+      let list: Subscription[] = [];
+      if (data && Array.isArray(data.items)) list = data.items;
+      else if (Array.isArray(data)) list = data;
+      setSubscriptions(list);
+    } catch {
       setSubscriptions([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadGroups = () => {
-    const saved = localStorage.getItem('subscriptionGroups');
-    if (saved) {
-      setGroups(JSON.parse(saved));
-    }
-  };
-
-  const saveGroups = (newGroups: SubscriptionGroup[]) => {
-    setGroups(newGroups);
-    localStorage.setItem('subscriptionGroups', JSON.stringify(newGroups));
-  };
-
-  const handleCreateGroup = () => {
-    setEditingGroup(null);
-    groupForm.resetFields();
-    setGroupModalVisible(true);
-  };
-
-  const handleEditGroup = (group: SubscriptionGroup) => {
-    setEditingGroup(group);
-    groupForm.setFieldsValue({
-      name: group.name,
-      description: group.description,
-      color: group.color || 'blue',
-    });
-    setGroupModalVisible(true);
-  };
-
-  const handleDeleteGroup = (groupId: string) => {
-    const newGroups = groups.filter(g => g.id !== groupId);
-    saveGroups(newGroups);
-    if (selectedGroup === groupId) {
-      setSelectedGroup(null);
-    }
-    message.success('分组已删除');
-  };
-
-  const handleGroupSubmit = async (values: any) => {
-    if (editingGroup) {
-      const updatedGroups = groups.map(g => 
-        g.id === editingGroup.id 
-          ? { ...g, ...values, updatedAt: new Date().toISOString() }
-          : g
-      );
-      saveGroups(updatedGroups);
-      message.success('分组更新成功');
-    } else {
-      const newGroup: SubscriptionGroup = {
-        id: `group_${Date.now()}`,
-        name: values.name,
-        description: values.description,
-        color: values.color || 'blue',
-        subscriptionIds: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      saveGroups([...groups, newGroup]);
-      message.success('分组创建成功');
-    }
-    setGroupModalVisible(false);
-    groupForm.resetFields();
-  };
-
-  const handleAddToGroup = (subscriptionId: string, groupId: string) => {
-    const updatedGroups = groups.map(g => 
-      g.id === groupId 
-        ? { ...g, subscriptionIds: [...g.subscriptionIds, subscriptionId], updatedAt: new Date().toISOString() }
-        : g
-    );
-    saveGroups(updatedGroups);
-    message.success('已添加到分组');
-  };
-
-  const handleRemoveFromGroup = (subscriptionId: string, groupId: string) => {
-    const updatedGroups = groups.map(g => 
-      g.id === groupId 
-        ? { ...g, subscriptionIds: g.subscriptionIds.filter(id => id !== subscriptionId), updatedAt: new Date().toISOString() }
-        : g
-    );
-    saveGroups(updatedGroups);
-    message.success('已从分组移除');
-  };
-
-  const getGroupSubscriptions = () => {
-    if (!selectedGroup) return subscriptions;
-    const group = groups.find(g => g.id === selectedGroup);
-    if (!group) return subscriptions;
-    return subscriptions.filter(s => group.subscriptionIds.includes(s.id));
   };
 
   const handleBatchAction = async (action: string) => {
@@ -204,15 +98,13 @@ export default function SubscriptionsPage() {
       message.warning('请先选择订阅');
       return;
     }
-
     try {
       setLoading(true);
       const ids = Array.from(selectedSubscriptions);
-
       switch (action) {
         case 'sync':
           await Promise.all(ids.map(id => subscriptionApi.syncSubscription(id)));
-          message.success('批量同步成功');
+          message.success('批量同步完成');
           break;
         case 'activate':
           await Promise.all(ids.map(id => subscriptionApi.updateSubscription(id, { isActive: true })));
@@ -226,54 +118,22 @@ export default function SubscriptionsPage() {
           await Promise.all(ids.map(id => subscriptionApi.deleteSubscription(id)));
           message.success('批量删除成功');
           break;
-        case 'addToGroup':
-          if (!selectedGroup) {
-            message.warning('请先选择分组');
-            return;
-          }
-          ids.forEach(id => handleAddToGroup(id, selectedGroup));
-          message.success('批量添加到分组成功');
-          break;
       }
-
       setSelectedSubscriptions(new Set());
       loadSubscriptions();
-    } catch (error: any) {
-      message.error(error.message || '批量操作失败');
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : '操作失败');
     } finally {
       setLoading(false);
     }
   };
 
-  const getBatchMenuItems: MenuProps['items'] = [
-    {
-      key: 'sync',
-      label: '立即同步',
-      icon: <SyncOutlined />,
-    },
-    {
-      key: 'activate',
-      label: '批量启用',
-      icon: <BellOutlined />,
-    },
-    {
-      key: 'deactivate',
-      label: '批量停用',
-    },
-    {
-      key: 'addToGroup',
-      label: '添加到分组',
-      icon: <FolderOutlined />,
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'delete',
-      label: '批量删除',
-      icon: <DeleteOutlined />,
-      danger: true,
-    },
+  const batchMenuItems: MenuProps['items'] = [
+    { key: 'sync', label: '立即同步', icon: <SyncOutlined /> },
+    { key: 'activate', label: '批量启用', icon: <BellOutlined /> },
+    { key: 'deactivate', label: '批量停用' },
+    { type: 'divider' },
+    { key: 'delete', label: '批量删除', icon: <DeleteOutlined />, danger: true },
   ];
 
   const handleCreate = () => {
@@ -298,22 +158,10 @@ export default function SubscriptionsPage() {
   const handleDelete = async (id: string) => {
     try {
       await subscriptionApi.deleteSubscription(id);
-      message.success('删除成功');
+      message.success('已删除');
       loadSubscriptions();
-    } catch (error: any) {
-      message.error(error.message || '删除失败');
-    }
-  };
-
-  const handleToggleActive = async (subscription: Subscription) => {
-    try {
-      await subscriptionApi.updateSubscription(subscription.id, {
-        isActive: !subscription.isActive,
-      });
-      message.success(subscription.isActive ? '已停用' : '已启用');
-      loadSubscriptions();
-    } catch (error: any) {
-      message.error(error.message || '操作失败');
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : '删除失败');
     }
   };
 
@@ -321,560 +169,378 @@ export default function SubscriptionsPage() {
     try {
       setSyncingIds(prev => new Set(prev).add(subscriptionId));
       const result = await subscriptionApi.syncSubscription(subscriptionId);
-      message.success(`同步成功：匹配${result.matchedCount}条，新增${result.newCount}条`);
+      message.success(`同步完成：匹配 ${result.matchedCount} 条，新增 ${result.newCount} 条`);
       loadSubscriptions();
-    } catch (error: any) {
-      message.error(error.message || '同步失败');
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : '同步失败');
     } finally {
       setSyncingIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(subscriptionId);
-        return newSet;
+        const s = new Set(prev);
+        s.delete(subscriptionId);
+        return s;
       });
     }
   };
 
-  const handleViewDetail = (subscriptionId: string) => {
-    router.push(`/subscriptions/${subscriptionId}`);
+  const handleViewDetail = (id: string) => {
+    router.push(`/subscriptions/${id}`);
   };
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: {
+    contentType: string;
+    keywords: string | string[];
+    tags?: string | string[];
+    authors?: string | string[];
+    notifyEnabled?: boolean;
+    isActive?: boolean;
+  }) => {
     try {
-      const keywords = values.keywords 
-        ? values.keywords.split(',').map((k: string) => k.trim()).filter((k: string) => k)
-        : [];
-      const tags = values.tags 
-        ? values.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t)
-        : [];
-      const authors = values.authors 
-        ? values.authors.split(',').map((a: string) => a.trim()).filter((a: string) => a)
-        : [];
+      const keywords = Array.isArray(values.keywords)
+        ? values.keywords
+        : values.keywords
+          ? values.keywords.split(',').map(k => k.trim()).filter(k => k)
+          : [];
+      const tags = Array.isArray(values.tags)
+        ? values.tags
+        : values.tags
+          ? values.tags.split(',').map(t => t.trim()).filter(t => t)
+          : [];
+      const authors = Array.isArray(values.authors)
+        ? values.authors
+        : values.authors
+          ? values.authors.split(',').map(a => a.trim()).filter(a => a)
+          : [];
 
+      const contentType = values.contentType as 'paper' | 'video' | 'repo' | 'job' | 'huggingface' | 'post';
       if (editingSubscription) {
-        // 更新订阅时，后端期望接收数组格式
         await subscriptionApi.updateSubscription(editingSubscription.id, {
-          contentType: values.contentType,
-          keywords: keywords, // 直接传递数组
-          tags: tags.length > 0 ? tags : undefined, // 直接传递数组
-          authors: authors.length > 0 ? authors : undefined, // 直接传递数组
+          contentType,
+          keywords,
+          tags,
+          authors,
           notifyEnabled: values.notifyEnabled,
           isActive: values.isActive,
         });
         message.success('更新成功');
       } else {
-        // 创建订阅时，后端期望接收数组格式，而不是JSON字符串
         await subscriptionApi.createSubscription({
-          contentType: values.contentType,
-          keywords: keywords, // 直接传递数组
-          tags: tags.length > 0 ? tags : undefined, // 直接传递数组
-          authors: authors.length > 0 ? authors : undefined, // 直接传递数组
+          contentType,
+          keywords,
+          tags,
+          authors,
           notifyEnabled: values.notifyEnabled ?? true,
         });
         message.success('创建成功');
       }
-      
       setModalVisible(false);
       form.resetFields();
       loadSubscriptions();
-    } catch (error: any) {
-      message.error(error.message || '操作失败');
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : '操作失败');
     }
   };
 
-  const getContentTypeIcon = (type: string) => {
-    switch (type) {
-      case 'paper':
-        return <FileTextOutlined />;
-      case 'video':
-        return <PlayCircleOutlined />;
-      case 'repo':
-        return <GithubOutlined />;
-      case 'huggingface':
-        return <RobotOutlined />;
-      case 'job':
-        return <TeamOutlined />;
-      default:
-        return <StarOutlined />;
-    }
+  const toggleSelect = (id: string, checked: boolean) => {
+    const next = new Set(selectedSubscriptions);
+    checked ? next.add(id) : next.delete(id);
+    setSelectedSubscriptions(next);
   };
 
-  const getContentTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      paper: '论文',
-      video: '视频',
-      repo: 'GitHub项目',
-      huggingface: 'HuggingFace模型',
-      job: '招聘岗位',
-    };
-    return labels[type] || type;
-  };
+  if (!user) return null;
 
-  const getContentTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      paper: 'blue',
-      video: 'green',
-      repo: 'purple',
-      huggingface: 'orange',
-      job: 'red',
-    };
-    return colors[type] || 'default';
-  };
-
-  // 按类型分组
-  const groupedSubscriptions = subscriptions.reduce((acc, sub) => {
-    if (!acc[sub.contentType]) {
-      acc[sub.contentType] = [];
-    }
-    acc[sub.contentType].push(sub);
-    return acc;
-  }, {} as Record<string, Subscription[]>);
-
-  const stats = {
-    total: subscriptions.length,
-    active: subscriptions.filter(s => s.isActive).length,
-    paper: groupedSubscriptions.paper?.length || 0,
-    video: groupedSubscriptions.video?.length || 0,
-    repo: groupedSubscriptions.repo?.length || 0,
-    huggingface: groupedSubscriptions.huggingface?.length || 0,
-    job: groupedSubscriptions.job?.length || 0,
-  };
-
-  if (!user) {
-    return null;
-  }
+  const displayedSubs = subscriptions;
+  const totalNew = subscriptions.reduce((sum, s) => sum + (s.newCount || 0), 0);
+  const totalMatched = subscriptions.reduce((sum, s) => sum + (s.totalMatched || 0), 0);
+  const activeCount = subscriptions.filter(s => s.isActive).length;
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>我的订阅</h1>
-          <p style={{ color: '#666', marginBottom: 16 }}>
-            管理你的内容订阅，系统会自动为你推送匹配的内容
-          </p>
+    <PageContainer loading={loading && subscriptions.length === 0}>
+      <div className={styles.container}>
+
+        {/* Header */}
+        <div className={styles.pageHeader}>
+          <div>
+            <h1 className={styles.pageTitle}>订阅管理</h1>
+            <p className={styles.pageDesc}>自动追踪并推送匹配你兴趣的最新内容</p>
+          </div>
+          <button className={styles.btnPrimary} onClick={handleCreate}>
+            <PlusOutlined /> 新建订阅
+          </button>
         </div>
 
-        {/* 统计卡片 */}
-        <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={8} md={6}>
-            <Card>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>
-                {stats.total}
-              </div>
-              <div style={{ color: '#666', marginTop: 4 }}>总订阅数</div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8} md={6}>
-            <Card>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>
-                {stats.active}
-              </div>
-              <div style={{ color: '#666', marginTop: 4 }}>活跃订阅</div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8} md={6}>
-            <Card>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#722ed1' }}>
-                {subscriptions.reduce((sum, s) => sum + (s.newCount || 0), 0)}
-              </div>
-              <div style={{ color: '#666', marginTop: 4 }}>新内容</div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8} md={6}>
-            <Card>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>
-                {subscriptions.reduce((sum, s) => sum + (s.totalMatched || 0), 0)}
-              </div>
-              <div style={{ color: '#666', marginTop: 4 }}>总匹配数</div>
-            </Card>
-          </Col>
-        </Row>
+        {/* Stats */}
+        <div className={styles.statsBar}>
+          {[
+            { value: subscriptions.length, label: '全部订阅' },
+            { value: activeCount, label: '已启用', cls: styles.statGreen },
+            { value: totalNew, label: '新内容', cls: styles.statBlue },
+            { value: totalMatched, label: '总匹配' },
+          ].map(({ value, label, cls }) => (
+            <div key={label} className={styles.statItem}>
+              <span className={`${styles.statValue}${cls ? ' ' + cls : ''}`}>{value}</span>
+              <span className={styles.statLabel}>{label}</span>
+            </div>
+          ))}
+        </div>
 
-        {/* 操作栏 */}
-        <Card style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-            <Space wrap>
-              <Tabs
-                activeKey={activeTab}
-                onChange={setActiveTab}
-                items={[
-                  { key: 'all', label: '全部' },
-                  { key: 'paper', label: '论文', icon: <FileTextOutlined /> },
-                  { key: 'video', label: '视频', icon: <PlayCircleOutlined /> },
-                  { key: 'repo', label: 'GitHub', icon: <GithubOutlined /> },
-                  { key: 'huggingface', label: 'HuggingFace', icon: <RobotOutlined /> },
-                  { key: 'job', label: '招聘', icon: <TeamOutlined /> },
-                ]}
-              />
-              
-              {groups.length > 0 && (
-                <Select
-                  placeholder="选择分组"
-                  style={{ width: 150 }}
-                  allowClear
-                  value={selectedGroup}
-                  onChange={setSelectedGroup}
-                  options={[
-                    { value: null, label: '全部分组' },
-                    ...groups.map(g => ({ value: g.id, label: g.name })),
-                  ]}
-                />
-              )}
-            </Space>
-
-            <Space>
-              {selectedSubscriptions.size > 0 && (
-                <Badge count={selectedSubscriptions.size} offset={[10, 0]}>
-                  <Dropdown menu={{ items: getBatchMenuItems, onClick: ({ key }) => handleBatchAction(key) }}>
-                    <Button>
-                      批量操作 <MoreOutlined />
-                    </Button>
-                  </Dropdown>
-                </Badge>
-              )}
-              
-              <Button
-                icon={viewMode === 'card' ? <UnorderedListOutlined /> : <AppstoreOutlined />}
-                onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
+        {/* Toolbar */}
+        <div className={styles.toolbar}>
+          <div className={styles.filterTabs}>
+            {FILTER_TABS.map(tab => (
+              <button
+                key={tab.key}
+                className={`${styles.filterTab}${activeTab === tab.key ? ' ' + styles.filterTabActive : ''}`}
+                onClick={() => setActiveTab(tab.key)}
               >
-                {viewMode === 'card' ? '列表' : '卡片'}
-              </Button>
-              
-              <Button
-                icon={<FolderAddOutlined />}
-                onClick={handleCreateGroup}
-              >
-                新建分组
-              </Button>
-              
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreate}
-              >
-                新建订阅
-              </Button>
-            </Space>
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
           </div>
-        </Card>
 
-        {/* 订阅列表 */}
-        <Spin spinning={loading}>
-          {getGroupSubscriptions().length === 0 ? (
-            <Card>
-              <Empty
-                description="暂无订阅"
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
+          <div className={styles.toolbarRight}>
+            {selectedSubscriptions.size > 0 && (
+              <Badge count={selectedSubscriptions.size} size="small">
+                <Dropdown menu={{ items: batchMenuItems, onClick: ({ key }) => handleBatchAction(key) }}>
+                  <Button size="small">批量操作 <MoreOutlined /></Button>
+                </Dropdown>
+              </Badge>
+            )}
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewToggleBtn}${viewMode === 'card' ? ' ' + styles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('card')}
+                title="卡片视图"
               >
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  创建第一个订阅
-                </Button>
-              </Empty>
-            </Card>
-          ) : (
-            <>
-              {viewMode === 'card' ? (
-                <Row gutter={[16, 16]}>
-                  {getGroupSubscriptions().map((subscription) => {
-                    const keywords = subscription.keywords 
-                      ? JSON.parse(subscription.keywords)
-                      : [];
-                    const tags = subscription.tags 
-                      ? JSON.parse(subscription.tags)
-                      : [];
-                    const authors = subscription.authors 
-                      ? JSON.parse(subscription.authors)
-                      : [];
-                    const isSelected = selectedSubscriptions.has(subscription.id);
-                    const group = groups.find(g => g.subscriptionIds.includes(subscription.id));
+                <AppstoreOutlined />
+              </button>
+              <button
+                className={`${styles.viewToggleBtn}${viewMode === 'list' ? ' ' + styles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('list')}
+                title="列表视图"
+              >
+                <UnorderedListOutlined />
+              </button>
+            </div>
+          </div>
+        </div>
 
-                    return (
-                      <Col xs={24} sm={12} md={8} key={subscription.id}>
-                        <Card
-                          hoverable
-                          style={{ 
-                            borderRadius: 12,
-                            border: isSelected ? '2px solid #1890ff' : undefined,
-                            position: 'relative',
-                          }}
-                          onClick={() => handleViewDetail(subscription.id)}
+        {/* Content */}
+        <Spin spinning={loading}>
+          {displayedSubs.length === 0 ? (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}><StarOutlined /></div>
+              <p className={styles.emptyTitle}>还没有订阅</p>
+              <p className={styles.emptyDesc}>创建订阅后，系统会自动追踪并推送匹配的内容</p>
+              <button className={styles.btnPrimary} onClick={handleCreate}>
+                <PlusOutlined /> 创建第一个订阅
+              </button>
+            </div>
+          ) : viewMode === 'card' ? (
+            <div className={styles.cardGrid}>
+              {displayedSubs.map(sub => {
+                const keywords: string[] = sub.keywords ? JSON.parse(sub.keywords) : [];
+                const isSelected = selectedSubscriptions.has(sub.id);
+                const tc = TYPE_CONFIG[sub.contentType];
+
+                return (
+                  <div
+                    key={sub.id}
+                    className={`${styles.subCard}${isSelected ? ' ' + styles.subCardSelected : ''}`}
+                    onClick={() => handleViewDetail(sub.id)}
+                  >
+                    <div
+                      className={styles.cardCheckboxWrap}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        className={styles.cardCheckbox}
+                        checked={isSelected}
+                        onChange={e => toggleSelect(sub.id, e.target.checked)}
+                      />
+                    </div>
+
+                    <div className={styles.cardHead}>
+                      {tc && (
+                        <span className={`${styles.typeBadge} ${tc.cls}`}>
+                          {tc.icon}&nbsp;{tc.label}
+                        </span>
+                      )}
+                      <span className={styles.cardStatus}>
+                        <span className={`${styles.statusDot} ${sub.isActive ? styles.dotActive : styles.dotInactive}`} />
+                        <span className={styles.statusText}>{sub.isActive ? '运行中' : '已停用'}</span>
+                      </span>
+                    </div>
+
+                    <div className={styles.keywordsArea}>
+                      {keywords.slice(0, 4).map((kw, i) => (
+                        <span key={i} className={styles.kwTag}>{kw}</span>
+                      ))}
+                      {keywords.length > 4 && <span className={styles.kwMore}>+{keywords.length - 4}</span>}
+                      {keywords.length === 0 && <span className={styles.kwEmpty}>暂无关键词</span>}
+                    </div>
+
+                    <div className={styles.cardFoot}>
+                      <div className={styles.cardMetrics}>
+                        <span className={styles.metric}>
+                          <span className={`${styles.metricVal}${(sub.newCount || 0) > 0 ? ' ' + styles.metricNew : ''}`}>
+                            {sub.newCount || 0}
+                          </span>
+                          <span className={styles.metricLbl}>新</span>
+                        </span>
+                        <span className={styles.metricDiv} />
+                        <span className={styles.metric}>
+                          <span className={styles.metricVal}>{sub.totalMatched || 0}</span>
+                          <span className={styles.metricLbl}>匹配</span>
+                        </span>
+                      </div>
+
+                      <div className={styles.cardActs} onClick={e => e.stopPropagation()}>
+                        <button
+                          className={styles.actBtn}
+                          onClick={() => handleSync(sub.id)}
+                          title="立即同步"
+                          disabled={syncingIds.has(sub.id)}
                         >
-                          <Checkbox
-                            style={{ position: 'absolute', top: 12, right: 12, zIndex: 1 }}
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const newSelected = new Set(selectedSubscriptions);
-                              if (e.target.checked) {
-                                newSelected.add(subscription.id);
-                              } else {
-                                newSelected.delete(subscription.id);
-                              }
-                              setSelectedSubscriptions(newSelected);
-                            }}
-                          />
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                            <Tag 
-                              icon={getContentTypeIcon(subscription.contentType)}
-                              color={getContentTypeColor(subscription.contentType)}
-                              style={{ fontSize: 14, padding: '4px 12px' }}
-                            >
-                              {getContentTypeLabel(subscription.contentType)}
-                            </Tag>
-                            <Tag color={subscription.isActive ? 'success' : 'default'}>
-                              {subscription.isActive ? '已启用' : '已停用'}
-                            </Tag>
-                            {group && (
-                              <Tag icon={<FolderOutlined />} color={group.color}>
-                                {group.name}
-                              </Tag>
-                            )}
-                          </div>
+                          <SyncOutlined spin={syncingIds.has(sub.id)} />
+                        </button>
+                        <button
+                          className={styles.actBtn}
+                          onClick={() => handleEdit(sub)}
+                          title="编辑"
+                        >
+                          <EditOutlined />
+                        </button>
+                        <Popconfirm
+                          title="确定要删除这个订阅吗？"
+                          onConfirm={() => handleDelete(sub.id)}
+                        >
+                          <button
+                            className={`${styles.actBtn} ${styles.actBtnDanger}`}
+                            onClick={e => e.stopPropagation()}
+                            title="删除"
+                          >
+                            <DeleteOutlined />
+                          </button>
+                        </Popconfirm>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.listContainer}>
+              {displayedSubs.map(sub => {
+                const keywords: string[] = sub.keywords ? JSON.parse(sub.keywords) : [];
+                const isSelected = selectedSubscriptions.has(sub.id);
+                const tc = TYPE_CONFIG[sub.contentType];
 
-                          {keywords.length > 0 && (
-                            <div style={{ marginBottom: 8 }}>
-                              <strong>关键词：</strong>
-                              <Space size={[4, 4]} wrap>
-                                {keywords.slice(0, 3).map((kw: string, idx: number) => (
-                                  <Tag key={idx} style={{ fontSize: 11 }}>{kw}</Tag>
-                                ))}
-                                {keywords.length > 3 && <Tag>+{keywords.length - 3}</Tag>}
-                              </Space>
-                            </div>
-                          )}
+                return (
+                  <div
+                    key={sub.id}
+                    className={`${styles.listItem}${isSelected ? ' ' + styles.listItemSelected : ''}`}
+                    onClick={() => handleViewDetail(sub.id)}
+                  >
+                    <div onClick={e => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={e => toggleSelect(sub.id, e.target.checked)}
+                      />
+                    </div>
 
-                          <div style={{ display: 'flex', gap: 16, marginTop: 12, color: '#666', fontSize: 12 }}>
-                            <span>新内容: <strong style={{ color: '#1890ff' }}>{subscription.newCount || 0}</strong></span>
-                            <span>总匹配: <strong>{subscription.totalMatched || 0}</strong></span>
-                          </div>
+                    {tc && (
+                      <span className={`${styles.typeBadge} ${tc.cls}`}>
+                        {tc.icon}&nbsp;{tc.label}
+                      </span>
+                    )}
 
-                          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                            <Button
-                              size="small"
-                              icon={<SyncOutlined />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSync(subscription.id);
-                              }}
-                              loading={syncingIds.has(subscription.id)}
-                            >
-                              同步
-                            </Button>
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(subscription);
-                              }}
-                            >
-                              编辑
-                            </Button>
-                            <Popconfirm
-                              title="确定要删除这个订阅吗？"
-                              onConfirm={(e) => {
-                                e?.stopPropagation();
-                                handleDelete(subscription.id);
-                              }}
-                            >
-                              <Button 
-                                size="small"
-                                danger
-                                icon={<DeleteOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                              >
-                                删除
-                              </Button>
-                            </Popconfirm>
-                          </div>
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              ) : (
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {getGroupSubscriptions().map((subscription) => {
-                    const keywords = subscription.keywords 
-                      ? JSON.parse(subscription.keywords)
-                      : [];
-                    const tags = subscription.tags 
-                      ? JSON.parse(subscription.tags)
-                      : [];
-                    const authors = subscription.authors 
-                      ? JSON.parse(subscription.authors)
-                      : [];
-                    const isSelected = selectedSubscriptions.has(subscription.id);
-                    const group = groups.find(g => g.subscriptionIds.includes(subscription.id));
+                    <span className={`${styles.statusDot} ${sub.isActive ? styles.dotActive : styles.dotInactive}`} />
 
-                    return (
-                      <Card
-                        key={subscription.id}
-                        hoverable
-                        style={{ 
-                          borderRadius: 12,
-                          border: isSelected ? '2px solid #1890ff' : undefined,
-                        }}
-                        onClick={() => handleViewDetail(subscription.id)}
+                    <div className={styles.listKeywords}>
+                      {keywords.slice(0, 6).map((kw, i) => (
+                        <span key={i} className={styles.kwTag}>{kw}</span>
+                      ))}
+                      {keywords.length > 6 && <span className={styles.kwMore}>+{keywords.length - 6}</span>}
+                      {keywords.length === 0 && <span className={styles.kwEmpty}>暂无关键词</span>}
+                    </div>
+
+                    <div className={styles.listMetrics}>
+                      {(sub.newCount || 0) > 0 && (
+                        <span className={styles.newBadge}>{sub.newCount} 新</span>
+                      )}
+                      <span className={styles.listStat}>{sub.totalMatched || 0} 匹配</span>
+                      {sub.lastSyncAt && (
+                        <span className={styles.listDate}>{dayjs(sub.lastSyncAt).format('MM-DD HH:mm')}</span>
+                      )}
+                    </div>
+
+                    <div className={styles.listActs} onClick={e => e.stopPropagation()}>
+                      <button
+                        className={styles.actBtn}
+                        onClick={() => handleSync(sub.id)}
+                        title="同步"
+                        disabled={syncingIds.has(sub.id)}
                       >
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const newSelected = new Set(selectedSubscriptions);
-                              if (e.target.checked) {
-                                newSelected.add(subscription.id);
-                              } else {
-                                newSelected.delete(subscription.id);
-                              }
-                              setSelectedSubscriptions(newSelected);
-                            }}
-                          />
-                          
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                              <Tag 
-                                icon={getContentTypeIcon(subscription.contentType)}
-                                color={getContentTypeColor(subscription.contentType)}
-                                style={{ fontSize: 14, padding: '4px 12px' }}
-                              >
-                                {getContentTypeLabel(subscription.contentType)}
-                              </Tag>
-                              <Tag color={subscription.isActive ? 'success' : 'default'}>
-                                {subscription.isActive ? '已启用' : '已停用'}
-                              </Tag>
-                              {subscription.notifyEnabled && (
-                                <Tag icon={<BellOutlined />} color="blue">通知</Tag>
-                              )}
-                              {subscription.syncEnabled && (
-                                <Tag icon={<SyncOutlined />} color="green">同步</Tag>
-                              )}
-                              {group && (
-                                <Tag icon={<FolderOutlined />} color={group.color}>
-                                  {group.name}
-                                </Tag>
-                              )}
-                            </div>
-
-                            {keywords.length > 0 && (
-                              <div style={{ marginBottom: 8 }}>
-                                <strong>关键词：</strong>
-                                <Space size={[8, 8]} wrap>
-                                  {keywords.map((kw: string, idx: number) => (
-                                    <Tag key={idx}>{kw}</Tag>
-                                  ))}
-                                </Space>
-                              </div>
-                            )}
-
-                            {tags.length > 0 && (
-                              <div style={{ marginBottom: 8 }}>
-                                <strong>标签：</strong>
-                                <Space size={[8, 8]} wrap>
-                                  {tags.map((tag: string, idx: number) => (
-                                    <Tag key={idx} color="blue">{tag}</Tag>
-                                  ))}
-                                </Space>
-                              </div>
-                            )}
-
-                            {authors.length > 0 && (
-                              <div style={{ marginBottom: 8 }}>
-                                <strong>作者：</strong>
-                                <Space size={[8, 8]} wrap>
-                                  {authors.map((author: string, idx: number) => (
-                                    <Tag key={idx} color="purple">{author}</Tag>
-                                  ))}
-                                </Space>
-                              </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: 24, marginTop: 12, color: '#666', fontSize: 12 }}>
-                              <span>新内容: <strong style={{ color: '#1890ff' }}>{subscription.newCount || 0}</strong></span>
-                              <span>总匹配: <strong>{subscription.totalMatched || 0}</strong></span>
-                              {subscription.lastSyncAt && (
-                                <span>最后同步: {dayjs(subscription.lastSyncAt).format('YYYY-MM-DD HH:mm')}</span>
-                              )}
-                            </div>
-                          </div>
-
-                          <Space direction="vertical">
-                            <Button
-                              type="link"
-                              icon={<SyncOutlined />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSync(subscription.id);
-                              }}
-                              loading={syncingIds.has(subscription.id)}
-                            >
-                              立即同步
-                            </Button>
-                            <Button
-                              type="link"
-                              icon={<EditOutlined />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(subscription);
-                              }}
-                            >
-                              编辑
-                            </Button>
-                            <Popconfirm
-                              title="确定要删除这个订阅吗？"
-                              onConfirm={(e) => {
-                                e?.stopPropagation();
-                                handleDelete(subscription.id);
-                              }}
-                            >
-                              <Button 
-                                type="link" 
-                                danger 
-                                icon={<DeleteOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                              >
-                                删除
-                              </Button>
-                            </Popconfirm>
-                          </Space>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </Space>
-              )}
-            </>
+                        <SyncOutlined spin={syncingIds.has(sub.id)} />
+                      </button>
+                      <button
+                        className={styles.actBtn}
+                        onClick={() => handleEdit(sub)}
+                        title="编辑"
+                      >
+                        <EditOutlined />
+                      </button>
+                      <Popconfirm
+                        title="确定删除？"
+                        onConfirm={() => handleDelete(sub.id)}
+                      >
+                        <button
+                          className={`${styles.actBtn} ${styles.actBtnDanger}`}
+                          onClick={e => e.stopPropagation()}
+                          title="删除"
+                        >
+                          <DeleteOutlined />
+                        </button>
+                      </Popconfirm>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Spin>
 
-        {/* 订阅推荐 */}
+        {/* Recommendations */}
         {subscriptions.length > 0 && (
-          <div style={{ marginTop: 32 }}>
-            <SubscriptionRecommendations onCreateSubscription={handleSubmit} />
+          <div className={styles.recsSection}>
+            <Card styles={{ body: { padding: '20px 24px' } }}>
+              <SubscriptionRecommendations
+                onCreateSubscription={async (data) => {
+                  await handleSubmit({
+                    contentType: data.contentType,
+                    keywords: data.keywords,
+                    tags: data.tags,
+                    authors: data.authors,
+                    notifyEnabled: data.notifyEnabled ?? true,
+                  });
+                }}
+              />
+            </Card>
           </div>
         )}
 
-        {/* 创建/编辑订阅弹窗 */}
+        {/* Create / Edit Subscription Modal */}
         <Modal
           title={editingSubscription ? '编辑订阅' : '新建订阅'}
           open={modalVisible}
           onOk={() => form.submit()}
-          onCancel={() => {
-            setModalVisible(false);
-            form.resetFields();
-          }}
-          width={600}
+          onCancel={() => { setModalVisible(false); form.resetFields(); }}
+          width={560}
+          okText="确认"
+          cancelText="取消"
         >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-          >
+          <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ paddingTop: 8 }}>
             <Form.Item
               name="contentType"
               label="内容类型"
@@ -883,8 +549,8 @@ export default function SubscriptionsPage() {
               <Select placeholder="选择内容类型">
                 <Select.Option value="paper">论文</Select.Option>
                 <Select.Option value="video">视频</Select.Option>
-                <Select.Option value="repo">GitHub项目</Select.Option>
-                <Select.Option value="huggingface">HuggingFace模型</Select.Option>
+                <Select.Option value="repo">GitHub 项目</Select.Option>
+                <Select.Option value="huggingface">HuggingFace 模型</Select.Option>
                 <Select.Option value="job">招聘岗位</Select.Option>
               </Select>
             </Form.Item>
@@ -896,112 +562,40 @@ export default function SubscriptionsPage() {
                 { required: true, message: '请输入至少一个关键词' },
                 {
                   validator: (_, value) => {
-                    if (!value || value.trim() === '') {
-                      return Promise.reject(new Error('请输入至少一个关键词'));
-                    }
-                    const keywords = value.split(',').map((k: string) => k.trim()).filter((k: string) => k);
-                    if (keywords.length === 0) {
-                      return Promise.reject(new Error('请输入至少一个关键词'));
-                    }
-                    return Promise.resolve();
+                    if (!value?.trim()) return Promise.reject(new Error('请输入至少一个关键词'));
+                    const kws = value.split(',').map((k: string) => k.trim()).filter((k: string) => k);
+                    return kws.length > 0
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('请输入至少一个关键词'));
                   },
                 },
               ]}
-              tooltip="多个关键词用逗号分隔，例如：embodied AI, robotics, computer vision"
+              tooltip="多个关键词用逗号分隔，例如：embodied AI, robotics"
             >
-              <TextArea
-                rows={3}
-                placeholder="输入关键词，用逗号分隔（必填）"
-              />
+              <TextArea rows={3} placeholder="输入关键词，用逗号分隔（必填）" />
             </Form.Item>
 
-            <Form.Item
-              name="tags"
-              label="标签"
-              tooltip="多个标签用逗号分隔"
-            >
+            <Form.Item name="tags" label="标签" tooltip="多个标签用逗号分隔">
               <Input placeholder="输入标签，用逗号分隔" />
             </Form.Item>
 
-            <Form.Item
-              name="authors"
-              label="作者（仅论文）"
-              tooltip="多个作者用逗号分隔"
-            >
+            <Form.Item name="authors" label="作者（仅论文）" tooltip="多个作者用逗号分隔">
               <Input placeholder="输入作者名称，用逗号分隔" />
             </Form.Item>
 
-            <Form.Item
-              name="notifyEnabled"
-              label="启用通知"
-              valuePropName="checked"
-              initialValue={true}
-            >
+            <Form.Item name="notifyEnabled" label="启用通知" valuePropName="checked" initialValue={true}>
               <Switch />
             </Form.Item>
 
             {editingSubscription && (
-              <Form.Item
-                name="isActive"
-                label="启用订阅"
-                valuePropName="checked"
-              >
+              <Form.Item name="isActive" label="启用订阅" valuePropName="checked">
                 <Switch />
               </Form.Item>
             )}
           </Form>
         </Modal>
 
-        {/* 创建/编辑分组弹窗 */}
-        <Modal
-          title={editingGroup ? '编辑分组' : '新建分组'}
-          open={groupModalVisible}
-          onOk={() => groupForm.submit()}
-          onCancel={() => {
-            setGroupModalVisible(false);
-            groupForm.resetFields();
-            setEditingGroup(null);
-          }}
-          width={500}
-        >
-          <Form
-            form={groupForm}
-            layout="vertical"
-            onFinish={handleGroupSubmit}
-          >
-            <Form.Item
-              name="name"
-              label="分组名称"
-              rules={[{ required: true, message: '请输入分组名称' }]}
-            >
-              <Input placeholder="输入分组名称" />
-            </Form.Item>
-
-            <Form.Item
-              name="description"
-              label="分组描述"
-            >
-              <TextArea rows={3} placeholder="输入分组描述（可选）" />
-            </Form.Item>
-
-            <Form.Item
-              name="color"
-              label="分组颜色"
-              initialValue="blue"
-            >
-              <Select>
-                <Select.Option value="blue">蓝色</Select.Option>
-                <Select.Option value="green">绿色</Select.Option>
-                <Select.Option value="purple">紫色</Select.Option>
-                <Select.Option value="orange">橙色</Select.Option>
-                <Select.Option value="red">红色</Select.Option>
-                <Select.Option value="cyan">青色</Select.Option>
-                <Select.Option value="magenta">洋红</Select.Option>
-              </Select>
-            </Form.Item>
-          </Form>
-        </Modal>
-      </Content>
-    </div>
+      </div>
+    </PageContainer>
   );
 }

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import userPrisma from '../config/database.user';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const prisma = userPrisma as any;
@@ -17,7 +18,7 @@ router.get('/hot-topics', async (req, res) => {
       try {
         hotTopics = JSON.parse(config.value);
       } catch (e) {
-        console.error('Failed to parse hot topics config:', e);
+        logger.error('Failed to parse hot topics config:', e);
       }
     }
 
@@ -29,7 +30,7 @@ router.get('/hot-topics', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get hot topics config error:', error);
+    logger.error('Get hot topics config error:', error);
     res.status(500).json({
       code: 500,
       message: '获取热门话题配置失败',
@@ -84,7 +85,7 @@ router.put('/hot-topics', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Update hot topics config error:', error);
+    logger.error('Update hot topics config error:', error);
     res.status(500).json({
       code: 500,
       message: '更新热门话题配置失败',
@@ -120,7 +121,7 @@ router.get('/auto-topics', async (req, res) => {
             topicCounts[tag] = (topicCounts[tag] || 0) + 1;
           });
         } catch (e) {
-          console.error('Failed to parse tags:', post.tags);
+          logger.error('Failed to parse tags:', post.tags);
         }
       }
     });
@@ -138,7 +139,7 @@ router.get('/auto-topics', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get auto topics error:', error);
+    logger.error('Get auto topics error:', error);
     res.status(500).json({
       code: 500,
       message: '获取自动识别话题失败',

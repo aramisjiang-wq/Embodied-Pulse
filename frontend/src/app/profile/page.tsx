@@ -1,86 +1,144 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { 
-  Layout, 
-  Card, 
-  Descriptions, 
-  Tabs, 
-  List, 
-  Tag, 
-  Button, 
-  Avatar, 
-  Space, 
-  Statistic, 
-  Row, 
-  Col,
+import {
+  Tabs,
+  Tag,
+  Button,
+  Avatar,
   Empty,
   Modal,
   Form,
   Input,
   Switch,
   Select,
-  Progress,
-  Badge,
-  Timeline,
+  Upload,
+  App,
   Tooltip,
-  App
+  Progress,
+  Spin,
 } from 'antd';
-import { 
-  UserOutlined, 
-  HeartOutlined, 
-  BellOutlined, 
-  StarOutlined, 
-  EyeOutlined, 
-  SettingOutlined, 
-  HistoryOutlined,
-  TrophyOutlined,
-  ClockCircleOutlined,
-  FireOutlined,
-  BookOutlined,
+import {
+  UserOutlined,
+  HeartOutlined,
+  BellOutlined,
+  SettingOutlined,
   EditOutlined,
   DeleteOutlined,
-  ShareAltOutlined,
-  LinkOutlined,
   PlayCircleOutlined,
   GithubOutlined,
   RiseOutlined,
   FileTextOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  CameraOutlined,
+  CheckCircleOutlined,
+  LockOutlined,
+  TrophyOutlined,
+  EnvironmentOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import { userApi } from '@/lib/api/user';
-import { subscriptionApi } from '@/lib/api/subscription';
+import { subscriptionApi, Subscription } from '@/lib/api/subscription';
 import { communityApi } from '@/lib/api/community';
 import { paperApi, repoApi, videoApi, jobApi } from '@/lib/api';
-import { getLevelBadge, getLevelProgress, getNextLevel, getPointsToNextLevel } from '@/lib/utils/levelUtils';
+import {
+  getLevelBadge,
+  getLevelProgress,
+  getNextLevel,
+  getPointsToNextLevel,
+  getLevelByPoints,
+  getAllBenefitsUpToLevel,
+  formatPoints,
+  LEVEL_CONFIG,
+} from '@/lib/utils/levelUtils';
+import PageContainer from '@/components/PageContainer';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './page.module.css';
+import type { RcFile } from 'antd/es/upload/interface';
 
 dayjs.extend(relativeTime);
 
-const { Content } = Layout;
 const { TextArea } = Input;
 
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  paper: '论文',
+  video: '视频',
+  repo: '开源项目',
+  huggingface: 'HuggingFace',
+  job: '职位',
+  post: '帖子',
+};
+
+const CONTENT_TYPE_COLORS: Record<string, string> = {
+  paper: 'blue',
+  video: 'cyan',
+  repo: 'purple',
+  huggingface: 'orange',
+  job: 'green',
+  post: 'magenta',
+};
+
+function getContentTypeIcon(type: string) {
+  const icons: Record<string, React.ReactNode> = {
+    paper: <FileTextOutlined />,
+    video: <PlayCircleOutlined />,
+    repo: <GithubOutlined />,
+    job: <RiseOutlined />,
+  };
+  return icons[type] || <FileTextOutlined />;
+}
+
+function buildLink(item: { contentType: string; contentId: string }) {
+  const map: Record<string, string> = {
+    paper: `/papers/${item.contentId}`,
+    video: `/videos/${item.contentId}`,
+    repo: `/repos/${item.contentId}`,
+    job: `/jobs/${item.contentId}`,
+  };
+  return map[item.contentType] || '#';
+}
+
+function compressImage(file: RcFile): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const size = Math.min(img.width, img.height, 300);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject('Canvas error');
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ProfilePage() {
-  const { user } = useAuthStore();
+  const { user, updateProfile: updateAuthProfile } = useAuthStore();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [favorites, setFavorites] = useState<any[]>([]);
-  const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [stats, setStats] = useState({
-    totalFavorites: 0,
-    totalSubscriptions: 0,
-    totalViews: 0,
-    totalShares: 0,
-  });
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [stats, setStats] = useState({ totalFavorites: 0, totalSubscriptions: 0 });
+  const [editOpen, setEditOpen] = useState(false);
   const [profileForm] = Form.useForm();
   const [settingsForm] = Form.useForm();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('favorites');
+  const [showAllBenefits, setShowAllBenefits] = useState(false);
 
   const loadUserData = useCallback(async () => {
     setLoading(true);
@@ -89,25 +147,28 @@ export default function ProfilePage() {
         communityApi.getFavorites({ page: 1, size: 50 }),
         subscriptionApi.getSubscriptions({ page: 1, size: 50 }),
       ]);
-
       const favItems = favData?.items || [];
       const subItems = subData?.items || [];
-      
-      const enrichedFavorites = await enrichFavorites(favItems);
-      setFavorites(enrichedFavorites);
+
+      const enriched = await Promise.all(
+        favItems.map(async (fav: any) => {
+          try {
+            switch (fav.contentType) {
+              case 'paper': return { ...fav, detail: await paperApi.getPaper(fav.contentId) };
+              case 'video': return { ...fav, detail: await videoApi.getVideo(fav.contentId) };
+              case 'repo': return { ...fav, detail: await repoApi.getRepo(fav.contentId) };
+              case 'job': return { ...fav, detail: await jobApi.getJob(fav.contentId) };
+              default: return fav;
+            }
+          } catch { return fav; }
+        })
+      );
+
+      setFavorites(enriched);
       setSubscriptions(subItems);
-      setActivities([]);
-      setStats({
-        totalFavorites: favItems.length,
-        totalSubscriptions: subItems.length,
-        totalViews: 0,
-        totalShares: 0,
-      });
-    } catch (error: any) {
-      console.error('Load user data error:', error);
-      setFavorites([]);
-      setSubscriptions([]);
-      setActivities([]);
+      setStats({ totalFavorites: favItems.length, totalSubscriptions: subItems.length });
+    } catch (err) {
+      console.error('Load user data error:', err);
     } finally {
       setLoading(false);
     }
@@ -115,51 +176,50 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
+      setAvatarUrl(user.avatar || user.avatarUrl || '');
       loadUserData();
     }
   }, [user, loadUserData]);
 
-  const enrichFavorites = async (items: any[]) => {
-    return Promise.all(
-      items.map(async (fav: any) => {
-        try {
-          switch (fav.contentType) {
-            case 'paper':
-              return { ...fav, detail: await paperApi.getPaper(fav.contentId) };
-            case 'video':
-              return { ...fav, detail: await videoApi.getVideo(fav.contentId) };
-            case 'repo':
-              return { ...fav, detail: await repoApi.getRepo(fav.contentId) };
-            case 'job':
-              return { ...fav, detail: await jobApi.getJob(fav.contentId) };
-            default:
-              return fav;
-          }
-        } catch {
-          return fav;
-        }
-      })
-    );
+  const handleOpenEdit = () => {
+    profileForm.setFieldsValue({
+      username: user?.username,
+      bio: user?.bio || '',
+      location: user?.location || '',
+      githubUrl: user?.githubUrl || '',
+      linkedinUrl: user?.linkedinUrl || '',
+      twitterUrl: user?.twitterUrl || '',
+      websiteUrl: user?.websiteUrl || '',
+      skills: user?.skills || '',
+      interests: user?.interests || '',
+    });
+    setAvatarUrl(user?.avatar || user?.avatarUrl || '');
+    setEditOpen(true);
   };
 
   const handleUpdateProfile = async (values: any) => {
+    setSaving(true);
     try {
-      await userApi.updateProfile(values);
-      message.success('更新成功');
-      setEditProfileOpen(false);
+      const payload = { ...values, avatarUrl };
+      const updatedUser = await userApi.updateProfile(payload);
+      updateAuthProfile({ ...updatedUser, avatar: updatedUser.avatarUrl });
+      message.success('资料已更新');
+      setEditOpen(false);
     } catch (error: any) {
-      message.error(error.message || '更新失败');
+      message.error(error.message || '更新失败，请重试');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleUpdateSettings = async (values: any) => {
+  const handleAvatarUpload = async (file: RcFile) => {
     try {
-      await userApi.updateSettings(values);
-      message.success('设置已保存');
-      setSettingsOpen(false);
-    } catch (error: any) {
-      message.error(error.message || '保存失败');
+      const base64 = await compressImage(file);
+      setAvatarUrl(base64);
+    } catch {
+      message.error('图片处理失败');
     }
+    return false;
   };
 
   const handleDeleteFavorite = async (id: string) => {
@@ -167,8 +227,9 @@ export default function ProfilePage() {
       await communityApi.deleteFavorite('all', id);
       message.success('已取消收藏');
       setFavorites(prev => prev.filter(f => f.id !== id));
+      setStats(prev => ({ ...prev, totalFavorites: prev.totalFavorites - 1 }));
     } catch (error: any) {
-      message.error(error.message || '删除失败');
+      message.error(error.message || '操作失败');
     }
   };
 
@@ -177,303 +238,211 @@ export default function ProfilePage() {
       await subscriptionApi.deleteSubscription(id);
       message.success('已取消订阅');
       setSubscriptions(prev => prev.filter(s => s.id !== id));
+      setStats(prev => ({ ...prev, totalSubscriptions: prev.totalSubscriptions - 1 }));
     } catch (error: any) {
-      message.error(error.message || '取消失败');
+      message.error(error.message || '操作失败');
     }
   };
 
-  const buildLink = (item: any) => {
-    const detail = item.detail;
-    if (!detail) return '#';
-
-    switch (item.contentType) {
-      case 'paper':
-        return `/papers/${item.contentId}`;
-      case 'video':
-        return `/videos/${item.contentId}`;
-      case 'repo':
-        return `/repos/${item.contentId}`;
-      case 'job':
-        return `/jobs/${item.contentId}`;
-      default:
-        return '#';
+  const handleUpdateSettings = async (values: any) => {
+    setSaving(true);
+    try {
+      await userApi.updateSettings(values);
+      message.success('设置已保存');
+    } catch (error: any) {
+      message.error(error.message || '保存失败');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const getContentTypeIcon = (type: string) => {
-    const icons: Record<string, any> = {
-      paper: <BookOutlined style={{ color: '#1890ff' }} />,
-      video: <PlayCircleOutlined style={{ color: '#00a1d6' }} />,
-      repo: <GithubOutlined style={{ color: '#722ed1' }} />,
-      job: <RiseOutlined style={{ color: '#fa8c16' }} />,
-    };
-    return icons[type] || <FileTextOutlined />;
-  };
+  if (!user) {
+    return (
+      <PageContainer title="个人中心">
+        <div className={styles.loginPrompt}>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={<span className={styles.loginText}>请先登录以查看个人中心</span>}
+          >
+            <Link href="/login">
+              <Button type="primary" size="large" className={styles.loginBtn}>立即登录</Button>
+            </Link>
+          </Empty>
+        </div>
+      </PageContainer>
+    );
+  }
 
-  const getActivityIcon = (type: string) => {
-    const icons: Record<string, any> = {
-      favorite: <HeartOutlined style={{ color: '#ff4d4f' }} />,
-      subscribe: <BellOutlined style={{ color: '#1890ff' }} />,
-      share: <ShareAltOutlined style={{ color: '#52c41a' }} />,
-      view: <EyeOutlined style={{ color: '#722ed1' }} />,
-    };
-    return icons[type] || <ClockCircleOutlined />;
-  };
+  const currentLevel = getLevelByPoints(user.points || 0);
+  const levelBadge = getLevelBadge(currentLevel.level);
+  const progress = getLevelProgress(user.points || 0);
+  const nextLevel = getNextLevel(user.points || 0);
+  const pointsToNext = getPointsToNextLevel(user.points || 0);
+  const benefits = getAllBenefitsUpToLevel(currentLevel.level);
+  const displayedBenefits = showAllBenefits ? benefits : benefits.slice(0, 8);
+
+  const skillList = user.skills ? user.skills.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const interestList = user.interests ? user.interests.split(',').map(s => s.trim()).filter(Boolean) : [];
 
   const tabItems = [
     {
-      key: 'overview',
-      label: (
-        <span>
-          <TrophyOutlined />
-          概览
-        </span>
-      ),
-      children: (
-        <div>
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="收藏数"
-                  value={stats.totalFavorites}
-                  prefix={<HeartOutlined />}
-                  valueStyle={{ color: '#ff4d4f' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="订阅数"
-                  value={stats.totalSubscriptions}
-                  prefix={<BellOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="浏览量"
-                  value={stats.totalViews}
-                  prefix={<EyeOutlined />}
-                  valueStyle={{ color: '#52c41a' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="分享数"
-                  value={stats.totalShares}
-                  prefix={<ShareAltOutlined />}
-                  valueStyle={{ color: '#fa8c16' }}
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          <Card title="基本信息" extra={
-            <Button icon={<EditOutlined />} onClick={() => setEditProfileOpen(true)}>
-              编辑
-            </Button>
-          }>
-            <Descriptions column={2} bordered>
-              <Descriptions.Item label="头像">
-                <Avatar size={64} src={user?.avatar} icon={<UserOutlined />} />
-              </Descriptions.Item>
-              <Descriptions.Item label="用户名">{user?.username}</Descriptions.Item>
-              <Descriptions.Item label="邮箱">{user?.email || '-'}</Descriptions.Item>
-              <Descriptions.Item label="等级">
-                <Tag color="gold">LV{user?.level || 1}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="积分">{user?.points || 0}</Descriptions.Item>
-              <Descriptions.Item label="VIP">
-                {user?.isVip ? <Tag color="purple">VIP会员</Tag> : <Tag>普通用户</Tag>}
-              </Descriptions.Item>
-              <Descriptions.Item label="位置">{user?.location || '-'}</Descriptions.Item>
-              <Descriptions.Item label="个人简介" span={2}>{user?.bio || '-'}</Descriptions.Item>
-              <Descriptions.Item label="技能" span={2}>
-                {user?.skills ? user.skills.split(',').map((skill: string, index: number) => (
-                  <Tag key={index} color="blue" style={{ marginBottom: 4 }}>{skill.trim()}</Tag>
-                )) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="兴趣" span={2}>
-                {user?.interests ? user.interests.split(',').map((interest: string, index: number) => (
-                  <Tag key={index} color="pink" style={{ marginBottom: 4 }}>{interest.trim()}</Tag>
-                )) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="GitHub">
-                {user?.githubUrl ? (
-                  <Link href={user.githubUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff' }}>
-                    <GithubOutlined /> GitHub
-                  </Link>
-                ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="LinkedIn">
-                {user?.linkedinUrl ? (
-                  <Link href={user.linkedinUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff' }}>
-                    <LinkOutlined /> LinkedIn
-                  </Link>
-                ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Twitter">
-                {user?.twitterUrl ? (
-                  <Link href={user.twitterUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff' }}>
-                    Twitter
-                  </Link>
-                ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="个人网站">
-                {user?.websiteUrl ? (
-                  <Link href={user.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff' }}>
-                    <GlobalOutlined /> 个人网站
-                  </Link>
-                ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="注册时间">
-                {user?.createdAt ? dayjs(user.createdAt).format('YYYY-MM-DD HH:mm') : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="最后登录">
-                {user?.lastLoginAt ? dayjs(user.lastLoginAt).fromNow() : '-'}
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </div>
-      ),
-    },
-    {
       key: 'favorites',
       label: (
-        <span>
+        <span className={styles.tabLabel}>
           <HeartOutlined />
-          收藏
-          <Badge count={favorites.length} style={{ marginLeft: 8 }} />
+          <span>收藏</span>
+          {stats.totalFavorites > 0 && (
+            <span className={styles.tabBadge}>{stats.totalFavorites}</span>
+          )}
         </span>
       ),
-      children: (
-        <List
-          loading={loading}
-          dataSource={favorites}
-          renderItem={(item: any) => (
-            <List.Item
-              actions={[
-                <Link key="view" href={buildLink(item)} target="_blank">
-                  查看
-                </Link>,
-                <Tooltip key="delete" title="取消收藏">
+      children: loading ? (
+        <div className={styles.tabLoading}><Spin /></div>
+      ) : favorites.length === 0 ? (
+        <Empty description="暂无收藏内容" image={Empty.PRESENTED_IMAGE_SIMPLE} className={styles.emptyState} />
+      ) : (
+        <div className={styles.listContainer}>
+          {favorites.map((item: any) => (
+            <div key={item.id} className={styles.listCard}>
+              <div className={styles.listCardIcon}>
+                {getContentTypeIcon(item.contentType)}
+              </div>
+              <div className={styles.listCardContent}>
+                <div className={styles.listCardTitle}>
+                  {item.detail?.title || item.detail?.fullName || item.contentId}
+                </div>
+                <div className={styles.listCardMeta}>
+                  <Tag color={CONTENT_TYPE_COLORS[item.contentType]} className={styles.typeTag}>
+                    {CONTENT_TYPE_LABELS[item.contentType] || item.contentType}
+                  </Tag>
+                  <span className={styles.timeText}>{dayjs(item.createdAt).fromNow()}</span>
+                </div>
+              </div>
+              <div className={styles.listCardActions}>
+                <Link href={buildLink(item)} target="_blank">
+                  <Button type="link" size="small">查看</Button>
+                </Link>
+                <Tooltip title="取消收藏">
                   <Button
                     type="text"
                     danger
                     icon={<DeleteOutlined />}
+                    size="small"
                     onClick={() => handleDeleteFavorite(item.id)}
                   />
-                </Tooltip>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={getContentTypeIcon(item.contentType)}
-                title={item.detail?.title || item.detail?.fullName || item.contentId}
-                description={
-                  <>
-                    <Tag color="blue">{item.contentType}</Tag>
-                    <span style={{ color: '#999', marginLeft: 8 }}>
-                      {dayjs(item.createdAt).fromNow()}
-                    </span>
-                  </>
-                }
-              />
-            </List.Item>
-          )}
-        />
+                </Tooltip>
+              </div>
+            </div>
+          ))}
+        </div>
       ),
     },
     {
       key: 'subscriptions',
       label: (
-        <span>
+        <span className={styles.tabLabel}>
           <BellOutlined />
-          订阅
-          <Badge count={subscriptions.length} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <List
-          loading={loading}
-          dataSource={subscriptions}
-          renderItem={(item: any) => (
-            <List.Item
-              actions={[
-                <Link key="view" href={buildLink(item)} target="_blank">
-                  查看
-                </Link>,
-                <Tooltip key="unsubscribe" title="取消订阅">
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleUnsubscribe(item.id)}
-                  />
-                </Tooltip>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={getContentTypeIcon(item.contentType)}
-                title={item.name || item.contentId}
-                description={
-                  <>
-                    <Tag color="green">{item.contentType}</Tag>
-                    <span style={{ color: '#999', marginLeft: 8 }}>
-                      {dayjs(item.createdAt).fromNow()}
-                    </span>
-                  </>
-                }
-              />
-            </List.Item>
+          <span>订阅</span>
+          {stats.totalSubscriptions > 0 && (
+            <span className={styles.tabBadge}>{stats.totalSubscriptions}</span>
           )}
-        />
-      ),
-    },
-    {
-      key: 'activities',
-      label: (
-        <span>
-          <HistoryOutlined />
-          活动记录
         </span>
       ),
-      children: (
-        <Timeline
-          items={activities.map((activity: any) => ({
-            dot: getActivityIcon(activity.type),
-            color: activity.type === 'favorite' ? 'red' : 
-                   activity.type === 'subscribe' ? 'blue' : 
-                   activity.type === 'share' ? 'green' : 'gray',
-            children: (
-              <div>
-                <div style={{ fontWeight: 500 }}>
-                  {activity.description || '未知操作'}
+      children: loading ? (
+        <div className={styles.tabLoading}><Spin /></div>
+      ) : subscriptions.length === 0 ? (
+        <Empty description="暂无订阅" image={Empty.PRESENTED_IMAGE_SIMPLE} className={styles.emptyState}>
+          <Link href="/subscriptions">
+            <Button type="primary">去添加订阅</Button>
+          </Link>
+        </Empty>
+      ) : (
+        <div className={styles.listContainer}>
+          {subscriptions.map((sub) => {
+            const filterTags: string[] = [];
+            if (sub.keywords) filterTags.push(`关键词: ${sub.keywords}`);
+            if (sub.authors) filterTags.push(`作者: ${sub.authors}`);
+            if (sub.uploaders) filterTags.push(`UP主: ${sub.uploaders}`);
+            if (sub.topics) filterTags.push(`主题: ${sub.topics}`);
+            if (sub.owners) filterTags.push(`Owner: ${sub.owners}`);
+            if (sub.tags) filterTags.push(`标签: ${sub.tags}`);
+            if (sub.platform) filterTags.push(`平台: ${sub.platform}`);
+            if (sub.minStars) filterTags.push(`⭐ ≥${sub.minStars}`);
+            if (sub.minCitations) filterTags.push(`引用 ≥${sub.minCitations}`);
+
+            return (
+              <div key={sub.id} className={styles.subCard}>
+                <div className={styles.subCardHeader}>
+                  <div className={styles.subCardTitle}>
+                    <span className={styles.subName}>{sub.name}</span>
+                    <Tag color={CONTENT_TYPE_COLORS[sub.contentType]} className={styles.typeTag}>
+                      {CONTENT_TYPE_LABELS[sub.contentType] || sub.contentType}
+                    </Tag>
+                    <Tag color={sub.isActive ? 'success' : 'default'}>
+                      {sub.isActive ? '运行中' : '已暂停'}
+                    </Tag>
+                  </div>
+                  <Tooltip title="取消订阅">
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      onClick={() => handleUnsubscribe(sub.id)}
+                    />
+                  </Tooltip>
                 </div>
-                <div style={{ color: '#999', fontSize: 12, marginTop: 4 }}>
-                  {dayjs(activity.createdAt).fromNow()}
+
+                {sub.description && (
+                  <div className={styles.subDescription}>{sub.description}</div>
+                )}
+
+                {filterTags.length > 0 && (
+                  <div className={styles.subFilters}>
+                    {filterTags.map((tag, i) => (
+                      <span key={i} className={styles.filterChip}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+
+                <div className={styles.subStats}>
+                  <span className={styles.subStat}>
+                    <span className={styles.subStatNum}>{sub.newCount}</span>
+                    <span className={styles.subStatLabel}>新内容</span>
+                  </span>
+                  <span className={styles.subStatDivider} />
+                  <span className={styles.subStat}>
+                    <span className={styles.subStatNum}>{sub.totalMatched}</span>
+                    <span className={styles.subStatLabel}>总匹配</span>
+                  </span>
+                  {sub.lastChecked && (
+                    <>
+                      <span className={styles.subStatDivider} />
+                      <span className={styles.subStatTime}>
+                        上次检查 {dayjs(sub.lastChecked).fromNow()}
+                      </span>
+                    </>
+                  )}
+                  {sub.notifyEnabled && (
+                    <Tag color="blue" style={{ marginLeft: 'auto' }}>推送开启</Tag>
+                  )}
                 </div>
               </div>
-            ),
-          }))}
-        />
+            );
+          })}
+        </div>
       ),
     },
     {
       key: 'settings',
       label: (
-        <span>
+        <span className={styles.tabLabel}>
           <SettingOutlined />
-          设置
+          <span>设置</span>
         </span>
       ),
       children: (
-        <Card>
+        <div className={styles.settingsContainer}>
           <Form
             form={settingsForm}
             layout="vertical"
@@ -483,315 +452,354 @@ export default function ProfilePage() {
               pushNotification: false,
               weeklyDigest: true,
               language: 'zh-CN',
-              theme: 'light',
             }}
           >
-            <Form.Item
-              label="邮件通知"
-              name="emailNotification"
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-            <Form.Item
-              label="推送通知"
-              name="pushNotification"
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-            <Form.Item
-              label="周报订阅"
-              name="weeklyDigest"
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-            <Form.Item label="语言" name="language">
-              <Select
-                options={[
-                  { label: '简体中文', value: 'zh-CN' },
-                  { label: 'English', value: 'en-US' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item label="主题" name="theme">
-              <Select
-                options={[
-                  { label: '浅色', value: 'light' },
-                  { label: '深色', value: 'dark' },
-                  { label: '跟随系统', value: 'auto' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" block>
-                保存设置
-              </Button>
-            </Form.Item>
+            <div className={styles.settingsSection}>
+              <div className={styles.settingsSectionTitle}>通知设置</div>
+              <div className={styles.settingsRow}>
+                <div className={styles.settingsRowInfo}>
+                  <div className={styles.settingsRowLabel}>邮件通知</div>
+                  <div className={styles.settingsRowDesc}>订阅内容更新时发送邮件</div>
+                </div>
+                <Form.Item name="emailNotification" valuePropName="checked" noStyle>
+                  <Switch />
+                </Form.Item>
+              </div>
+              <div className={styles.settingsRow}>
+                <div className={styles.settingsRowInfo}>
+                  <div className={styles.settingsRowLabel}>推送通知</div>
+                  <div className={styles.settingsRowDesc}>浏览器推送通知</div>
+                </div>
+                <Form.Item name="pushNotification" valuePropName="checked" noStyle>
+                  <Switch />
+                </Form.Item>
+              </div>
+              <div className={styles.settingsRow}>
+                <div className={styles.settingsRowInfo}>
+                  <div className={styles.settingsRowLabel}>周报订阅</div>
+                  <div className={styles.settingsRowDesc}>每周发送具身AI领域精选内容</div>
+                </div>
+                <Form.Item name="weeklyDigest" valuePropName="checked" noStyle>
+                  <Switch />
+                </Form.Item>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.settingsSectionTitle}>偏好设置</div>
+              <Form.Item label="界面语言" name="language">
+                <Select
+                  options={[
+                    { label: '简体中文', value: 'zh-CN' },
+                    { label: 'English', value: 'en-US' },
+                  ]}
+                  style={{ width: 200 }}
+                />
+              </Form.Item>
+            </div>
+
+            <Button type="primary" htmlType="submit" loading={saving} className={styles.saveBtn}>
+              保存设置
+            </Button>
           </Form>
-        </Card>
+        </div>
       ),
     },
   ];
 
-  if (!user) {
-    return (
-      <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-        <Content style={{ padding: 100, textAlign: 'center' }}>
-          <Empty description="请先登录">
-            <Link href="/login">
-              <Button type="primary" size="large">
-                去登录
-              </Button>
-            </Link>
-          </Empty>
-        </Content>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        {/* 用户卡片 */}
-        <Card 
-          style={{ 
-            marginBottom: 24, 
-            borderRadius: 12,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            border: 'none'
-          }}
-          styles={{ body: { padding: 0 } }}
-        >
-          <div style={{ padding: '32px 40px', display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <Avatar 
-                size={100} 
-                src={user?.avatar} 
-                icon={<UserOutlined />}
-                style={{ 
-                  border: '4px solid rgba(255,255,255,0.3)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                }}
-              />
-              {user?.isVip && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: -4,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'linear-gradient(135deg, #ffd700 0%, #ffaa00 100%)',
-                  padding: '2px 12px',
-                  borderRadius: 10,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}>
-                    VIP
+    <PageContainer title="个人中心">
+      <div className={styles.page}>
+
+        {/* 个人信息主卡 */}
+        <div className={styles.profileCard}>
+          <div className={styles.profileBanner} style={{ background: levelBadge.gradient }} />
+          <div className={styles.profileBody}>
+            <div className={styles.profileTop}>
+              <div className={styles.avatarSection}>
+                <div className={styles.avatarWrap}>
+                  <Avatar
+                    size={96}
+                    src={user.avatar || user.avatarUrl}
+                    icon={<UserOutlined />}
+                    className={styles.avatar}
+                  />
+                </div>
+                <div className={styles.levelBadge} style={{ background: levelBadge.gradient }}>
+                  {levelBadge.icon} {levelBadge.name}
+                </div>
+              </div>
+
+              <div className={styles.userInfo}>
+                <div className={styles.userNameRow}>
+                  <h1 className={styles.userName}>{user.username}</h1>
+                  {user.isVip && <Tag color="gold" className={styles.vipTag}>VIP</Tag>}
+                </div>
+
+                <p className={styles.userBio}>
+                  {user.bio || '还没有填写个人简介，点击"编辑资料"来介绍自己吧～'}
+                </p>
+
+                <div className={styles.userMeta}>
+                  {user.location && (
+                    <span className={styles.metaItem}>
+                      <EnvironmentOutlined /> {user.location}
+                    </span>
+                  )}
+                  {user.githubUrl && (
+                    <a href={user.githubUrl} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>
+                      <GithubOutlined /> GitHub
+                    </a>
+                  )}
+                  {user.linkedinUrl && (
+                    <a href={user.linkedinUrl} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>
+                      <LinkOutlined /> LinkedIn
+                    </a>
+                  )}
+                  {user.websiteUrl && (
+                    <a href={user.websiteUrl} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>
+                      <GlobalOutlined /> 个人网站
+                    </a>
+                  )}
+                </div>
+
+                {(skillList.length > 0 || interestList.length > 0) && (
+                  <div className={styles.tagsSection}>
+                    {skillList.map((s, i) => (
+                      <Tag key={i} color="blue" className={styles.skillTag}>{s}</Tag>
+                    ))}
+                    {interestList.map((s, i) => (
+                      <Tag key={i} color="purple" className={styles.skillTag}>{s}</Tag>
+                    ))}
                   </div>
-              )}
-            </div>
-            
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#fff' }}>
-                  {user?.username}
-                </h2>
-                <Tag 
-                  style={{ 
-                    fontSize: 14, 
-                    padding: '2px 12px', 
-                    borderRadius: 12,
-                    fontWeight: 600,
-                    background: getLevelBadge(user?.level || 1).color,
-                    border: 'none',
-                    color: '#fff'
-                  }}
-                >
-                  {getLevelBadge(user?.level || 1).icon} LV{user?.level || 1} {getLevelBadge(user?.level || 1).name}
-                </Tag>
-              </div>
-              
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 15, marginBottom: 12 }}>
-                {user?.bio || '这个人很懒，还没有填写简介~'}
-              </div>
-              
-              <Space size="large" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>
-                <span>
-                  <TrophyOutlined style={{ marginRight: 6 }} />
-                  {user?.points || 0} 积分
-                </span>
-                <span>
-                  <HeartOutlined style={{ marginRight: 6 }} />
-                  {stats.totalFavorites} 收藏
-                </span>
-                <span>
-                  <BellOutlined style={{ marginRight: 6 }} />
-                  {stats.totalSubscriptions} 订阅
-                </span>
-                {user?.location && (
-                  <span>
-                    📍 {user.location}
-                  </span>
                 )}
-              </Space>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Button 
-                type="primary" 
+              </div>
+
+              <Button
+                type="primary"
                 icon={<EditOutlined />}
-                onClick={() => setEditProfileOpen(true)}
-                style={{ 
-                  background: 'rgba(255,255,255,0.2)', 
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 8,
-                  fontWeight: 500
-                }}
+                onClick={handleOpenEdit}
+                className={styles.editBtn}
               >
                 编辑资料
               </Button>
-              <Button 
-                icon={<SettingOutlined />}
-                onClick={() => setActiveTab('settings')}
-                style={{ 
-                  background: 'rgba(255,255,255,0.1)', 
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  color: '#fff',
-                  borderRadius: 8
-                }}
-              >
-                账号设置
-              </Button>
+            </div>
+
+            <div className={styles.statsRow}>
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>{formatPoints(user.points || 0)}</span>
+                <span className={styles.statLabel}>
+                  <TrophyOutlined className={styles.statIcon} /> 积分
+                </span>
+              </div>
+              <div className={styles.statDivider} />
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>{stats.totalFavorites}</span>
+                <span className={styles.statLabel}>
+                  <HeartOutlined className={styles.statIcon} /> 收藏
+                </span>
+              </div>
+              <div className={styles.statDivider} />
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>{stats.totalSubscriptions}</span>
+                <span className={styles.statLabel}>
+                  <BellOutlined className={styles.statIcon} /> 订阅
+                </span>
+              </div>
+              <div className={styles.statDivider} />
+              <div className={styles.statItem}>
+                <span className={styles.statValue}>
+                  {dayjs(user.createdAt).format('YYYY-MM-DD')}
+                </span>
+                <span className={styles.statLabel}>加入时间</span>
+              </div>
             </div>
           </div>
-          
-          {/* 等级进度条 */}
-          <div style={{ 
-            padding: '16px 40px', 
-            background: 'rgba(0,0,0,0.1)',
-            borderTop: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>
-                等级进度
-              </span>
-              <span style={{ color: '#ffd700', fontSize: 13, fontWeight: 600 }}>
-                {getLevelBadge(user?.level || 1).icon} LV{user?.level || 1} {getLevelBadge(user?.level || 1).name}
-              </span>
-              {getNextLevel(user?.points || 0) && (
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                  · 距离 {getNextLevel(user?.points || 0)?.name} 还需 {getPointsToNextLevel(user?.points || 0)} 积分
-                </span>
-              )}
+        </div>
+
+        <div className={styles.mainContent}>
+          {/* 等级与特权卡 */}
+          <div className={styles.levelCard}>
+            <div className={styles.levelCardHeader}>
+              <div>
+                <div className={styles.levelTitle}>
+                  {currentLevel.icon} {currentLevel.name}
+                  <span className={styles.levelSubtitle}> · {currentLevel.subtitle}</span>
+                </div>
+                <div className={styles.levelPoints}>
+                  {formatPoints(user.points || 0)} 积分
+                  {nextLevel && (
+                    <span className={styles.nextLevelHint}>
+                      · 距 {nextLevel.name} 还差 {formatPoints(pointsToNext)} 分
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className={styles.levelNum}>LV{currentLevel.level}</div>
             </div>
-            <Progress 
-              percent={getLevelProgress(user?.points || 0)} 
-              strokeColor={{
-                '0%': '#ffd700',
-                '100%': '#ffaa00',
-              }}
-              trailColor="rgba(255,255,255,0.2)"
+
+            <Progress
+              percent={progress}
+              strokeColor={levelBadge.gradient}
+              trailColor="rgba(0,0,0,0.06)"
               showInfo={false}
-              size="small"
+              className={styles.levelProgress}
+            />
+
+            <div className={styles.benefitsTitle}>等级特权</div>
+            <div className={styles.benefitsList}>
+              {displayedBenefits.map((b, i) => (
+                <div key={i} className={`${styles.benefitItem} ${!b.unlocked ? styles.benefitLocked : ''}`}>
+                  {b.unlocked
+                    ? <CheckCircleOutlined className={styles.benefitCheck} />
+                    : <LockOutlined className={styles.benefitLock} />
+                  }
+                  <span className={styles.benefitText}>{b.text}</span>
+                  {b.status === 'live' && b.unlocked && (
+                    <span className={styles.statusLive}>已上线</span>
+                  )}
+                  {b.status === 'beta' && (
+                    <span className={styles.statusBeta}>Beta</span>
+                  )}
+                  {b.status === 'planned' && (
+                    <span className={styles.statusPlanned}>规划中</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {benefits.length > 8 && (
+              <button
+                className={styles.showMoreBtn}
+                onClick={() => setShowAllBenefits(!showAllBenefits)}
+              >
+                {showAllBenefits ? '收起' : `查看全部 ${benefits.length} 项特权`}
+              </button>
+            )}
+
+            <div className={styles.levelRoadmap}>
+              {LEVEL_CONFIG.map((lvl) => (
+                <Tooltip key={lvl.level} title={`${lvl.name} · ${lvl.subtitle} (${formatPoints(lvl.minPoints)} 积分)`}>
+                  <div
+                    className={`${styles.roadmapDot} ${lvl.level <= currentLevel.level ? styles.roadmapDotActive : ''}`}
+                    style={lvl.level <= currentLevel.level ? { background: lvl.color } : {}}
+                  >
+                    {lvl.level === currentLevel.level && (
+                      <div className={styles.roadmapCurrent} />
+                    )}
+                    <span className={styles.roadmapIcon}>{lvl.icon}</span>
+                  </div>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+
+          {/* 内容 Tabs */}
+          <div className={styles.tabsCard}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={tabItems}
+              className={styles.tabs}
             />
           </div>
-        </Card>
+        </div>
+      </div>
 
-        <Card>
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={tabItems}
-            size="large"
-          />
-        </Card>
-      </Content>
-
+      {/* 编辑资料弹窗 */}
       <Modal
         title="编辑个人资料"
-        open={editProfileOpen}
-        onCancel={() => setEditProfileOpen(false)}
+        open={editOpen}
+        onCancel={() => setEditOpen(false)}
         footer={null}
-        width={600}
+        width={640}
+        className={styles.editModal}
+        destroyOnHidden
       >
         <Form
           form={profileForm}
           layout="vertical"
           onFinish={handleUpdateProfile}
-          initialValues={{
-            username: user?.username,
-            email: user?.email,
-            bio: user?.bio || '',
-            avatarUrl: user?.avatar || '',
-            githubUrl: user?.githubUrl || '',
-            linkedinUrl: user?.linkedinUrl || '',
-            twitterUrl: user?.twitterUrl || '',
-            websiteUrl: user?.websiteUrl || '',
-            location: user?.location || '',
-            skills: user?.skills || '',
-            interests: user?.interests || '',
-          }}
+          className={styles.editForm}
         >
-          <Form.Item
-            label="用户名"
-            name="username"
-            rules={[{ required: true, message: '请输入用户名' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            label="邮箱"
-            name="email"
-            rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '请输入有效的邮箱地址' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
+          {/* 头像上传 */}
+          <div className={styles.avatarUploadSection}>
+            <div className={styles.avatarUploadPreview}>
+              <Avatar
+                size={80}
+                src={avatarUrl}
+                icon={<UserOutlined />}
+                className={styles.avatarPreview}
+              />
+            </div>
+            <div className={styles.avatarUploadInfo}>
+              <div className={styles.avatarUploadTitle}>更换头像</div>
+              <div className={styles.avatarUploadDesc}>支持 JPG、PNG，自动裁剪为正方形</div>
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={handleAvatarUpload}
+              >
+                <Button icon={<CameraOutlined />} size="small">选择图片</Button>
+              </Upload>
+            </div>
+          </div>
+
+          <div className={styles.formGrid}>
+            <Form.Item
+              label="用户名"
+              name="username"
+              rules={[{ required: true, message: '用户名不能为空' }]}
+            >
+              <Input placeholder="你的用户名" />
+            </Form.Item>
+
+            <Form.Item label="所在城市" name="location">
+              <Input placeholder="例如：北京、上海" prefix={<EnvironmentOutlined />} />
+            </Form.Item>
+          </div>
+
           <Form.Item label="个人简介" name="bio">
-            <TextArea rows={4} placeholder="介绍一下你自己..." />
+            <TextArea
+              rows={3}
+              placeholder="简单介绍一下自己，你的研究方向、技术栈..."
+              showCount
+              maxLength={200}
+            />
           </Form.Item>
-          <Form.Item label="头像URL" name="avatarUrl">
-            <Input placeholder="https://..." />
+
+          <Form.Item label="技能 (逗号分隔)" name="skills">
+            <Input placeholder="例如：Python, ROS2, 计算机视觉, 强化学习" />
           </Form.Item>
-          <Form.Item label="位置" name="location">
-            <Input placeholder="城市，国家" />
+
+          <Form.Item label="研究兴趣 (逗号分隔)" name="interests">
+            <Input placeholder="例如：具身智能, 机器人操控, 多模态感知" />
           </Form.Item>
-          <Form.Item label="GitHub" name="githubUrl">
-            <Input placeholder="https://github.com/..." />
-          </Form.Item>
-          <Form.Item label="LinkedIn" name="linkedinUrl">
-            <Input placeholder="https://linkedin.com/in/..." />
-          </Form.Item>
-          <Form.Item label="Twitter" name="twitterUrl">
-            <Input placeholder="https://twitter.com/..." />
-          </Form.Item>
-          <Form.Item label="个人网站" name="websiteUrl">
-            <Input placeholder="https://..." />
-          </Form.Item>
-          <Form.Item label="技能" name="skills">
-            <Input placeholder="用逗号分隔，例如：Python, React, 机器学习" />
-          </Form.Item>
-          <Form.Item label="兴趣" name="interests">
-            <Input placeholder="用逗号分隔，例如：计算机视觉, 机器人, NLP" />
-          </Form.Item>
-          <Form.Item>
-            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-              <Button onClick={() => setEditProfileOpen(false)}>
-                取消
-              </Button>
-              <Button type="primary" htmlType="submit">
-                保存
-              </Button>
-            </Space>
-          </Form.Item>
+
+          <div className={styles.sectionDivider}>社交主页</div>
+
+          <div className={styles.formGrid}>
+            <Form.Item label="GitHub" name="githubUrl">
+              <Input placeholder="https://github.com/username" prefix={<GithubOutlined />} />
+            </Form.Item>
+            <Form.Item label="个人网站" name="websiteUrl">
+              <Input placeholder="https://your-site.com" prefix={<GlobalOutlined />} />
+            </Form.Item>
+            <Form.Item label="LinkedIn" name="linkedinUrl">
+              <Input placeholder="https://linkedin.com/in/..." prefix={<LinkOutlined />} />
+            </Form.Item>
+            <Form.Item label="Twitter / X" name="twitterUrl">
+              <Input placeholder="https://twitter.com/..." />
+            </Form.Item>
+          </div>
+
+          <div className={styles.editFormFooter}>
+            <Button onClick={() => setEditOpen(false)}>取消</Button>
+            <Button type="primary" htmlType="submit" loading={saving}>
+              保存资料
+            </Button>
+          </div>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

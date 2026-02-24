@@ -1,0 +1,64 @@
+/**
+ * PageContainer样式
+ * 统一页面布局样式
+ * 注意：布局由 GlobalSidebarWrapper 处理，此组件只负责内容区域样式
+ */
+
+.pageWrapper {
+  width: 100%;
+  background-color: var(--color-bg-default);
+}
+
+.contentArea {
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pageHeader {
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.pageTitle {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold, 600);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.loadingWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .contentArea {
+    padding: var(--spacing-md);
+  }
+
+  .pageTitle {
+    font-size: var(--font-size-lg);
+  }
+}
+
+@media (max-width: 576px) {
+  .contentArea {
+    padding: var(--mobile-padding);
+  }
+
+  .pageHeader {
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+  }
+
+  .pageTitle {
+    font-size: var(--font-size-md);
+  }
+}

@@ -4,6 +4,7 @@
 
 import { logger } from '../utils/logger';
 import adminPrisma, { ensureAdminDatabaseConnected } from '../config/database.admin';
+import userPrisma from '../config/database.user';
 
 const prisma = adminPrisma as any;
 
@@ -87,10 +88,11 @@ export async function getAllKeywords(params: GetKeywordsParams) {
       model.count({ where }),
     ]);
 
+    // 视频数据存储在用户库（userPrisma），按关键词同步时由 video.service 写入
     const keywordsWithVideoCount = await Promise.all(
       keywords.map(async (keyword: any) => {
         try {
-          const videoCount = await prisma.video.count({
+          const videoCount = await userPrisma.video.count({
             where: {
               platform: 'bilibili',
               OR: [

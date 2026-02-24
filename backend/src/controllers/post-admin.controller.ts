@@ -3,8 +3,10 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { deletePost, restorePost, pinPost, featurePost } from '../services/post-admin.service';
-import { sendSuccess, sendError } from '../utils/response';
+import { deletePost, restorePost, pinPost, featurePost, getCommunityStats } from '../services/post-admin.service';
+import { getPosts } from '../services/post.service';
+import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
+import { sendSuccess } from '../utils/response';
 
 /**
  * 删除帖子
@@ -55,6 +57,43 @@ export async function featurePostHandler(req: Request, res: Response, next: Next
     const { isFeatured } = req.body;
     await featurePost(postId, isFeatured);
     sendSuccess(res, { message: isFeatured ? '加精成功' : '取消加精成功' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 管理端获取帖子列表（支持 status 筛选，与用户端同源数据）
+ */
+export async function getAdminPostsListHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { skip, take, page, size } = parsePaginationParams(req.query);
+    const { sort, status } = req.query;
+
+    const { posts, total } = await getPosts({
+      skip,
+      take,
+      sort: (sort as 'hot' | 'latest') || 'latest',
+      topicId: undefined,
+      status: (status as string) || undefined,
+    });
+
+    sendSuccess(res, {
+      items: posts,
+      pagination: buildPaginationResponse(page, size, total),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 市集统计（管理端）
+ */
+export async function getCommunityStatsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const stats = await getCommunityStats();
+    sendSuccess(res, stats);
   } catch (error) {
     next(error);
   }

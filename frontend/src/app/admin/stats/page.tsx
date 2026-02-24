@@ -6,6 +6,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
 export default function AdminStatsRedirect() {
   const router = useRouter();
@@ -14,5 +16,11 @@ export default function AdminStatsRedirect() {
     router.replace('/admin');
   }, [router]);
 
-  return null;
+  return (
+    <PageContainer title="数据统计">
+      <div className={styles.pageWrapper}>
+        <p className={styles.loadingText}>正在跳转到数据看板...</p>
+      </div>
+    </PageContainer>
+  );
 }

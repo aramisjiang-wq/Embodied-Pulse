@@ -10,11 +10,12 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/store/authStore';
+import styles from './page.module.css';
 
 export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { setUser, setToken } = useAuthStore();
+  const { setUser, setToken, setRefreshToken } = useAuthStore();
   const { message } = App.useApp();
 
   const onFinish = async (values: { email: string; password: string }) => {
@@ -29,7 +30,8 @@ export default function AdminLoginPage() {
       });
 
       setToken(response.token, true);
-      setUser(response.user);
+      if (response.refreshToken) setRefreshToken(response.refreshToken, true);
+      setUser(response.user, true);
       
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('admin_login_success', 'true');
@@ -39,12 +41,9 @@ export default function AdminLoginPage() {
 
       message.success('登录成功');
       
-      const savedToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-
       setTimeout(() => {
-        router.push('/admin');
-        router.refresh();
-      }, 200);
+        window.location.href = '/admin';
+      }, 300);
     } catch (error: any) {
       const errorMessage = error.message || error.response?.data?.message || '登录失败，请检查邮箱和密码';
       message.error(errorMessage);
@@ -54,22 +53,11 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <Card style={{ width: 450, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 'bold', color: '#1890ff', margin: 0 }}>
-            Embodied Pulse
-          </h1>
-          <p style={{ fontSize: 16, color: '#999', marginTop: 8 }}>管理后台</p>
+    <div className={styles.loginPage}>
+      <Card className={styles.loginCard}>
+        <div className={styles.loginHeader}>
+          <h1 className={styles.loginTitle}>Embodied Pulse</h1>
+          <p className={styles.loginSubtitle}>管理后台</p>
         </div>
 
         <Form name="admin_login" onFinish={onFinish} size="large">
@@ -97,8 +85,8 @@ export default function AdminLoginPage() {
           </Form.Item>
         </Form>
 
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#999' }}>
-          <a href="/" style={{ color: '#1890ff' }}>
+        <div className={styles.loginFooter}>
+          <a href="/" className={styles.loginLink}>
             返回用户端
           </a>
         </div>

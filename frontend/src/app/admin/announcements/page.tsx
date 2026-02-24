@@ -5,6 +5,8 @@ import { Table, Button, Space, Modal, Form, Input, Switch, DatePicker, Tag, App 
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { announcementApi } from '@/lib/api/announcement';
 import { Announcement } from '@/lib/api/types';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 import dayjs from 'dayjs';
 
 export default function AdminAnnouncementsPage() {
@@ -172,9 +174,9 @@ export default function AdminAnnouncementsPage() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>公告管理</h1>
+    <PageContainer title="公告管理" loading={loading && announcements.length === 0}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>公告管理</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           新建公告
         </Button>
@@ -229,6 +231,6 @@ export default function AdminAnnouncementsPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

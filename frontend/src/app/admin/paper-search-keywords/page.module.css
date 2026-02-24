@@ -1,0 +1,456 @@
+/* ─── 页面根容器 ─── */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: #f8fafc;
+  min-height: 100%;
+}
+
+/* ─── 顶部标题 ─── */
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pageTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.pageTitleIcon {
+  color: #3b82f6;
+  font-size: 22px;
+}
+
+.pageTitleSub {
+  font-size: 13px;
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+/* ─── 数据概览 ─── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow 0.2s;
+}
+
+.statCard:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ─── 同步控制台 ─── */
+.syncPanel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.syncPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.syncPanelIcon {
+  color: #3b82f6;
+  font-size: 16px;
+}
+
+.syncPanelSub {
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
+  margin-left: 4px;
+}
+
+/* ─── 模式切换 Tabs ─── */
+.syncModeTabs {
+  display: flex;
+  gap: 0;
+  padding: 16px 20px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modeTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-right: 4px;
+}
+
+.modeTab:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.modeTabActive {
+  background: #fff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  border-bottom-color: #fff;
+  font-weight: 600;
+  position: relative;
+  bottom: -1px;
+  z-index: 1;
+}
+
+.modeTabBadge {
+  display: inline-block;
+  padding: 1px 6px;
+  background: #10b981;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 10px;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── 同步配置区 ─── */
+.syncConfig {
+  padding: 20px;
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.syncConfigInner {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.configGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.configLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.configInput {
+  width: 180px;
+}
+
+.configHint {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+  max-width: 340px;
+  padding-top: 4px;
+}
+
+/* ─── arXiv 分类格子 ─── */
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 8px;
+}
+
+.categoryItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.categoryItem:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.categoryLabel {
+  font-weight: 600;
+  color: #1e40af;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+}
+
+.categoryDesc {
+  color: #64748b;
+  font-size: 11px;
+}
+
+/* ─── 同步操作区 ─── */
+.syncActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.syncBtn {
+  min-width: 160px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.syncResultOk {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  max-width: 320px;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.syncResultError {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  max-width: 480px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* ─── 表格面板 ─── */
+.tablePanel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tablePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tableFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  width: 200px;
+}
+
+.filterSelect {
+  width: 110px;
+}
+
+.searchIcon {
+  color: #94a3b8;
+}
+
+.tableActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dataTable {
+  border-radius: 0;
+}
+
+/* ─── 表格单元格 ─── */
+.kwCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.kwText {
+  font-weight: 600;
+  color: #1d4ed8;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.kwCell:hover .kwText {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.kwBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.actionBtn {
+  color: #64748b !important;
+}
+
+.actionBtn:hover {
+  color: #334155 !important;
+}
+
+/* ─── 标签 ─── */
+.tagBlue {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tagCyan {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #ecfeff;
+  color: #0e7490;
+  border: 1px solid #a5f3fc;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tagOrange {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tagRed {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.textMuted {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* ─── 响应式 ─── */
+@media (max-width: 768px) {
+  .root {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .categoryGrid {
+    grid-template-columns: repeat(2, auto);
+  }
+
+  .syncConfig {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .pageTitleSub {
+    display: none;
+  }
+}

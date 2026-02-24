@@ -1,15 +1,13 @@
-/**
- * 论文详情页
- */
-
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Layout, Card, Tag, Space, Button, Spin, Divider, Tabs, App } from 'antd';
-import { EyeOutlined, HeartOutlined, ShareAltOutlined, StarOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons';
+import { useEffect, useState, useCallback } from 'react';
+import { Card, Button, Divider, Tabs, App, Spin } from 'antd';
+import { EyeOutlined, HeartOutlined, ShareAltOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { paperApi } from '@/lib/api/paper';
 import { Paper } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
+import { useFavorite } from '@/hooks/useFavorite';
 import dynamic from 'next/dynamic';
 import DynamicComponents from '@/lib/dynamicComponents';
 import { communityApi } from '@/lib/api/community';
@@ -17,68 +15,69 @@ import RelatedContent from '@/components/RelatedContent';
 import QuickActions from '@/components/QuickActions';
 import JsonLd from '@/components/JsonLd';
 import { generateArticleJsonLd, generateBreadcrumbListJsonLd } from '@/lib/metadata';
+import PageContainer from '@/components/PageContainer';
+import styles from './page.module.css';
 
 const ShareModal = DynamicComponents.ShareModal;
 const PDFViewer = DynamicComponents.PDFViewer;
 
-const { Content } = Layout;
-
-export default function PaperDetailPage({ params }: { params: { id: string } }) {
+export default function PaperDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [paper, setPaper] = useState<Paper | null>(null);
   const { user } = useAuthStore();
   const [shareOpen, setShareOpen] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
   const [activeTab, setActiveTab] = useState('abstract');
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadPaper();
-  }, [params.id]);
+  const { isFavorited, setIsFavorited } = useFavorite('paper', id || '');
 
-  useEffect(() => {
-    if (user) {
-      loadFavoriteState();
-    } else {
-      setIsFavorited(false);
-    }
-  }, [user, params.id]);
-
-  const loadFavoriteState = async () => {
-    try {
-      const data = await communityApi.getFavorites({ page: 1, size: 1000, contentType: 'paper' });
-      const favorited = data.items?.some((fav: any) => fav.contentId === params.id);
-      setIsFavorited(favorited);
-    } catch (error) {
-      console.error('Load favorite state error:', error);
-    }
-  };
-
-  const loadPaper = async () => {
+  const loadPaper = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await paperApi.getPaper(params.id);
-      setPaper(data);
+      const data = await paperApi.getPaper(id);
+      if (data) {
+        setPaper(data);
+      } else {
+        setPaper(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载失败');
+      console.error('Load paper error:', error);
+      setPaper(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadPaper();
+    }
+  }, [id, loadPaper]);
 
   if (loading) {
     return (
-      <div style={{ padding: 100, textAlign: 'center' }}>
-        <Spin size="large" />
-      </div>
+      <PageContainer loading={true}>
+        <div className={styles.loadingWrapper}>
+          <Spin size="large" />
+        </div>
+      </PageContainer>
     );
   }
 
   if (!paper) {
     return (
-      <div style={{ padding: 100, textAlign: 'center', color: '#999' }}>
-        论文不存在
-      </div>
+      <PageContainer>
+        <div className={styles.notFoundWrapper}>
+          论文不存在
+        </div>
+      </PageContainer>
     );
   }
 
@@ -113,125 +112,146 @@ export default function PaperDetailPage({ params }: { params: { id: string } }) 
     <>
       <JsonLd data={articleJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <Card style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>{paper.title}</h1>
-
-          <Space wrap style={{ marginBottom: 16 }}>
-            <span style={{ color: '#000000', fontSize: 15 }}>作者: {Array.isArray(paper.authors) ? paper.authors.join(', ') : ''}</span>
-          </Space>
-
-          <Space wrap style={{ marginBottom: 16 }}>
-            {paper.venue && <Tag color="green" style={{ fontSize: 14, color: '#000000', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>{paper.venue}</Tag>}
-            {paper.publishedDate && (
-              <Tag style={{ fontSize: 14, color: '#000000', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>{new Date(paper.publishedDate).toLocaleDateString()}</Tag>
-            )}
-            {paper.arxivId && <Tag style={{ fontSize: 14, color: '#000000', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 4, whiteSpace: 'nowrap' }}>arXiv: {paper.arxivId}</Tag>}
-          </Space>
-
-          <div style={{ marginBottom: 16 }}>
-            <Space size="large" style={{ fontSize: 14, color: '#000000' }}>
-              <span><EyeOutlined /> {paper.viewCount} 浏览</span>
-              <span><HeartOutlined /> {paper.favoriteCount} 收藏</span>
-              <span><ShareAltOutlined /> {paper.shareCount} 分享</span>
-              <span>引用 {paper.citationCount}</span>
-            </Space>
-          </div>
-
-          <QuickActions
-            contentType="paper"
-            contentId={paper.id}
-            title={paper.title}
-            url={typeof window !== 'undefined' ? `${window.location.origin}/papers/${paper.id}` : ''}
-            onShare={() => setShareOpen(true)}
-            onFavoriteChange={(isFav) => setIsFavorited(isFav)}
-          />
-
-          <Space size="middle" style={{ marginBottom: 24 }}>
-            {paper.arxivId && (
-              <Button 
-                type="primary"
-                href={`https://arxiv.org/abs/${paper.arxivId}`} 
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                查看arXiv原文
-              </Button>
-            )}
-            {paper.pdfUrl && (
-              <Button icon={<DownloadOutlined />} href={paper.pdfUrl} target="_blank" rel="noopener noreferrer">
-                下载PDF
-              </Button>
-            )}
-          </Space>
-
-          <Divider />
-
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={[
-              {
-                key: 'abstract',
-                label: (
-                  <span>
-                    <FileTextOutlined />
-                    摘要
+      <PageContainer title={paper.title}>
+        <div className={styles.container}>
+          <Card className={styles.paperCard}>
+            <header className={styles.header}>
+              <h1 className={styles.paperTitle}>{paper.title}</h1>
+              {Array.isArray(paper.authors) && paper.authors.length > 0 && (
+                <p className={styles.authorsText}>
+                  作者：{paper.authors.join('、')}
+                </p>
+              )}
+              <div className={styles.metaRow}>
+                {paper.venue && (
+                  <span className={styles.venuePill}>{paper.venue}</span>
+                )}
+                {paper.publishedDate && (
+                  <span className={styles.metaChip}>
+                    {new Date(paper.publishedDate).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </span>
-                ),
-                children: (
-                  <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>摘要</h2>
-                    <p style={{ fontSize: 15, lineHeight: 1.8, color: '#333' }}>
-                      {paper.abstract}
-                    </p>
+                )}
+                {paper.arxivId && (
+                  <span className={styles.arxivChip}>arXiv: {paper.arxivId}</span>
+                )}
+              </div>
+            </header>
 
-                    {paper.categories && Array.isArray(paper.categories) && paper.categories.length > 0 && (
-                      <>
-                        <Divider />
-                        <div>
-                          <h3 style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>分类标签</h3>
-                          <Space wrap>
-                            {paper.categories.map((cat: string) => (
-                              <Tag key={cat} color="blue">{cat}</Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: 'pdf',
-                label: (
-                  <span>
-                    <DownloadOutlined />
-                    PDF预览
-                  </span>
-                ),
-                children: paper.pdfUrl ? (
-                  <PDFViewer url={paper.pdfUrl} title={paper.title} />
-                ) : (
-                  <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
-                    暂无PDF预览
-                  </div>
-                ),
-                disabled: !paper.pdfUrl,
-              },
-            ]}
+            <div className={styles.statsBar}>
+              <span className={styles.statItem}><EyeOutlined /> {paper.viewCount}</span>
+              <span className={styles.statItem}><HeartOutlined /> {paper.favoriteCount}</span>
+              <span className={styles.statItem}><ShareAltOutlined /> {paper.shareCount}</span>
+              <span className={styles.statItem}>引用 {paper.citationCount}</span>
+            </div>
+
+            <div className={styles.actionBar}>
+              <div className={styles.primaryActions}>
+                {paper.arxivId && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    href={`https://arxiv.org/abs/${paper.arxivId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.ctaButton}
+                  >
+                    <FileTextOutlined /> 查看 arXiv 原文
+                  </Button>
+                )}
+                {paper.pdfUrl && (
+                  <Button
+                    size="large"
+                    icon={<DownloadOutlined />}
+                    href={paper.pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.secondaryButton}
+                  >
+                    下载 PDF
+                  </Button>
+                )}
+              </div>
+              <div className={styles.quickActionsWrap}>
+                <QuickActions
+                  contentType="paper"
+                  contentId={paper.id}
+                  title={paper.title}
+                  url={typeof window !== 'undefined' ? `${window.location.origin}/papers/${paper.id}` : ''}
+                  onShare={() => setShareOpen(true)}
+                  onFavoriteChange={(isFav) => setIsFavorited(isFav)}
+                  showSubscribe={false}
+                />
+              </div>
+            </div>
+
+            <Divider className={styles.divider} />
+
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              className={styles.tabs}
+              items={[
+                {
+                  key: 'abstract',
+                  label: (
+                    <span>
+                      <FileTextOutlined />
+                      摘要
+                    </span>
+                  ),
+                  children: (
+                    <div className={styles.tabContent}>
+                      <h2 className={styles.sectionTitle}>摘要</h2>
+                      <p className={styles.abstractText}>
+                        {paper.abstract}
+                      </p>
+
+                      {paper.categories && Array.isArray(paper.categories) && paper.categories.length > 0 && (
+                        <>
+                          <Divider className={styles.categoryDivider} />
+                          <div className={styles.categorySection}>
+                            <h3 className={styles.categoryTitle}>分类标签</h3>
+                            <div className={styles.categoryTags}>
+                              {paper.categories.map((cat: string) => (
+                                <span key={cat} className={styles.categoryTag}>{cat}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'pdf',
+                  label: (
+                    <span>
+                      <DownloadOutlined />
+                      PDF预览
+                    </span>
+                  ),
+                  children: paper.pdfUrl ? (
+                    <PDFViewer url={paper.pdfUrl} title={paper.title} />
+                  ) : (
+                    <div className={styles.pdfPlaceholder}>
+                      暂无PDF预览
+                    </div>
+                  ),
+                  disabled: !paper.pdfUrl,
+                },
+              ]}
+            />
+          </Card>
+
+          <RelatedContent
+            currentId={paper.id}
+            type="paper"
+            categories={paper.categories}
+            keywords={paper.title ? paper.title.split(' ') : []}
+            limit={5}
           />
-        </Card>
-
-        <RelatedContent
-          currentId={paper.id}
-          type="paper"
-          categories={paper.categories}
-          keywords={paper.title ? paper.title.split(' ') : []}
-          limit={5}
-        />
-      </Content>
+        </div>
+      </PageContainer>
 
       <ShareModal
         open={shareOpen}
@@ -247,7 +267,6 @@ export default function PaperDetailPage({ params }: { params: { id: string } }) 
         }}
         onClose={() => setShareOpen(false)}
       />
-    </div>
     </>
   );
 }

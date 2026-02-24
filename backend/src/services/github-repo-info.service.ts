@@ -39,7 +39,7 @@ export interface GitHubRepoInfo {
 }
 
 export interface ParsedGitHubRepo {
-  repoId: number;
+  repoId: bigint;
   fullName: string;
   name: string;
   owner: string;
@@ -116,7 +116,7 @@ export async function getGitHubRepoFromUrl(url: string): Promise<ParsedGitHubRep
   const repoInfo = await getGitHubRepoInfo(parsed.owner, parsed.repo);
 
   return {
-    repoId: repoInfo.id,
+    repoId: BigInt(repoInfo.id),
     fullName: repoInfo.full_name,
     name: repoInfo.name,
     owner: repoInfo.owner.login,

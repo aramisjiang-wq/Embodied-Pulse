@@ -6,6 +6,7 @@ import { ReloadOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icon
 import { syncApi } from '@/lib/api/sync';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 
@@ -166,9 +167,9 @@ export default function AdminSyncQueuePage() {
   });
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>同步队列</h1>
+    <div className={styles.pageWrapper}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>同步队列</h1>
         <Space>
           <Input
             placeholder="搜索数据源、任务类型、状态"

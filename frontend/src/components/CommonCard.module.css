@@ -1,0 +1,56 @@
+/**
+ * CommonCard样式
+ * 统一卡片样式
+ */
+
+.card {
+  background-color: var(--color-bg-paper);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-normal);
+}
+
+.card:hover {
+  border-color: var(--color-border);
+}
+
+.hoverable {
+  cursor: pointer;
+}
+
+.hoverable:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+  border-color: var(--color-primary-light);
+}
+
+/* 卡片标题样式 */
+.card :global(.ant-card-head) {
+  border-bottom: 1px solid var(--color-divider);
+  padding: 0 var(--spacing-md);
+  min-height: 48px;
+}
+
+.card :global(.ant-card-head-title) {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  padding: var(--spacing-sm) 0;
+}
+
+/* 卡片内容样式 */
+.card :global(.ant-card-body) {
+  color: var(--color-text-secondary);
+}
+
+/* 响应式 */
+@media (max-width: 576px) {
+  .card {
+    border-radius: var(--radius-sm);
+  }
+
+  .card :global(.ant-card-head) {
+    padding: 0 var(--spacing-sm);
+  }
+}

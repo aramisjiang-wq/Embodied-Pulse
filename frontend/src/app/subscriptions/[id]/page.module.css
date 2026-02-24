@@ -1,0 +1,26 @@
+.pageWrapper {
+  padding: var(--spacing-lg);
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.backButton {
+  margin-bottom: 16px;
+}
+
+.subscriptionCard {
+  border-radius: var(--radius-md);
+}
+
+.subscriptionTitle {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md);
+  }
+}

@@ -14,13 +14,14 @@ import { logger } from '../utils/logger';
  */
 export async function getCookieStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const status = BilibiliCookieManager.getCookieStatus();
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const activeCount = cookies.filter(c => c.isActive).length;
     
     sendSuccess(res, {
-      total: status.length,
-      active: status.filter(s => s.isActive).length,
-      inactive: status.filter(s => !s.isActive).length,
-      cookies: status,
+      totalCount: cookies.length,
+      activeCount,
+      inactiveCount: cookies.length - activeCount,
+      cookies,
     });
   } catch (error: any) {
     logger.error('获取Cookie状态失败:', error);
@@ -33,14 +34,43 @@ export async function getCookieStatus(req: Request, res: Response, next: NextFun
  */
 export async function checkCookies(req: Request, res: Response, next: NextFunction) {
   try {
-    const cookiePool = BilibiliHealthService.getCookiePoolConfig();
-    const results = await BilibiliHealthService.checkAllCookies(cookiePool);
-    
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const results = [];
+
+    for (const cookie of cookies) {
+      if (!cookie.id.startsWith('env-') && cookie.id !== 'env') {
+        const result = await BilibiliHealthService.checkCookie(cookie.cookie || '');
+        
+        await BilibiliCookieManager.updateCookieStatus(cookie.id, {
+          lastCheckAt: new Date(),
+          checkResult: result.valid ? 'valid' : result.error,
+          userMid: result.mid,
+          userName: result.name,
+        });
+
+        results.push({
+          id: cookie.id,
+          name: cookie.name,
+          valid: result.valid,
+          mid: result.mid,
+          userName: result.name,
+          error: result.error,
+          errorCode: result.errorCode,
+        });
+      } else {
+        results.push({
+          id: cookie.id,
+          name: cookie.name,
+          valid: true,
+          error: '环境变量Cookie，跳过检查',
+        });
+      }
+    }
+
     const summary = {
       total: results.length,
       valid: results.filter(r => r.valid).length,
-      invalid: results.filter(r => !r.valid && r.cookie).length,
-      unconfigured: results.filter(r => !r.cookie).length,
+      invalid: results.filter(r => !r.valid).length,
       cookies: results,
     };
     
@@ -56,7 +86,28 @@ export async function checkCookies(req: Request, res: Response, next: NextFuncti
  */
 export async function getHealthSummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const summary = await BilibiliHealthService.getHealthSummary();
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    
+    const summary = {
+      total: cookies.length,
+      active: cookies.filter(c => c.isActive).length,
+      healthy: cookies.filter(c => c.errorCount === 0 && c.isActive).length,
+      warning: cookies.filter(c => c.errorCount > 0 && c.errorCount < 3 && c.isActive).length,
+      invalid: cookies.filter(c => c.errorCount >= 3 || !c.isActive).length,
+      cookies: cookies.map(c => ({
+        id: c.id,
+        name: c.name,
+        isActive: c.isActive,
+        errorCount: c.errorCount,
+        lastUsed: c.lastUsed,
+        lastError: c.lastError,
+        lastCheckAt: c.lastCheckAt,
+        checkResult: c.checkResult,
+        userMid: c.userMid,
+        userName: c.userName,
+      })),
+    };
+
     sendSuccess(res, summary);
   } catch (error: any) {
     logger.error('获取Cookie健康摘要失败:', error);
@@ -75,22 +126,22 @@ export async function addCookie(req: Request, res: Response, next: NextFunction)
       return sendError(res, 1001, '参数不完整：name和cookie必填', 400);
     }
     
-    const cookieId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    BilibiliCookieManager.addCookie({
-      id: cookieId,
+    const result = await BilibiliCookieManager.addCookie({
+      id: `manual-${Date.now()}`,
       name,
       cookie,
       isActive: true,
       lastUsed: new Date(),
       errorCount: 0,
       createdAt: new Date(),
+      priority: priority || 0,
+      source: 'manual',
     });
     
-    logger.info(`添加Cookie成功: ${name} (ID: ${cookieId})`);
+    logger.info(`添加Cookie成功: ${name} (ID: ${result.id})`);
     
     sendSuccess(res, {
-      id: cookieId,
+      id: result.id,
       name,
       message: '添加成功',
     });
@@ -110,8 +161,12 @@ export async function removeCookie(req: Request, res: Response, next: NextFuncti
     if (!id) {
       return sendError(res, 1001, 'Cookie ID不能为空', 400);
     }
+
+    if (id === 'env') {
+      return sendError(res, 1003, '环境变量Cookie不能删除，请在.env文件中修改', 400);
+    }
     
-    BilibiliCookieManager.removeCookie(id);
+    await BilibiliCookieManager.removeCookie(id);
     
     logger.info(`删除Cookie成功: ${id}`);
     
@@ -132,31 +187,27 @@ export async function toggleCookieStatus(req: Request, res: Response, next: Next
     if (!id) {
       return sendError(res, 1001, 'Cookie ID不能为空', 400);
     }
-    
-    const status = BilibiliCookieManager.getCookieStatus();
-    const cookie = status.find(c => c.id === id);
+
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const cookie = cookies.find(c => c.id === id);
     
     if (!cookie) {
       return sendError(res, 1005, 'Cookie不存在', 404);
     }
     
-    if (cookie.id === 'env') {
+    if (id === 'env') {
       return sendError(res, 1003, '环境变量Cookie不能切换状态', 400);
     }
     
-    BilibiliCookieManager.removeCookie(id);
-    BilibiliCookieManager.addCookie({
-      ...cookie,
-      isActive: !cookie.isActive,
-      lastUsed: new Date(),
-    } as any);
+    const newStatus = !cookie.isActive;
+    await BilibiliCookieManager.updateCookieStatus(id, { isActive: newStatus });
     
-    logger.info(`切换Cookie状态成功: ${id} -> ${!cookie.isActive ? '激活' : '停用'}`);
+    logger.info(`切换Cookie状态成功: ${id} -> ${newStatus ? '激活' : '停用'}`);
     
     sendSuccess(res, {
       id,
-      isActive: !cookie.isActive,
-      message: cookie.isActive ? '已停用' : '已激活',
+      isActive: newStatus,
+      message: newStatus ? '已激活' : '已停用',
     });
   } catch (error: any) {
     logger.error('切换Cookie状态失败:', error);
@@ -174,21 +225,19 @@ export async function resetCookieErrorCount(req: Request, res: Response, next: N
     if (!id) {
       return sendError(res, 1001, 'Cookie ID不能为空', 400);
     }
-    
-    const status = BilibiliCookieManager.getCookieStatus();
-    const cookie = status.find(c => c.id === id);
+
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const cookie = cookies.find(c => c.id === id);
     
     if (!cookie) {
       return sendError(res, 1005, 'Cookie不存在', 404);
     }
     
-    BilibiliCookieManager.removeCookie(id);
-    BilibiliCookieManager.addCookie({
-      ...cookie,
+    await BilibiliCookieManager.updateCookieStatus(id, {
       errorCount: 0,
       lastError: undefined,
-      lastUsed: new Date(),
-    } as any);
+      isActive: true,
+    });
     
     logger.info(`重置Cookie错误计数成功: ${id}`);
     
@@ -204,31 +253,33 @@ export async function resetCookieErrorCount(req: Request, res: Response, next: N
  */
 export async function getCookieStats(req: Request, res: Response, next: NextFunction) {
   try {
-    const status = BilibiliCookieManager.getCookieStatus();
+    const cookies = await BilibiliCookieManager.getCookieStatus();
     
     const stats = {
-      total: status.length,
-      active: status.filter(s => s.isActive).length,
-      inactive: status.filter(s => !s.isActive).length,
-      totalErrors: status.reduce((sum, s) => sum + s.errorCount, 0),
-      avgErrors: status.length > 0 
-        ? status.reduce((sum, s) => sum + s.errorCount, 0) / status.length 
+      total: cookies.length,
+      active: cookies.filter(c => c.isActive).length,
+      inactive: cookies.filter(c => !c.isActive).length,
+      totalErrors: cookies.reduce((sum, c) => sum + c.errorCount, 0),
+      avgErrors: cookies.length > 0 
+        ? cookies.reduce((sum, c) => sum + c.errorCount, 0) / cookies.length 
         : 0,
-      mostUsed: status.length > 0 
-        ? status.reduce((max, s) => 
-            new Date(s.lastUsed) > new Date(max.lastUsed) ? s : max
+      mostUsed: cookies.length > 0 
+        ? cookies.reduce((max, c) => 
+            new Date(c.lastUsed) > new Date(max.lastUsed) ? c : max
           )
         : null,
-      mostErrors: status.length > 0 
-        ? status.reduce((max, s) => s.errorCount > max.errorCount ? s : max)
+      mostErrors: cookies.length > 0 
+        ? cookies.reduce((max, c) => c.errorCount > max.errorCount ? c : max)
         : null,
-      cookies: status.map(s => ({
-        id: s.id,
-        name: s.name,
-        isActive: s.isActive,
-        errorCount: s.errorCount,
-        lastUsed: s.lastUsed,
-        lastError: s.lastError,
+      cookies: cookies.map(c => ({
+        id: c.id,
+        name: c.name,
+        isActive: c.isActive,
+        errorCount: c.errorCount,
+        lastUsed: c.lastUsed,
+        lastError: c.lastError,
+        lastCheckAt: c.lastCheckAt,
+        checkResult: c.checkResult,
       })),
     };
     
@@ -236,5 +287,102 @@ export async function getCookieStats(req: Request, res: Response, next: NextFunc
   } catch (error: any) {
     logger.error('获取Cookie统计失败:', error);
     sendError(res, 500, error.message || '获取Cookie统计失败');
+  }
+}
+
+/**
+ * 获取设置
+ */
+export async function getSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const settings = await BilibiliCookieManager.getSettings();
+    sendSuccess(res, settings);
+  } catch (error: any) {
+    logger.error('获取Cookie设置失败:', error);
+    sendError(res, 500, error.message || '获取Cookie设置失败');
+  }
+}
+
+/**
+ * 更新设置
+ */
+export async function updateSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { autoRotateEnabled, healthCheckInterval, maxErrorCount, alertEnabled } = req.body;
+    
+    const settings = await BilibiliCookieManager.updateSettings({
+      autoRotateEnabled,
+      healthCheckInterval,
+      maxErrorCount,
+      alertEnabled,
+    });
+    
+    logger.info('更新Cookie设置成功');
+    sendSuccess(res, settings);
+  } catch (error: any) {
+    logger.error('更新Cookie设置失败:', error);
+    sendError(res, 500, error.message || '更新Cookie设置失败');
+  }
+}
+
+/**
+ * 手动轮换Cookie
+ */
+export async function rotateCookie(req: Request, res: Response, next: NextFunction) {
+  try {
+    const newCookie = await BilibiliCookieManager.rotateCookie();
+    
+    if (!newCookie) {
+      return sendError(res, 500, '没有可用的Cookie');
+    }
+    
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const activeCookies = cookies.filter(c => c.isActive);
+    
+    sendSuccess(res, {
+      message: '切换成功',
+      activeCount: activeCookies.length,
+    });
+  } catch (error: any) {
+    logger.error('轮换Cookie失败:', error);
+    sendError(res, 500, error.message || '轮换Cookie失败');
+  }
+}
+
+/**
+ * 检查单个Cookie健康状态
+ */
+export async function checkSingleCookie(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    
+    const cookies = await BilibiliCookieManager.getCookieStatus();
+    const cookie = cookies.find(c => c.id === id);
+    
+    if (!cookie) {
+      return sendError(res, 1005, 'Cookie不存在', 404);
+    }
+
+    const result = await BilibiliHealthService.checkCookie(cookie.cookie || '');
+    
+    await BilibiliCookieManager.updateCookieStatus(id, {
+      lastCheckAt: new Date(),
+      checkResult: result.valid ? 'valid' : result.error,
+      userMid: result.mid,
+      userName: result.name,
+    });
+    
+    sendSuccess(res, {
+      id,
+      name: cookie.name,
+      valid: result.valid,
+      mid: result.mid,
+      userName: result.name,
+      error: result.error,
+      errorCode: result.errorCode,
+    });
+  } catch (error: any) {
+    logger.error('检查单个Cookie失败:', error);
+    sendError(res, 500, error.message || '检查Cookie失败');
   }
 }

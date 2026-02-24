@@ -1,6 +1,3 @@
-// Prisma Schema - User Database (用户端数据库)
-// 存储所有用户端注册用户信息
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client-user"
@@ -11,98 +8,81 @@ datasource db {
   url      = env("USER_DATABASE_URL")
 }
 
-// 用户表（用户端注册用户）
 model User {
-  id            String    @id @default(uuid())
-  userNumber    String    @unique @map("user_number") // 系统内唯一编号
-  username      String    @unique
-  email         String?   @unique
-  passwordHash  String?   @map("password_hash")
-  avatarUrl     String?   @map("avatar_url")
-  bio           String?
-  githubId      String?   @unique @map("github_id")
-  level         Int       @default(1)
-  points        Int       @default(0)
-  isVip         Boolean   @default(false) @map("is_vip")
-  isActive      Boolean   @default(true) @map("is_active")
-  lastLoginAt   DateTime? @map("last_login_at")
-  tags          String?   // JSON格式存储标签数组
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  // 关系
-  posts         Post[]
-  comments      Comment[]
-  favorites     Favorite[]
-  pointRecords  PointRecord[]
-  userActions   UserAction[]
-  subscriptions Subscription[]
-  notifications Notification[]
-  contentSubscriptions ContentSubscription[]
-  jobSeekingPosts JobSeekingPost[]
+  id               String         @id @default(uuid())
+  userNumber       String         @unique @map("user_number")
+  username         String         @unique
+  email            String?        @unique
+  passwordHash     String?        @map("password_hash")
+  avatarUrl        String?        @map("avatar_url")
+  bio              String?
+  githubId         String?        @unique @map("github_id")
+  githubUrl        String?        @map("github_url")
+  linkedinUrl      String?        @map("linkedin_url")
+  twitterUrl       String?        @map("twitter_url")
+  websiteUrl       String?        @map("website_url")
+  location         String?
+  skills           String?
+  interests        String?
+  level            Int            @default(1)
+  points           Int            @default(0)
+  isVip            Boolean        @default(false) @map("is_vip")
+  isActive         Boolean        @default(true) @map("is_active")
+  lastLoginAt      DateTime?      @map("last_login_at")
+  tags             String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  role             String?        @default("user")
+  identityType     String?        @map("identity_type")
+  organizationName String?        @map("organization_name")
+  region           String?        @map("region")
+  comments         Comment[]
+  favorites        Favorite[]
+  notifications    Notification[]
+  pointRecords     PointRecord[]
+  posts            Post[]
+  subscriptions    Subscription[]
+  userActions      UserAction[]
 
   @@map("users")
 }
 
-// 论文表
 model Paper {
-  id                           String    @id @default(uuid())
-  arxivId                      String?   @unique @map("arxiv_id")
-  title                        String
-  authors                      String
-  abstract                     String?
-  pdfUrl                       String?   @map("pdf_url")
-  publishedDate                DateTime? @map("published_date")
-  citationCount                Int       @default(0) @map("citation_count")
-  venue                        String?
-  categories                   String?
-  viewCount                    Int       @default(0) @map("view_count")
-  favoriteCount                Int       @default(0) @map("favorite_count")
-  shareCount                   Int       @default(0) @map("share_count")
-  createdAt                    DateTime  @default(now()) @map("created_at")
-  updatedAt                    DateTime  @updatedAt @map("updated_at")
-  
-  semanticScholarId            String?   @unique @map("semantic_scholar_id")
-  influentialCitationCount     Int?      @default(0) @map("influential_citation_count")
-  isOpenAccess                 Boolean?  @default(false) @map("is_open_access")
-  openAccessPdfUrl             String?   @map("open_access_pdf_url")
-  fieldsOfStudy                String?   @map("fields_of_study")
-  publicationTypes             String?   @map("publication_types")
-  tldr                         String?
-  relatedPaperIds              String?   @map("related_paper_ids")
-  venueType                    String?   @map("venue_type")
-  journalName                  String?   @map("journal_name")
-  conferenceName               String?   @map("conference_name")
-  volume                       String?
-  issue                        String?
-  pages                        String?
-  doi                          String?
-  pmid                         String?
-  lastEnrichmentDate           DateTime? @map("last_enrichment_date")
-  enrichmentStatus             String?   @default("pending") @map("enrichment_status")
-  enrichmentError              String?   @map("enrichment_error")
-  enrichmentRetryCount         Int       @default(0) @map("enrichment_retry_count")
+  id            String    @id @default(uuid())
+  arxivId       String?   @unique @map("arxiv_id")
+  title         String
+  authors       String
+  abstract      String?
+  pdfUrl        String?   @map("pdf_url")
+  publishedDate DateTime? @map("published_date")
+  citationCount Int       @default(0) @map("citation_count")
+  venue         String?
+  categories    String?
+  viewCount     Int       @default(0) @map("view_count")
+  favoriteCount Int       @default(0) @map("favorite_count")
+  shareCount    Int       @default(0) @map("share_count")
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@index([publishedDate(sort: Desc)])
   @@index([viewCount(sort: Desc)])
   @@index([favoriteCount(sort: Desc)])
   @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
-  @@index([enrichmentStatus])
-  @@index([lastEnrichmentDate(sort: Desc)])
-  @@index([semanticScholarId])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("papers")
 }
 
-// 视频表
 model Video {
   id            String    @id @default(uuid())
-  platform      String    // 平台：bilibili, youtube等
-  videoId       String    @map("video_id") // 平台视频ID（如bvid）
-  bvid          String?   @unique // Bilibili视频ID（兼容字段）
+  platform      String
+  videoId       String    @map("video_id")
+  bvid          String?   @unique
   title         String
   description   String?
   coverUrl      String?   @map("cover_url")
-  duration      Int?      // 时长（秒）
+  duration      Int?
   uploader      String?
   uploaderId    String?   @map("uploader_id")
   publishedDate DateTime? @map("published_date")
@@ -110,8 +90,10 @@ model Video {
   likeCount     Int       @default(0) @map("like_count")
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
-  tags          String?   // JSON格式存储标签数组
-  metadata      String?   // JSON格式存储额外元数据
+  tags          String?
+  metadata      String?
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -119,30 +101,29 @@ model Video {
   @@index([viewCount(sort: Desc)])
   @@index([platform])
   @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("videos")
 }
 
-// Bilibili UP主表
 model BilibiliUploader {
-  id          String   @id @default(uuid())
-  mid         String   @unique // Bilibili用户ID
-  name        String   // UP主名称
-  avatar      String?  // 头像URL
-  description String?  // 简介
-  tags        String?  // JSON格式存储标签数组
-  isActive    Boolean  @default(true) @map("is_active") // 是否启用
-  lastSyncAt  DateTime? @map("last_sync_at") // 最后同步时间
-  videoCount  Int      @default(0) @map("video_count") // 已抓取视频数
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  mid         String    @unique
+  name        String
+  avatar      String?
+  description String?
+  tags        String?
+  isActive    Boolean   @default(true) @map("is_active")
+  lastSyncAt  DateTime? @map("last_sync_at")
+  videoCount  Int       @default(0) @map("video_count")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("bilibili_uploaders")
 }
 
-// GitHub项目表
 model GithubRepo {
   id            String    @id @default(uuid())
-  repoId        Int       @map("repo_id")
+  repoId        String    @map("repo_id")
   name          String
   fullName      String    @unique @map("full_name")
   owner         String?
@@ -153,74 +134,72 @@ model GithubRepo {
   forksCount    Int       @default(0) @map("forks_count")
   issuesCount   Int       @default(0) @map("issues_count")
   topics        String?
-  license       String?
-  homepageUrl   String?   @map("homepage_url")
   createdDate   DateTime? @map("created_date")
   updatedDate   DateTime? @map("updated_date")
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
-  addedBy       String?   @map("added_by")
-  notifyEnabled Boolean   @default(true) @map("notify_enabled")
-  lastNotified  DateTime? @map("last_notified")
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  addedBy       String?   @map("added_by")
+  notifyEnabled Int?      @default(1) @map("notify_enabled")
+  lastNotified  String?   @map("last_notified")
+  category      String?   @map("category")
 
   @@index([repoId])
+  @@index([category])
   @@index([starsCount(sort: Desc)])
   @@index([updatedDate(sort: Desc)])
   @@index([updatedDate(sort: Desc), starsCount(sort: Desc)])
-  @@index([addedBy])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("github_repos")
 }
 
-// Banner表
 model Banner {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   title       String
-  description String?   // Banner描述文字
-  imageUrl    String    @map("image_url")
-  linkUrl     String?   @map("link_url")
-  order       Int       @default(0)
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  description String?
+  imageUrl    String   @map("image_url")
+  linkUrl     String?  @map("link_url")
+  order       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@index([order])
   @@map("banners")
 }
 
-// 公告表
 model Announcement {
-  id          String    @id @default(uuid())
-  title       String
-  content     String
-  type        String    @default("info") // info, warning, error, success
-  linkUrl     String?   @map("link_url")
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   @default("info")
+  linkUrl   String?  @map("link_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([isActive])
   @@map("announcements")
 }
 
-// 首页运营模块配置表
 model HomeModule {
-  id          String    @id @default(uuid())
-  name        String    @unique
+  id          String   @id @default(uuid())
+  name        String   @unique
   title       String
   description String?
-  config      String?   // JSON格式配置
-  isActive    Boolean   @default(true) @map("is_active")
-  order       Int       @default(0)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  config      String?
+  isActive    Boolean  @default(true) @map("is_active")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@index([order])
   @@map("home_modules")
 }
 
-// Hugging Face 模型表
 model HuggingFaceModel {
   id            String    @id @default(uuid())
   fullName      String    @unique @map("full_name")
@@ -232,15 +211,26 @@ model HuggingFaceModel {
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
   shareCount    Int       @default(0) @map("share_count")
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  hf_id         String?
+  name          String?
+  author        String?
+  license       String?
+  tags          String?
+  contentType   String?   @map("content_type")
+  category      String?
 
   @@index([downloads(sort: Desc)])
   @@index([lastModified(sort: Desc)])
+  @@index([contentType])
+  @@index([category])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("huggingface_models")
 }
 
-// 岗位表
 model Job {
   id            String    @id @default(uuid())
   title         String
@@ -250,54 +240,37 @@ model Job {
   salaryMax     Int?      @map("salary_max")
   description   String?
   requirements  String?
-  status        String    @default("open") // open, closed
+  status        String    @default("open")
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
   tags          String?
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  external_id   String?
+  company_logo  String?
+  experience    String?
+  education     String?
+  benefits      String?
+  apply_url     String?
+  apply_count   Int?      @default(0)
 
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("jobs")
 }
 
-// 求职信息表
-model JobSeekingPost {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  name          String?
-  position      String?
-  location      String?
-  salaryMin     Int?      @map("salary_min")
-  salaryMax     Int?      @map("salary_max")
-  experience    String?
-  education     String?
-  skills        String?
-  description   String?
-  resumeUrl     String?   @map("resume_url")
-  viewCount     Int       @default(0) @map("view_count")
-  favoriteCount Int       @default(0) @map("favorite_count")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([createdAt(sort: Desc)])
-  @@map("job_seeking_posts")
-}
-
-// 具身智能新闻表
 model News {
   id            String    @id @default(uuid())
+  platform      String
   title         String
-  description   String?   // 描述字段（用于 summary 和 content）
-  url           String    @unique // 原文链接（使用 url 而不是 source_url）
-  score         String?   // 评分
-  platform      String    // 来源：36kr, techcrunch, mit, ai-news等
-  publishedDate DateTime  @map("published_date") // 发布日期
+  url           String    @unique
+  score         String?
+  description   String?
+  publishedDate DateTime? @map("published_date")
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
   shareCount    Int       @default(0) @map("share_count")
@@ -307,27 +280,31 @@ model News {
   @@index([publishedDate(sort: Desc)])
   @@index([viewCount(sort: Desc)])
   @@index([platform])
+  @@index([createdAt(sort: Desc)])
   @@map("news")
 }
 
-// 社区帖子表
 model Post {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  contentType   String    @map("content_type") // paper, video, repo, huggingface
-  contentId     String    @map("content_id")
-  title         String?
-  content       String
-  tags          String?   // JSON array of tags
-  viewCount     Int       @default(0) @map("view_count")
-  likeCount     Int       @default(0) @map("like_count")
-  commentCount  Int       @default(0) @map("comment_count")
-  status        String    @default("active") // active, deleted
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments      Comment[]
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  contentType  String    @map("content_type")
+  contentId    String    @map("content_id")
+  title        String?
+  content      String
+  viewCount    Int       @default(0) @map("view_count")
+  likeCount    Int       @default(0) @map("like_count")
+  commentCount Int       @default(0) @map("comment_count")
+  status       String    @default("active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  images       String?
+  tags         String?
+  topic_id     String?
+  share_count  Int?      @default(0)
+  is_featured  Boolean?  @default(false)
+  is_top       Boolean?  @default(false)
+  comments     Comment[]
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([contentType, contentId])
@@ -335,19 +312,17 @@ model Post {
   @@map("posts")
 }
 
-// 评论表
 model Comment {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  postId        String    @map("post_id")
-  parentId      String?   @map("parent_id")
-  content       String
-  likeCount     Int       @default(0) @map("like_count")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  parentId  String?  @map("parent_id")
+  content   String
+  likeCount Int      @default(0) @map("like_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([postId])
@@ -355,16 +330,14 @@ model Comment {
   @@map("comments")
 }
 
-// 收藏表
 model Favorite {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  contentType   String    @map("content_type")
-  contentId     String    @map("content_id")
-  folderId      String?   @map("folder_id")
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  contentType String   @map("content_type")
+  contentId   String   @map("content_id")
+  folderId    String?  @map("folder_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, contentType, contentId])
   @@index([userId])
@@ -372,17 +345,15 @@ model Favorite {
   @@map("favorites")
 }
 
-// 用户行为表
 model UserAction {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  actionType    String    @map("action_type") // view, like, share, comment
-  contentType   String    @map("content_type")
-  contentId     String    @map("content_id")
-  metadata      String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  user          User      @relation(fields: [userId], references: [id])
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  actionType  String   @map("action_type")
+  contentType String   @map("content_type")
+  contentId   String   @map("content_id")
+  metadata    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId, actionType])
   @@index([contentType, contentId])
@@ -390,46 +361,42 @@ model UserAction {
   @@map("user_actions")
 }
 
-// 积分记录表
 model PointRecord {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  points        Int
-  actionType    String    @map("action_type")
-  description   String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  user          User      @relation(fields: [userId], references: [id])
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  points      Int
+  actionType  String   @map("action_type")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([createdAt(sort: Desc)])
   @@map("point_records")
 }
 
-// 用户订阅表
 model Subscription {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  contentType   String    @map("content_type") // paper, video, repo, huggingface, job
-  keywords      String?                        // JSON字符串，存储订阅的关键词列表（可选）
-  tags          String?                        // JSON字符串，存储订阅的标签列表
-  authors       String?                        // JSON字符串，存储订阅的作者列表（论文用）
-  uploaders     String?                        // JSON字符串，存储订阅的UP主列表（视频用）
-  platform      String?                        // 平台限制（视频用：bilibili/youtube）
-  isPublic      Boolean   @default(false) @map("is_public") // 是否为公共订阅（管理员配置）
-  isActive      Boolean   @default(true) @map("is_active")
-  notifyEnabled Boolean   @default(true) @map("notify_enabled") // 是否开启通知
-  syncEnabled   Boolean   @default(true) @map("sync_enabled") // 是否开启自动同步
-  newCount      Int       @default(0) @map("new_count") // 新内容数量（红点提示）
-  totalMatched  Int       @default(0) @map("total_matched") // 总匹配数量
-  lastNotified  DateTime? @map("last_notified") // 最后一次通知时间
-  lastChecked   DateTime? @map("last_checked") // 最后一次检查更新时间
-  lastSyncAt    DateTime? @map("last_sync_at") // 最后一次同步时间
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user          User      @relation(fields: [userId], references: [id])
+  id            String                @id @default(uuid())
+  userId        String                @map("user_id")
+  contentType   String                @map("content_type")
+  keywords      String?
+  tags          String?
+  authors       String?
+  uploaders     String?
+  platform      String?
+  isPublic      Boolean               @default(false) @map("is_public")
+  isActive      Boolean               @default(true) @map("is_active")
+  notifyEnabled Boolean               @default(true) @map("notify_enabled")
+  syncEnabled   Boolean               @default(true) @map("sync_enabled")
+  newCount      Int                   @default(0) @map("new_count")
+  totalMatched  Int                   @default(0) @map("total_matched")
+  lastNotified  DateTime?             @map("last_notified")
+  lastChecked   DateTime?             @map("last_checked")
+  lastSyncAt    DateTime?             @map("last_sync_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
   history       SubscriptionHistory[]
+  user          User                  @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([contentType])
@@ -439,19 +406,17 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// 订阅同步历史表
 model SubscriptionHistory {
-  id             String    @id @default(uuid())
-  subscriptionId String    @map("subscription_id")
-  syncType       String    @map("sync_type") // manual, auto, scheduled
-  matchedCount   Int       @default(0) @map("matched_count")
-  newCount       Int       @default(0) @map("new_count")
-  status         String    @default("success") // success, failed, partial
-  errorMessage   String?   @map("error_message")
+  id             String       @id @default(uuid())
+  subscriptionId String       @map("subscription_id")
+  syncType       String       @map("sync_type")
+  matchedCount   Int          @default(0) @map("matched_count")
+  newCount       Int          @default(0) @map("new_count")
+  status         String       @default("success")
+  errorMessage   String?      @map("error_message")
   duration       Int?
   metadata       String?
-  createdAt      DateTime  @default(now()) @map("created_at")
-
+  createdAt      DateTime     @default(now()) @map("created_at")
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
@@ -459,42 +424,40 @@ model SubscriptionHistory {
   @@map("subscription_history")
 }
 
-// 新闻关键词过滤规则表
 model NewsKeywordFilter {
-  id            String    @id @default(uuid())
-  name          String    @unique // 规则名称
-  description   String?   // 规则描述
-  keywords      String?   // JSON格式：包含的关键词列表
-  excludeKeywords String? @map("exclude_keywords") // JSON格式：排除的关键词列表
-  matchType     String    @default("all") @map("match_type") // all: 全部匹配, any: 任一匹配
-  caseSensitive Boolean   @default(false) @map("case_sensitive") // 是否区分大小写
-  isActive      Boolean   @default(true) @map("is_active") // 是否启用
-  priority      Int       @default(0) // 优先级（数字越大优先级越高）
-  applyToPlatform String? @map("apply_to_platform") // 适用的平台：baidu, weibo, zhihu, bilibili, all
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String?
+  keywords        String?
+  excludeKeywords String?  @map("exclude_keywords")
+  matchType       String   @default("all") @map("match_type")
+  caseSensitive   Boolean  @default(false) @map("case_sensitive")
+  isActive        Boolean  @default(true) @map("is_active")
+  priority        Int      @default(0)
+  applyToPlatform String?  @map("apply_to_platform")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([isActive])
   @@index([priority(sort: Desc)])
   @@map("news_keyword_filters")
 }
 
-// 新闻抓取配置表
 model NewsSourceConfig {
   id            String    @id @default(uuid())
-  platform      String    @unique // 平台标识：baidu, weibo, zhihu, bilibili
-  name          String    // 平台名称
-  baseUrl       String    @map("base_url") // 基础URL
-  searchUrl     String?   @map("search_url") // 搜索URL模板
-  listUrl       String?   @map("list_url") // 列表URL模板
-  headers       String?   // JSON格式：请求头配置
-  params        String?   // JSON格式：默认请求参数
-  isActive      Boolean   @default(true) @map("is_active") // 是否启用
-  syncEnabled   Boolean   @default(true) @map("sync_enabled") // 是否开启自动同步
-  syncInterval  Int       @default(3600) @map("sync_interval") // 同步间隔（秒）
-  lastSyncAt    DateTime? @map("last_sync_at") // 最后一次同步时间
-  lastSuccessAt DateTime? @map("last_success_at") // 最后一次成功同步时间
-  totalItems    Int       @default(0) @map("total_items") // 总抓取数量
+  platform      String    @unique
+  name          String
+  baseUrl       String    @map("base_url")
+  searchUrl     String?   @map("search_url")
+  listUrl       String?   @map("list_url")
+  headers       String?
+  params        String?
+  isActive      Boolean   @default(true) @map("is_active")
+  syncEnabled   Boolean   @default(true) @map("sync_enabled")
+  syncInterval  Int       @default(3600) @map("sync_interval")
+  lastSyncAt    DateTime? @map("last_sync_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  totalItems    Int       @default(0) @map("total_items")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -503,77 +466,27 @@ model NewsSourceConfig {
   @@map("news_source_configs")
 }
 
-// 通知表
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Notification {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  type          String    // repo_update, paper_new, video_new, job_new, system
-  title         String    // 通知标题
-  content       String?   // 通知内容
-  contentType   String?   @map("content_type") // 关联内容类型：paper, video, repo, huggingface, job
-  contentId     String?   @map("content_id") // 关联内容ID
-  metadata      String?   // JSON格式：存储额外的元数据
-  isRead        Boolean   @default(false) @map("is_read") // 是否已读
-  readAt        DateTime? @map("read_at") // 阅读时间
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String? @id @default(uuid())
+  userId      String  @map("user_id")
+  type        String
+  title       String
+  content     String?
+  contentType String? @map("content_type")
+  contentId   String? @map("content_id")
+  metadata    String?
+  isRead      Int?    @default(0) @map("is_read")
+  readAt      String? @map("read_at")
+  createdAt   String  @default("CURRENT_TIMESTAMP") @map("created_at")
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId])
   @@index([type])
   @@index([isRead])
   @@index([createdAt(sort: Desc)])
   @@map("notifications")
-}
-
-// 内容订阅表
-model ContentSubscription {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  contentType   String    @map("content_type") // repo, paper, huggingface
-  contentId     String    @map("content_id") // 具体内容的ID
-  notifyEnabled Boolean   @default(true) @map("notify_enabled") // 是否开启更新通知
-  lastNotified  DateTime? @map("last_notified") // 最后一次通知时间
-  lastChecked   DateTime? @map("last_checked") // 最后一次检查更新时间
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, contentType, contentId])
-  @@index([userId])
-  @@index([contentType, contentId])
-  @@map("content_subscriptions")
-}
-
-// 系统配置表
-// 用户HuggingFace订阅表
-model UserHuggingFaceSubscription {
-  id              String    @id @default(uuid())
-  userId          String    @map("user_id")
-  subscriptionType String   @map("subscription_type") // papers, author
-  author          String?
-  authorUrl       String?   @map("author_url")
-  isActive        Boolean   @default(true) @map("is_active")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  @@unique([userId, subscriptionType, author])
-  @@index([userId])
-  @@index([subscriptionType])
-  @@index([isActive])
-  @@map("user_huggingface_subscriptions")
-}
-
-model SystemConfig {
-  id          String    @id @default(uuid())
-  key         String    @unique
-  value       String?
-  description String?
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  @@map("system_configs")
+  @@ignore
 }
 
 model PasswordReset {
@@ -601,4 +514,78 @@ model EmailVerification {
   @@index([email])
   @@index([code])
   @@map("email_verifications")
+}
+
+model custom_pages {
+  id         String   @id
+  slug       String   @unique
+  title      String
+  content    String
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime
+
+  @@index([sort_order])
+  @@index([is_active])
+}
+
+model DailyNews {
+  id        String  @id @default(uuid())
+  date      String
+  title     String
+  content   String
+  isPinned  Boolean @default(false) @map("is_pinned")
+  pinnedAt  String? @map("pinned_at")
+  viewCount Int     @default(0) @map("view_count")
+  createdAt String  @map("created_at")
+  updatedAt String  @updatedAt @map("updated_at")
+
+  @@index([date(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
+  @@map("daily_news")
+}
+
+model admin_audit_logs {
+  id         String   @id
+  admin_id   String
+  action     String
+  target     String?
+  details    String?
+  ip         String?
+  created_at DateTime @default(now())
+
+  @@index([action])
+  @@index([created_at(sort: Desc)])
+  @@index([admin_id])
+}
+
+model bilibili_cookie_settings {
+  id                    String   @id
+  auto_rotate_enabled   Boolean  @default(false)
+  health_check_interval Int      @default(60)
+  max_error_count       Int      @default(3)
+  alert_enabled         Boolean  @default(true)
+  updated_at            DateTime
+}
+
+model bilibili_cookies {
+  id            String    @id
+  name          String
+  cookie        String
+  priority      Int       @default(0)
+  is_active     Boolean   @default(true)
+  error_count   Int       @default(0)
+  last_error    String?
+  last_used_at  DateTime?
+  last_check_at DateTime?
+  check_result  String?
+  user_mid      String?
+  user_name     String?
+  source        String    @default("manual")
+  created_at    DateTime  @default(now())
+  updated_at    DateTime
+
+  @@index([priority])
+  @@index([is_active])
 }

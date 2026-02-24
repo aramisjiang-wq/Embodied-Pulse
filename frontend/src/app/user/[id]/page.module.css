@@ -1,0 +1,45 @@
+.pageWrapper {
+  padding: var(--spacing-lg);
+}
+
+.userCard {
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.userName {
+  margin: 0 0 8px 0;
+}
+
+.userBio {
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.userStats {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.postsCard {
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding: var(--spacing-md);
+  }
+
+  .userInfo {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}

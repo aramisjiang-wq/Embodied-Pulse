@@ -15,6 +15,9 @@ export interface GetHuggingFaceParams {
   task?: string;
   license?: string;
   keyword?: string;
+  contentType?: string; // model | dataset | space
+  author?: string; // 按作者筛选
+  category?: string; // 具身智能资源大全分类 id
 }
 
 export async function getHuggingFaceModels(
@@ -28,6 +31,15 @@ export async function getHuggingFaceModels(
     }
     if (params.license) {
       where.license = params.license;
+    }
+    if (params.contentType) {
+      where.contentType = params.contentType;
+    }
+    if (params.category) {
+      where.category = params.category;
+    }
+    if (params.author) {
+      where.author = params.author;
     }
     // 关键词搜索（SQLite不支持mode: 'insensitive'，使用contains即可）
     if (params.keyword) {
@@ -95,24 +107,33 @@ export async function createHuggingFaceModel(
     // 处理日期字段
     const lastModified = data.lastModified ? new Date(data.lastModified) : null;
 
-    // 注意：userPrisma的HuggingFaceModel只有以下字段：
-    // - fullName (唯一约束)
-    // - description, task, downloads, likes, lastModified
-    // 没有tags、hfId、name、author字段（数据库表结构中没有tags字段）
+    // 处理tags字段（如果是数组，转换为字符串）
+    const tagsValue = data.tags 
+      ? (Array.isArray(data.tags) ? data.tags.join(',') : data.tags)
+      : null;
+
     const createData: any = {
       fullName: data.fullName,
       description: data.description || null,
       task: data.task || null,
-      // tags字段在数据库表中不存在，所以不包含
+      contentType: (data as any).contentType || 'model',
+      category: (data as any).category || null,
       downloads: data.downloads || 0,
       likes: data.likes || 0,
       lastModified: lastModified,
+      hf_id: (data as any).hf_id || (data as any).hfId || null,
+      name: (data as any).name || data.fullName.split('/').pop() || null,
+      author: (data as any).author || data.fullName.split('/')[0] || null,
+      license: (data as any).license || null,
+      tags: tagsValue,
     };
 
     logger.info('Creating HuggingFace model with data:', {
       fullName: createData.fullName,
       task: createData.task,
       lastModified: createData.lastModified?.toISOString(),
+      author: createData.author,
+      name: createData.name,
     });
 
     return await prisma.huggingFaceModel.create({ data: createData });
@@ -160,5 +181,60 @@ export async function deleteHuggingFaceModels(modelIds: string[]): Promise<void>
   } catch (error) {
     logger.error('Delete HuggingFace models error:', error);
     throw new Error('HUGGINGFACE_DELETE_FAILED');
+  }
+}
+
+/**
+ * 获取各任务类型、内容类型、分类的模型数量统计，以及最新更新时间
+ */
+export async function getTaskTypeStats(): Promise<
+  Record<string, number> & { latestUpdatedAt?: string }
+> {
+  try {
+    const [models, latest] = await Promise.all([
+      prisma.huggingFaceModel.findMany({
+        select: { task: true, contentType: true, category: true },
+      }),
+      prisma.huggingFaceModel.findFirst({
+        select: { lastModified: true },
+        orderBy: { lastModified: 'desc' },
+      }),
+    ]);
+
+    const stats: Record<string, number> & {
+      latestUpdatedAt?: string;
+    } = {};
+
+    stats['all'] = models.length;
+    stats['model'] = 0;
+    stats['dataset'] = 0;
+    stats['space'] = 0;
+
+    models.forEach((model) => {
+      if (model.contentType === 'model') {
+        stats['model'] = (stats['model'] || 0) + 1;
+      } else if (model.contentType === 'dataset') {
+        stats['dataset'] = (stats['dataset'] || 0) + 1;
+      } else if (model.contentType === 'space') {
+        stats['space'] = (stats['space'] || 0) + 1;
+      }
+      
+      if (model.task) {
+        stats[model.task] = (stats[model.task] || 0) + 1;
+      }
+      
+      if (model.category) {
+        stats[model.category] = (stats[model.category] || 0) + 1;
+      }
+    });
+
+    if (latest?.lastModified) {
+      stats.latestUpdatedAt = latest.lastModified.toISOString();
+    }
+
+    return stats;
+  } catch (error) {
+    logger.error('Get task type stats error:', error);
+    return { all: 0 };
   }
 }

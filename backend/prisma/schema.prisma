@@ -9,37 +9,40 @@ datasource db {
 }
 
 model User {
-  id            String          @id @default(uuid())
-  userNumber    String          @unique @map("user_number")
-  username      String          @unique
-  email         String?         @unique
-  passwordHash  String?         @map("password_hash")
-  avatarUrl     String?         @map("avatar_url")
-  bio           String?
-  githubId      String?         @unique @map("github_id")
-  githubUrl     String?         @map("github_url")
-  linkedinUrl   String?         @map("linkedin_url")
-  twitterUrl    String?         @map("twitter_url")
-  websiteUrl    String?         @map("website_url")
-  location      String?
-  skills        String?
-  interests     String?
-  level         Int             @default(1)
-  points        Int             @default(0)
-  isVip         Boolean         @default(false) @map("is_vip")
-  isActive      Boolean         @default(true) @map("is_active")
-  lastLoginAt   DateTime?       @map("last_login_at")
-  tags          String?
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  role          String?         @default("user")
-  comments      Comment[]
-  favorites     Favorite[]
-  notifications notifications[] @ignore
-  pointRecords  PointRecord[]
-  posts         Post[]
-  subscriptions Subscription[]
-  userActions   UserAction[]
+  id              String          @id @default(uuid())
+  userNumber      String          @unique @map("user_number")
+  username        String          @unique
+  email           String?         @unique
+  passwordHash    String?         @map("password_hash")
+  avatarUrl       String?         @map("avatar_url")
+  bio             String?
+  githubId        String?         @unique @map("github_id")
+  githubUrl       String?         @map("github_url")
+  linkedinUrl     String?         @map("linkedin_url")
+  twitterUrl      String?         @map("twitter_url")
+  websiteUrl      String?         @map("website_url")
+  location        String?
+  skills          String?
+  interests       String?
+  level           Int             @default(1)
+  points          Int             @default(0)
+  isVip           Boolean         @default(false) @map("is_vip")
+  isActive        Boolean         @default(true) @map("is_active")
+  lastLoginAt     DateTime?       @map("last_login_at")
+  tags            String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  role            String?         @default("user")
+  identityType    String?         @map("identity_type")
+  organizationName String?        @map("organization_name")
+  region          String?
+  comments        Comment[]
+  favorites       Favorite[]
+  notifications   notifications[] @ignore
+  pointRecords    PointRecord[]
+  posts           Post[]
+  subscriptions   Subscription[]
+  userActions     UserAction[]
 
   @@map("users")
 }
@@ -58,6 +61,8 @@ model Paper {
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
   shareCount    Int       @default(0) @map("share_count")
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -65,6 +70,7 @@ model Paper {
   @@index([viewCount(sort: Desc)])
   @@index([favoriteCount(sort: Desc)])
   @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("papers")
 }
 
@@ -86,6 +92,8 @@ model Video {
   favoriteCount Int       @default(0) @map("favorite_count")
   tags          String?
   metadata      String?
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -93,12 +101,13 @@ model Video {
   @@index([publishedDate(sort: Desc), viewCount(sort: Desc)])
   @@index([platform])
   @@index([viewCount(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("videos")
 }
 
 model GithubRepo {
   id             String    @id @default(uuid())
-  repoId         Int       @map("repo_id")
+  repoId         String    @map("repo_id")
   name           String
   fullName       String    @unique @map("full_name")
   owner          String?
@@ -113,16 +122,21 @@ model GithubRepo {
   updatedDate    DateTime? @map("updated_date")
   viewCount      Int       @default(0) @map("view_count")
   favoriteCount  Int       @default(0) @map("favorite_count")
+  isPinned       Boolean   @default(false) @map("is_pinned")
+  pinnedAt       DateTime? @map("pinned_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   added_by       String?
   notify_enabled Int?      @default(1)
   last_notified  String?
+  category       String?
 
   @@index([starsCount(sort: Desc)])
   @@index([updatedDate(sort: Desc)])
   @@index([updatedDate(sort: Desc), starsCount(sort: Desc)])
   @@index([repoId])
+  @@index([category])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("github_repos")
 }
 
@@ -181,6 +195,8 @@ model HuggingFaceModel {
   viewCount     Int       @default(0) @map("view_count")
   favoriteCount Int       @default(0) @map("favorite_count")
   shareCount    Int       @default(0) @map("share_count")
+  isPinned      Boolean   @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   hfId          String?   @map("hf_id")
@@ -188,9 +204,14 @@ model HuggingFaceModel {
   author        String?
   license       String?
   tags          String?
+  contentType   String?   @map("content_type")
+  category      String?
 
   @@index([downloads(sort: Desc)])
   @@index([lastModified(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
+  @@index([contentType])
+  @@index([category])
   @@map("huggingface_models")
 }
 
@@ -207,6 +228,8 @@ model Job {
   viewCount     Int      @default(0) @map("view_count")
   favoriteCount Int      @default(0) @map("favorite_count")
   tags          String?
+  isPinned      Boolean  @default(false) @map("is_pinned")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   externalId    String?  @map("external_id")
@@ -220,6 +243,7 @@ model Job {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("jobs")
 }
 
@@ -363,18 +387,20 @@ model SubscriptionHistory {
   @@map("subscription_history")
 }
 
-model bilibili_uploaders {
+model BilibiliUploader {
   id           String    @id
   mid          String    @unique
   name         String
   avatar       String?
   description  String?
   tags         String?
-  is_active    Boolean   @default(true)
-  last_sync_at DateTime?
-  video_count  Int       @default(0)
-  created_at   DateTime  @default(now())
-  updated_at   DateTime
+  isActive     Boolean   @default(true) @map("is_active")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  videoCount   Int       @default(0) @map("video_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("bilibili_uploaders")
 }
 
 model news {
@@ -499,4 +525,53 @@ model EmailVerification {
   @@index([email])
   @@index([code])
   @@map("email_verifications")
+}
+
+model BilibiliCookie {
+  id           String    @id @default(uuid())
+  name         String
+  cookie       String
+  priority     Int       @default(0)
+  isActive     Boolean   @default(true) @map("is_active")
+  errorCount   Int       @default(0) @map("error_count")
+  lastError    String?   @map("last_error")
+  lastUsedAt   DateTime? @map("last_used_at")
+  lastCheckAt  DateTime? @map("last_check_at")
+  checkResult  String?   @map("check_result")
+  userMid      String?   @map("user_mid")
+  userName     String?   @map("user_name")
+  source       String    @default("manual")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([priority])
+  @@map("bilibili_cookies")
+}
+
+model BilibiliCookieSetting {
+  id                   String   @id @default(uuid())
+  autoRotateEnabled    Boolean  @default(false) @map("auto_rotate_enabled")
+  healthCheckInterval  Int      @default(60) @map("health_check_interval")
+  maxErrorCount        Int      @default(3) @map("max_error_count")
+  alertEnabled         Boolean  @default(true) @map("alert_enabled")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("bilibili_cookie_settings")
+}
+
+model DailyNews {
+  id          String    @id @default(uuid())
+  date        String
+  title       String
+  content     String
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  pinnedAt    String?   @map("pinned_at")
+  viewCount   Int       @default(0) @map("view_count")
+  createdAt   String    @map("created_at")
+  updatedAt   String    @map("updated_at")
+
+  @@index([date(sort: Desc)])
+  @@index([isPinned, pinnedAt(sort: Desc)])
+  @@map("daily_news")
 }

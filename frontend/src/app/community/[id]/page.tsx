@@ -1,24 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Layout, Card, Avatar, Space, Button, Spin, Divider, Tag, Typography, Row, Col, App } from 'antd';
-import { LikeOutlined, ShareAltOutlined, EyeOutlined, CalendarOutlined } from '@ant-design/icons';
+import { useEffect, useState, useCallback } from 'react';
+import { Card, Avatar, Space, Button, Spin, Divider, Tag, Typography, Row, Col, App } from 'antd';
+import { LikeOutlined, ShareAltOutlined, EyeOutlined, CalendarOutlined, UserOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { communityApi } from '@/lib/api/community';
 import { Post } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
 import RealTimeComments from '@/components/RealTimeComments';
 import QuickActions from '@/components/QuickActions';
+import { getLevelBadge } from '@/lib/utils/levelUtils';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
+import PageContainer from '@/components/PageContainer';
+import Link from 'next/link';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
 
-const { Content } = Layout;
-const { Title, Paragraph, Text } = Typography;
+const { Title, Text } = Typography;
 
-export default function CommunityDetailPage({ params }: { params: { id: string } }) {
+const POST_TYPE_CONFIG: Record<string, { icon: string; label: string }> = {
+  tech: { icon: '💻', label: '技术讨论' },
+  resource: { icon: '📦', label: '资源分享' },
+  jobs: { icon: '💼', label: '求职招聘' },
+  activity: { icon: '🎯', label: '活动交流' },
+  discussion: { icon: '💬', label: '讨论' },
+  paper: { icon: '📄', label: '论文分享' },
+  video: { icon: '🎬', label: '视频分享' },
+  repo: { icon: '🔧', label: '项目推荐' },
+  model: { icon: '🤖', label: '模型推荐' },
+  event: { icon: '📅', label: '活动信息' },
+  job: { icon: '💼', label: '招聘信息' },
+};
+
+export default function CommunityDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [post, setPost] = useState<Post | null>(null);
   const [commentCount, setCommentCount] = useState(0);
@@ -26,35 +46,47 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
   const { user } = useAuthStore();
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadPost();
-  }, [params.id]);
-
-  const loadPost = async () => {
+  const loadPost = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await communityApi.getPost(params.id);
-      setPost(data);
+      const data = await communityApi.getPost(id);
+      if (data) {
+        setPost(data);
+      } else {
+        setPost(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载失败');
+      console.error('Load post error:', error);
+      setPost(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
 
-  const handleLike = async () => {
-    if (!user) {
+  const handleLike = useCallback(async () => {
+    if (!user || !id) {
       message.warning('请先登录');
       return;
     }
     try {
-      await communityApi.likePost(params.id);
+      await communityApi.likePost(id);
       message.success('点赞成功');
       loadPost();
     } catch (error: any) {
       message.error(error.message || '点赞失败');
     }
-  };
+  }, [user, id, message, loadPost]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadPost();
+    }
+  }, [id, loadPost]);
 
   const handleShare = () => {
     if (!user) {
@@ -62,7 +94,7 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
       return;
     }
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${baseUrl}/community/${params.id}`;
+    const shareUrl = `${baseUrl}/community/${id}`;
     
     if (navigator.share) {
       navigator.share({
@@ -78,60 +110,77 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
 
   if (loading) {
     return (
-      <div style={{ padding: 100, textAlign: 'center' }}>
-        <Spin size="large" />
-      </div>
+      <PageContainer loading={true}>
+        <div className={styles.loadingWrapper}>
+          <Spin size="large" />
+        </div>
+      </PageContainer>
     );
   }
 
   if (!post) {
     return (
-      <div style={{ padding: 100, textAlign: 'center', color: '#999' }}>
-        帖子不存在
-      </div>
+      <PageContainer>
+        <div className={styles.notFoundWrapper}>
+          帖子不存在
+        </div>
+      </PageContainer>
     );
   }
 
+  const typeConfig = POST_TYPE_CONFIG[post.contentType as string] || POST_TYPE_CONFIG.discussion;
+  const levelBadge = getLevelBadge(post.user?.level || 1);
+
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px', maxWidth: 1000, margin: '0 auto' }}>
+    <PageContainer title={post.title || '市集讨论'}>
+      <div className={styles.container}>
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={16}>
-            <Card>
-              <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16 }}>
-                <Avatar src={post.user.avatarUrl} size={48} icon={<div style={{ fontSize: 20 }}>{post.user.username?.[0]?.toUpperCase()}</div>} />
-                <div style={{ marginLeft: 12, flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Text strong style={{ fontSize: 16 }}>{post.user.username}</Text>
-                    <Tag color="blue">LV{post.user.level}</Tag>
+            <Card className={styles.postCard}>
+              <div className={styles.postHeader}>
+                <Link href={post.user?.id ? `/user/${post.user.id}` : '#'}>
+                  <Avatar 
+                    src={post.user?.avatarUrl} 
+                    size={48} 
+                    icon={<UserOutlined />}
+                    style={{ border: '2px solid #e5e7eb' }}
+                  />
+                </Link>
+                <div className={styles.userInfo}>
+                  <div className={styles.userNameRow}>
+                    <Link href={post.user?.id ? `/user/${post.user.id}` : '#'} style={{ textDecoration: 'none' }}>
+                      <Text strong className={styles.userName}>{post.user?.username}</Text>
+                    </Link>
+                    <Tag style={{ color: levelBadge.color, borderColor: levelBadge.color, background: 'transparent' }}>
+                      {levelBadge.icon} LV{post.user?.level || 1} {levelBadge.name}
+                    </Tag>
+                    <Tag style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#4b5563' }}>
+                      {typeConfig.icon} {typeConfig.label}
+                    </Tag>
+                    {post.isTop && <Tag color="red">置顶</Tag>}
+                    {post.isFeatured && <Tag color="gold">精选</Tag>}
                   </div>
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    {dayjs(post.createdAt).fromNow()}
+                  <Text type="secondary" className={styles.postTime}>
+                    {dayjs(post.createdAt).fromNow()} · {dayjs(post.createdAt).format('YYYY-MM-DD HH:mm')}
                   </Text>
                 </div>
               </div>
 
               {post.title && (
-                <Title level={2} style={{ marginBottom: 16, marginTop: 0 }}>
+                <Title level={2} className={styles.postTitle}>
                   {post.title}
                 </Title>
               )}
 
-              <div style={{ 
-                color: '#333', 
-                lineHeight: 1.8, 
-                fontSize: 15, 
-                whiteSpace: 'pre-wrap',
-                marginBottom: 24 
-              }}>
+              <div className={styles.postContent}>
                 {post.content}
               </div>
 
               {post.tags && post.tags.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <Space wrap>
+                <div className={styles.tagsSection}>
+                  <Space wrap size={8}>
                     {post.tags.map((tag, index) => (
-                      <Tag key={index} color="geekblue">
+                      <Tag key={index}>
                         #{tag}
                       </Tag>
                     ))}
@@ -141,31 +190,33 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
 
               <Divider />
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <div className={styles.postActions}>
                 <Space>
                   <Button 
-                    type={user ? 'default' : 'text'}
+                    type="text"
                     icon={<LikeOutlined />}
                     onClick={handleLike}
                     disabled={!user}
+                    style={{ color: '#6b7280' }}
                   >
-                    {post.likeCount}
+                    {post.likeCount || 0}
                   </Button>
                   <Button 
                     type="text" 
                     icon={<ShareAltOutlined />}
                     onClick={handleShare}
                     disabled={!user}
+                    style={{ color: '#6b7280' }}
                   >
                     分享
                   </Button>
                 </Space>
                 
-                <Space size="large" style={{ marginLeft: 'auto' }}>
-                  <Text type="secondary">
-                    <EyeOutlined /> {post.viewCount}
+                <Space size="large" className={styles.postStats}>
+                  <Text type="secondary" className={styles.statText}>
+                    <EyeOutlined /> {post.viewCount || 0}
                   </Text>
-                  <Text type="secondary">
+                  <Text type="secondary" className={styles.statText}>
                     <CalendarOutlined /> {dayjs(post.createdAt).format('YYYY-MM-DD')}
                   </Text>
                 </Space>
@@ -181,8 +232,8 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
           </Col>
 
           <Col xs={24} lg={8}>
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
-              <Card title="快捷操作">
+            <Space direction="vertical" className={styles.sidebar} size={16}>
+              <Card title="快捷操作" className={styles.sidebarCard}>
                 <QuickActions
                   contentType="post"
                   contentId={post.id}
@@ -192,46 +243,46 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
                 />
               </Card>
 
-              <Card title="帖子信息">
-                <Space direction="vertical" style={{ width: '100%' }} size={12}>
-                  <div>
-                    <Text type="secondary">浏览量</Text>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
-                      {post.viewCount}
+              <Card title="帖子信息" className={styles.sidebarCard}>
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                  <div className={styles.infoItem}>
+                    <Text type="secondary" className={styles.infoLabel}>浏览量</Text>
+                    <div className={styles.infoValue}>
+                      {post.viewCount || 0}
                     </div>
                   </div>
-                  <div>
-                    <Text type="secondary">点赞数</Text>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
-                      {post.likeCount}
+                  <div className={styles.infoItem}>
+                    <Text type="secondary" className={styles.infoLabel}>点赞数</Text>
+                    <div className={styles.infoValue}>
+                      {post.likeCount || 0}
                     </div>
                   </div>
-                  <div>
-                    <Text type="secondary">评论数</Text>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  <div className={styles.infoItem}>
+                    <Text type="secondary" className={styles.infoLabel}>评论数</Text>
+                    <div className={styles.infoValue}>
                       {commentCount}
                     </div>
                   </div>
-                  <div>
-                    <Text type="secondary">分享数</Text>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
-                      {post.shareCount}
+                  <div className={styles.infoItem}>
+                    <Text type="secondary" className={styles.infoLabel}>分享数</Text>
+                    <div className={styles.infoValue}>
+                      {post.shareCount || 0}
                     </div>
                   </div>
                 </Space>
               </Card>
 
               {post.isTop && (
-                <Card>
-                  <Tag color="red" style={{ fontSize: 14, padding: '4px 12px' }}>
+                <Card className={styles.sidebarCard}>
+                  <Tag color="red" className={styles.specialTag}>
                     置顶帖子
                   </Tag>
                 </Card>
               )}
 
               {post.isFeatured && (
-                <Card>
-                  <Tag color="gold" style={{ fontSize: 14, padding: '4px 12px' }}>
+                <Card className={styles.sidebarCard}>
+                  <Tag color="gold" className={styles.specialTag}>
                     精选帖子
                   </Tag>
                 </Card>
@@ -239,7 +290,7 @@ export default function CommunityDetailPage({ params }: { params: { id: string }
             </Space>
           </Col>
         </Row>
-      </Content>
-    </div>
+      </div>
+    </PageContainer>
   );
 }

@@ -4,58 +4,58 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Layout, Card, Space, Tag, Spin, Button, App } from 'antd';
 import { DownloadOutlined, LikeOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { useParams } from 'next/navigation';
 import { huggingfaceApi } from '@/lib/api/huggingface';
 import { HuggingFaceModel } from '@/lib/api/types';
 import { useAuthStore } from '@/store/authStore';
-import ShareModal from '@/components/ShareModal';
+import { useFavorite } from '@/hooks/useFavorite';
+import { DynamicComponents } from '@/lib/dynamicComponents';
 import { communityApi } from '@/lib/api/community';
+import styles from './page.module.css';
 
 const { Content } = Layout;
 
-export default function HuggingFaceDetailPage({ params }: { params: { id: string } }) {
+export default function HuggingFaceDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<HuggingFaceModel | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const { user } = useAuthStore();
-  const [isFavorited, setIsFavorited] = useState(false);
   const { message } = App.useApp();
 
-  useEffect(() => {
-    loadModel();
-  }, [params.id]);
+  const { isFavorited, setIsFavorited } = useFavorite('huggingface', id || '');
 
-  useEffect(() => {
-    if (user) {
-      loadFavoriteState();
-    } else {
-      setIsFavorited(false);
-    }
-  }, [user, params.id]);
-
-  const loadModel = async () => {
+  const loadModel = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await huggingfaceApi.getModel(params.id);
-      setModel(data);
+      const data = await huggingfaceApi.getModel(id);
+      if (data) {
+        setModel(data);
+      } else {
+        setModel(null);
+      }
     } catch (error: any) {
-      message.error(error.message || '加载失败');
+      console.error('Load model error:', error);
+      setModel(null);
+      const errorMessage = error?.message || error?.response?.data?.message || '加载失败';
+      if (error?.status !== 404) {
+        message.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, message]);
 
-  const loadFavoriteState = async () => {
-    try {
-      const data = await communityApi.getFavorites({ page: 1, size: 200, contentType: 'huggingface' });
-      const ids = new Set((data.items || []).map((fav: any) => fav.contentId));
-      setIsFavorited(ids.has(params.id));
-    } catch (error: any) {
-      message.error(error.message || '收藏状态获取失败');
+  useEffect(() => {
+    if (typeof window !== 'undefined' && id) {
+      loadModel();
     }
-  };
+  }, [id, loadModel]);
 
   const handleShare = () => {
     if (!user) {
@@ -99,25 +99,35 @@ export default function HuggingFaceDetailPage({ params }: { params: { id: string
       });
   };
 
+  const getHuggingFaceUrl = () => {
+    const contentType = model.contentType || 'model';
+    if (contentType === 'dataset') {
+      return `https://huggingface.co/datasets/${model.fullName}`;
+    } else if (contentType === 'space') {
+      return `https://huggingface.co/spaces/${model.fullName}`;
+    }
+    return `https://huggingface.co/${model.fullName}`;
+  };
+
   return (
-    <div style={{ background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto' }}>
-        <Card>
-          <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>{model.fullName}</h1>
+    <div className={styles.pageWrapper}>
+      <Content style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <Card className={styles.detailCard}>
+          <h1 className={styles.pageTitle}>{model.fullName}</h1>
           <Space wrap style={{ marginBottom: 16 }}>
             {model.task && <Tag color="purple">{model.task}</Tag>}
             {model.license && <Tag>{model.license}</Tag>}
             {model.author && <Tag>{model.author}</Tag>}
           </Space>
 
-          <div style={{ marginBottom: 16 }}>
+          <div className={styles.statsRow}>
             <Space size="large">
               <span><DownloadOutlined /> {model.downloads} 下载</span>
               <span><LikeOutlined /> {model.likes} 点赞</span>
             </Space>
           </div>
 
-          <Space size="middle" style={{ marginBottom: 16 }}>
+          <Space size="middle" className={styles.actionBar}>
             <Button type={isFavorited ? 'primary' : 'default'} onClick={handleFavorite}>
               {isFavorited ? '已收藏' : '收藏'}
             </Button>
@@ -126,7 +136,7 @@ export default function HuggingFaceDetailPage({ params }: { params: { id: string
             </Button>
             <Button 
               type="primary"
-              href={model.fullName ? `https://huggingface.co/${model.fullName}` : (model.hfId ? `https://huggingface.co/${model.hfId}` : '#')} 
+              href={model.fullName ? getHuggingFaceUrl() : (model.hfId ? `https://huggingface.co/${model.hfId}` : '#')} 
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -134,7 +144,7 @@ export default function HuggingFaceDetailPage({ params }: { params: { id: string
             </Button>
           </Space>
 
-          <div style={{ color: '#333', marginBottom: 16 }}>
+          <div className={styles.description}>
             {model.description || '暂无描述'}
           </div>
 
@@ -148,7 +158,7 @@ export default function HuggingFaceDetailPage({ params }: { params: { id: string
         </Card>
       </Content>
 
-      <ShareModal
+      <DynamicComponents.ShareModal
         open={shareOpen}
         title={model.fullName}
         url={typeof window !== 'undefined' ? `${window.location.origin}/huggingface/${model.id}` : ''}

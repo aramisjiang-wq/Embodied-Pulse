@@ -1,0 +1,89 @@
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.infoBox {
+  margin-bottom: var(--spacing-lg);
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.infoText {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.syncGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.syncCard {
+  min-height: 200px;
+  border-radius: var(--radius-md);
+}
+
+.cardDescription {
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.resultSection {
+  margin-top: 16px;
+}
+
+.resultDivider {
+  margin: 12px 0;
+}
+
+.resultRow {
+  display: flex;
+  justify-content: space-between;
+}
+
+.successCount {
+  color: var(--color-success);
+  font-weight: bold;
+}
+
+.errorCount {
+  color: var(--color-error);
+  font-weight: bold;
+}
+
+.syncingIndicator {
+  margin-top: 16px;
+}
+
+.syncingText {
+  margin-left: 8px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .pageTitle {
+    font-size: 20px;
+  }
+
+  .syncGrid {
+    grid-template-columns: 1fr;
+  }
+}

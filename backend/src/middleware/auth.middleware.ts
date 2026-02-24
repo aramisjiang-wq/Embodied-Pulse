@@ -17,6 +17,7 @@ interface AuthUser {
   avatarUrl?: string;
   role?: string;
   isActive: boolean;
+  isVip?: boolean;
 }
 
 interface AuthRequest extends Request {
@@ -67,6 +68,7 @@ async function findUserById(userId: string): Promise<AuthUser | null> {
       avatarUrl: user.avatarUrl ?? undefined,
       role: user.role ?? undefined,
       isActive: user.isActive,
+      isVip: user.isVip ?? false,
     };
   } catch (error) {
     logger.error(`Failed to find user by ID: ${userId}`, error);

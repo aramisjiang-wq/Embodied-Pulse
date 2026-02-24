@@ -5,7 +5,6 @@ import { Menu, Badge, theme } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   StarOutlined,
-  SearchOutlined,
   SettingOutlined,
   HeartOutlined,
   UsergroupAddOutlined,
@@ -38,7 +37,9 @@ export default function GlobalSidebar({ collapsed: controlledCollapsed, onCollap
 
   const loadSubscriptionNewCount = useCallback(async () => {
     if (!user) return;
-    
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('user_token');
+    if (!hasToken) return;
+
     try {
       const data = await subscriptionApi.getSubscriptions({ page: 1, size: 100 });
       const totalNewCount = (data.items || []).reduce((sum: number, sub) => {
@@ -93,11 +94,6 @@ export default function GlobalSidebar({ collapsed: controlledCollapsed, onCollap
     },
     {
       type: 'divider',
-    },
-    {
-      key: '/search',
-      icon: <SearchOutlined />,
-      label: '搜索',
     },
     {
       key: '/settings',

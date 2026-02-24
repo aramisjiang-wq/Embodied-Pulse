@@ -10,6 +10,7 @@ import {
   subscribeAuthor,
   unsubscribeAuthor,
 } from '../services/user-huggingface-subscription.service';
+import { getHuggingFaceModels } from '../services/huggingface.service';
 import { sendSuccess, sendError } from '../utils/response';
 
 export async function getMySubscriptions(req: Request, res: Response, next: NextFunction) {
@@ -103,6 +104,50 @@ export async function unsubscribeHuggingFaceAuthor(req: Request, res: Response, 
     } else {
       sendError(res, 'UNSUBSCRIBE_FAILED', result.message || '取消订阅失败');
     }
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 获取订阅作者的新内容
+ */
+export async function getSubscribedAuthorsContent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return sendError(res, 'UNAUTHORIZED', '请先登录');
+    }
+
+    const subscriptions = await getUserSubscriptions(userId);
+    
+    // 获取所有订阅作者的最新内容
+    const authorContents: Array<{
+      author: string;
+      authorUrl: string;
+      items: any[];
+      total: number;
+    }> = [];
+
+    for (const authorSub of subscriptions.authors) {
+      if (!authorSub.isActive) continue;
+      
+      const { models, total } = await getHuggingFaceModels({
+        skip: 0,
+        take: 10,
+        sort: 'latest',
+        author: authorSub.author,
+      });
+
+      authorContents.push({
+        author: authorSub.author,
+        authorUrl: authorSub.authorUrl || `https://huggingface.co/${authorSub.author}`,
+        items: models,
+        total,
+      });
+    }
+
+    sendSuccess(res, { authors: authorContents });
   } catch (error) {
     next(error);
   }

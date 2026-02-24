@@ -158,7 +158,7 @@ Embodied/
 - **框架**: Express 4.x + TypeScript
 - **ORM**: Prisma 5.x
 - **认证**: JWT + bcrypt
-- **邮件**: nodemailer (QQ邮箱 SMTP)
+- **邮件**: nodemailer (飞书邮箱 SMTP)
 - **数据库**: PostgreSQL 15.x
 - **缓存**: Redis 7.x
 
@@ -317,7 +317,7 @@ cd frontend && npm run lint
   - 数据库设计(Prisma Schema)
   - 用户认证系统(邮箱验证 + 密码找回)
   - JWT Token管理
-  - 邮件服务(QQ邮箱 SMTP)
+  - 邮件服务(飞书邮箱 SMTP)
 
 - ✅ 核心API
   - 信息流推荐算法
@@ -385,4 +385,4 @@ MIT License
 ---
 
 **Last Updated**: 2026-02-15  
-**Version**: v3.1.0 (Phase 1 MVP - 100% Complete)
+**Version**: v3.2.0 (Phase 1 MVP - 100% Complete)

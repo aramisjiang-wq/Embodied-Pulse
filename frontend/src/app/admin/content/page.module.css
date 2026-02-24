@@ -1,0 +1,38 @@
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.tableWrapper {
+  background: var(--color-bg-paper);
+  border-radius: var(--radius-md);
+}
+
+.emptyState {
+  padding: 40px 0;
+}
+
+.formWrapper {
+  padding: var(--spacing-md) 0;
+}
+
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .pageTitle {
+    font-size: 20px;
+  }
+}

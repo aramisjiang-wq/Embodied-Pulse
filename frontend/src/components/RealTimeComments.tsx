@@ -6,6 +6,7 @@ import { LikeOutlined, MessageOutlined, SendOutlined, DeleteOutlined, EditOutlin
 import { Comment as CommentType } from '@/lib/api/types';
 import { communityApi } from '@/lib/api/community';
 import { useAuthStore } from '@/store/authStore';
+import { getLevelByPoints } from '@/lib/utils/levelUtils';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -27,6 +28,7 @@ export default function RealTimeComments({ postId, onCommentCountChange }: RealT
   const [comments, setComments] = useState<CommentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [commentContent, setCommentContent] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export default function RealTimeComments({ postId, onCommentCountChange }: RealT
       setComments(prev => [newComment, ...prev]);
       setReplyingTo(null);
       setReplyContent('');
+      setCommentContent('');
     } catch (error: unknown) {
       message.error(getErrorMessage(error, '评论失败'));
     } finally {
@@ -242,7 +245,7 @@ export default function RealTimeComments({ postId, onCommentCountChange }: RealT
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>{comment.user.username}</span>
                   <Tag color="blue" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
-                    LV{comment.user.level}
+                    LV{getLevelByPoints(comment.user.points || 0).level}
                   </Tag>
                   <Tooltip title={dayjs(comment.createdAt).format('YYYY-MM-DD HH:mm:ss')}>
                     <span style={{ color: '#999', fontSize: 12 }}>
@@ -392,11 +395,13 @@ export default function RealTimeComments({ postId, onCommentCountChange }: RealT
           <div style={{ marginBottom: 16 }}>
             <Input.TextArea
               rows={3}
+              value={commentContent}
+              onChange={(e) => setCommentContent(e.target.value)}
               placeholder={user ? '写下你的评论...' : '请先登录后再评论'}
               disabled={!user}
               onPressEnter={(e) => {
                 if (e.ctrlKey || e.metaKey) {
-                  handleSubmit((e.target as HTMLTextAreaElement).value);
+                  handleSubmit(commentContent);
                 }
               }}
             />
@@ -404,12 +409,7 @@ export default function RealTimeComments({ postId, onCommentCountChange }: RealT
               <Button
                 type="primary"
                 icon={<SendOutlined />}
-                onClick={() => {
-                  const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-                  if (textarea) {
-                    handleSubmit(textarea.value);
-                  }
-                }}
+                onClick={() => handleSubmit(commentContent)}
                 loading={submitting}
                 disabled={!user}
               >

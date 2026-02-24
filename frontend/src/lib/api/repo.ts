@@ -2,6 +2,12 @@ import { cachedGet } from './cached-client';
 import apiClient from './client';
 import { PaginatedResponse, GithubRepo } from './types';
 
+export interface RepoCounts {
+  total: number;
+  categoryCounts: Record<string, number>;
+  languageCounts: Record<string, number>;
+}
+
 export const repoApi = {
   getRepos: async (params: {
     page?: number;
@@ -11,9 +17,14 @@ export const repoApi = {
     keyword?: string;
     domain?: string;
     scenario?: string;
+    category?: string;
   }): Promise<PaginatedResponse<GithubRepo>> => {
     try {
-      const response = await cachedGet<PaginatedResponse<GithubRepo>>('/repos', { params });
+      const safeParams: Record<string, unknown> = { ...params };
+      if (safeParams.category === undefined || safeParams.category === '' || safeParams.category === 'undefined') {
+        delete safeParams.category;
+      }
+      const response = await cachedGet<PaginatedResponse<GithubRepo>>('/repos', { params: safeParams });
       if (response && typeof response === 'object' && 'items' in response) {
         return response;
       }
@@ -21,6 +32,19 @@ export const repoApi = {
     } catch (error) {
       console.error('getRepos error:', error);
       return { items: [], pagination: { page: 1, size: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
+    }
+  },
+
+  getRepoCounts: async (): Promise<RepoCounts> => {
+    try {
+      const response = await cachedGet<RepoCounts>('/repos/counts');
+      if (response && typeof response === 'object' && 'total' in response) {
+        return response;
+      }
+      return { total: 0, categoryCounts: {}, languageCounts: {} };
+    } catch (error) {
+      console.error('getRepoCounts error:', error);
+      return { total: 0, categoryCounts: {}, languageCounts: {} };
     }
   },
 

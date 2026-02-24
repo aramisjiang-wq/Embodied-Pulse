@@ -2,8 +2,12 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosRequ
 import { apiCache } from './cache';
 import { ApiResponse } from './types';
 import { getApiConfig, isDevelopment } from './config';
+import { useAuthStore } from '@/store/authStore';
 
 const API_CONFIG = getApiConfig();
+
+/** 用于 401 时串行刷新：多个请求同时 401 时共用一个刷新请求 */
+let refreshPromise: Promise<boolean> | null = null;
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: `${API_CONFIG.baseUrl}/api/v1`,
@@ -27,13 +31,14 @@ axiosInstance.interceptors.request.use(
     if (typeof window !== 'undefined') {
       const requestUrl = config.url || '';
       
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${requestUrl}`);
+      
       if (requestUrl.includes('/admin/sync/huggingface') || 
           requestUrl.includes('/admin/sync/all') ||
           requestUrl.includes('/admin/sync/embodied-ai') ||
           (requestUrl.includes('/admin/subscriptions/') && requestUrl.includes('/sync'))) {
         config.timeout = 180000;
       } else if (requestUrl.includes('/admin/sync/') ||
-                 requestUrl.includes('/admin/news-search-keywords/search') ||
                  requestUrl.includes('/admin/bilibili-search-keywords/search')) {
         config.timeout = 120000;
       } else if (requestUrl.includes('/discovery')) {
@@ -44,26 +49,31 @@ axiosInstance.interceptors.request.use(
                             requestUrl.includes('/auth/register') ||
                             requestUrl.includes('/auth/admin/login');
       
-      const isPublicApi = requestUrl.startsWith('/stats/') ||
-                         requestUrl.startsWith('/analytics/') ||
-                         requestUrl.startsWith('/announcements/') ||
-                         requestUrl.startsWith('/home-modules/') ||
+      const requestMethod = config.method?.toLowerCase() || 'get';
+      const isPublicApi = requestUrl.startsWith('/stats/public/') ||
+                         requestUrl.startsWith('/announcements') ||
+                         requestUrl.startsWith('/home-modules') && requestMethod === 'get' && !requestUrl.includes('/home-modules/all') ||
                          requestUrl.startsWith('/github-repo-info/') ||
                          requestUrl.startsWith('/search/') ||
-                         requestUrl.startsWith('/papers/') ||
-                         requestUrl.startsWith('/videos/') ||
-                         requestUrl.startsWith('/repos/') ||
-                         requestUrl.startsWith('/jobs/') ||
-                         requestUrl.startsWith('/huggingface/') ||
-                         requestUrl.startsWith('/news/') ||
+                         (requestUrl.startsWith('/papers') && requestMethod === 'get') ||
+                         (requestUrl.startsWith('/videos') && requestMethod === 'get') ||
+                         (requestUrl.startsWith('/repos') && requestMethod === 'get') ||
+                         (requestUrl.startsWith('/jobs') && requestMethod === 'get') ||
+                         (requestUrl.startsWith('/huggingface') && requestMethod === 'get') ||
                          (requestUrl.startsWith('/posts/') && !requestUrl.includes('/posts/my') && !requestUrl.includes('/posts/like')) ||
                          requestUrl.startsWith('/comments/') ||
-                         requestUrl.startsWith('/favorites') ||
-                         requestUrl.startsWith('/tasks/') ||
-                         requestUrl.startsWith('/banners/') ||
-                         requestUrl.startsWith('/community/');
+                         requestUrl.startsWith('/banners') ||
+                         requestUrl.startsWith('/community') ||
+                         requestUrl.startsWith('/users/');
       
-      if (!isAuthEndpoint && !isPublicApi) {
+      console.log(`[API Request] isAuthEndpoint=${isAuthEndpoint}, isPublicApi=${isPublicApi}`);
+      
+      if (requestUrl.includes('/auth/refresh')) {
+        const isAdmin = window.location.pathname.startsWith('/admin');
+        const tokenKey = isAdmin ? 'admin_refresh_token' : 'user_refresh_token';
+        token = localStorage.getItem(tokenKey);
+        if (!token) console.warn('[API Request] No refresh token for /auth/refresh');
+      } else if (!isAuthEndpoint && !isPublicApi) {
         const isAdminRequest = requestUrl.includes('/admin/');
         const isAdminPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
         
@@ -76,7 +86,26 @@ axiosInstance.interceptors.request.use(
         
         const isAdmin = isAdminRequest || isAdminPage || isAdminOnlyApi;
         const tokenKey = isAdmin ? 'admin_token' : 'user_token';
+        
         token = localStorage.getItem(tokenKey);
+        
+        if (!token) {
+          try {
+            const authState = useAuthStore.getState();
+            if (authState.token && authState.isAdmin === isAdmin) {
+              token = authState.token;
+              console.log(`[API Request] Got token from zustand store instead of localStorage`);
+            }
+          } catch (e) {
+            console.warn('[API Request] Failed to get token from zustand store:', e);
+          }
+        }
+        
+        console.log(`[API Request] URL=${requestUrl}, isAdmin=${isAdmin}, tokenKey=${tokenKey}, hasToken=${!!token}, tokenPreview=${token ? token.substring(0, 20) + '...' : 'null'}`);
+        
+        if (!token) {
+          console.warn(`[API Request] No token found for ${requestUrl}! This may cause 401 error.`);
+        }
       }
     }
     if (token) {
@@ -131,29 +160,128 @@ axiosInstance.interceptors.response.use(
     
     if (axiosError.response) {
       const { status, data } = axiosError.response;
-      const responseData = (data || {}) as { code?: number; message?: string };
+      const responseData = (data || {}) as {
+        code?: number;
+        message?: string;
+        error?: { code?: string; message?: string };
+      };
+      const extractedMessage =
+        responseData.message ||
+        responseData.error?.message ||
+        axiosError.message;
+      const extractedCode = responseData.code || responseData.error?.code || 'UNKNOWN_ERROR';
       
       if (isDevelopment()) {
         const fullUrl = axiosError.config ? `${axiosError.config.baseURL}${axiosError.config.url}` : 'unknown';
         console.error(`[API Error] ${axiosError.config?.method?.toUpperCase()} ${fullUrl}`, {
           status,
           data,
-          message: responseData.message,
-          code: responseData.code,
+          message: extractedMessage,
+          code: extractedCode,
         });
       }
       
       if (status === 401 || responseData.code === 1002 || responseData.code === 1003) {
         if (typeof window !== 'undefined') {
-          const isAdminLogin = (axiosError.config?.url || '').includes('/auth/admin/login');
-          const isLoginPage = window.location.pathname.includes('/login');
-          const isRegisterPage = window.location.pathname.includes('/register');
+          const requestUrl = axiosError.config?.url || '';
+          const isAdminLogin = requestUrl.includes('/auth/admin/login');
+          const isUserLogin = requestUrl.includes('/auth/login') && !isAdminLogin;
+          const isLoginRequest = isUserLogin || isAdminLogin;
           const isAdminPage = window.location.pathname.startsWith('/admin');
-          
+          const isRefreshRequest = requestUrl.includes('/auth/refresh');
+
+          // 登录接口返回 401：直接返回后端文案（如「邮箱或密码错误」），不要改成「请先登录」
+          if (isLoginRequest) {
+            return Promise.reject({
+              code: extractedCode,
+              message: extractedMessage || '邮箱或密码错误',
+              status: 401,
+            });
+          }
+
+          // 刷新 Token 失败：清除本地 token，不再重试
+          if (isRefreshRequest) {
+            const tokenKey = isAdminPage ? 'admin_token' : 'user_token';
+            const refreshKey = isAdminPage ? 'admin_refresh_token' : 'user_refresh_token';
+            const userKey = isAdminPage ? 'admin_user' : 'user_user';
+            localStorage.removeItem(tokenKey);
+            localStorage.removeItem(refreshKey);
+            localStorage.removeItem(userKey);
+            if (!isAdminPage) useAuthStore.getState().logout();
+            if (isAdminPage && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
+            return Promise.reject({
+              code: 'UNAUTHORIZED',
+              message: '登录已过期，请重新登录',
+              status: 401,
+            });
+          }
+
           const tokenKey = isAdminPage ? 'admin_token' : 'user_token';
-          localStorage.removeItem(tokenKey);
-          
-          if (isAdminPage && !isAdminLogin && window.location.pathname !== '/admin/login') {
+          const refreshKey = isAdminPage ? 'admin_refresh_token' : 'user_refresh_token';
+          const userKey = isAdminPage ? 'admin_user' : 'user_user';
+          const refreshToken = localStorage.getItem(refreshKey);
+
+          // 有 refreshToken 时尝试刷新再重试原请求，实现长久登录
+          if (refreshToken) {
+            const doRefresh = (): Promise<boolean> => {
+              console.log('[API Refresh] Starting token refresh...');
+              return axiosInstance
+                .post<ApiResponse<{ token: string; refreshToken: string }>>('/auth/refresh')
+                .then((res: unknown) => {
+                  const data = (res as ApiResponse<{ token: string; refreshToken: string }>).data;
+                  console.log('[API Refresh] Refresh response:', data ? 'has data' : 'no data');
+                  if (data?.token) {
+                    localStorage.setItem(tokenKey, data.token);
+                    if (data.refreshToken) localStorage.setItem(refreshKey, data.refreshToken);
+                    useAuthStore.getState().setToken(data.token, isAdminPage);
+                    useAuthStore.getState().setRefreshToken(data.refreshToken || null, isAdminPage);
+                    console.log('[API Refresh] Token refreshed successfully');
+                    return true;
+                  }
+                  console.log('[API Refresh] No token in response');
+                  return false;
+                })
+                .catch((err) => {
+                  console.error('[API Refresh] Refresh failed:', err);
+                  return false;
+                });
+            };
+            if (!refreshPromise) refreshPromise = doRefresh();
+            return refreshPromise.then((ok) => {
+              refreshPromise = null;
+              console.log('[API Refresh] Refresh result:', ok);
+              if (ok && axiosError.config) {
+                const newToken = localStorage.getItem(tokenKey);
+                console.log('[API Refresh] New token from localStorage:', newToken ? newToken.substring(0, 30) + '...' : 'null');
+                if (newToken && axiosError.config.headers) {
+                  axiosError.config.headers.Authorization = `Bearer ${newToken}`;
+                  console.log('[API Refresh] Updated Authorization header');
+                }
+                console.log('[API Refresh] Retrying request to:', axiosError.config.url);
+                return axiosInstance(axiosError.config);
+              }
+              localStorage.removeItem(tokenKey);
+              localStorage.removeItem(refreshKey);
+              localStorage.removeItem(userKey);
+              if (!isAdminPage) useAuthStore.getState().logout();
+              if (isAdminPage && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
+              return Promise.reject({
+                code: 'UNAUTHORIZED',
+                message: '登录已过期，请重新登录',
+                status: 401,
+              });
+            });
+          }
+
+          const currentToken = localStorage.getItem(tokenKey);
+          if (currentToken) {
+            console.log(`[API 401] Token exists in localStorage, clearing invalid token`);
+            localStorage.removeItem(tokenKey);
+            localStorage.removeItem(userKey);
+            if (!isAdminPage) useAuthStore.getState().logout();
+          }
+
+          if (isAdminPage && window.location.pathname !== '/admin/login') {
             window.location.href = '/admin/login';
             return Promise.reject({
               code: 'UNAUTHORIZED',
@@ -161,24 +289,18 @@ axiosInstance.interceptors.response.use(
               status: 401,
             });
           }
-          
-          const isAuthApi = (axiosError.config?.url || '').includes('/auth/login') || 
-                           (axiosError.config?.url || '').includes('/auth/register');
-          
-          if (!isLoginPage && !isRegisterPage && !isAdminPage && !isAuthApi) {
-            window.location.href = '/login';
-            return Promise.reject({
-              code: 'UNAUTHORIZED',
-              message: '未登录或登录已过期，请重新登录',
-              status: 401,
-            });
-          }
+
+          return Promise.reject({
+            code: 'UNAUTHORIZED',
+            message: '请先登录',
+            status: 401,
+          });
         }
       }
       
       return Promise.reject({
-        code: responseData.code || 'UNKNOWN_ERROR',
-        message: responseData.message || axiosError.message,
+        code: extractedCode,
+        message: extractedMessage,
         status,
       });
     }

@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { Card, Spin, Tabs, List, Avatar, Tag, Space, Typography, Row, Col, Statistic, App } from 'antd';
 import { TrophyOutlined, FireOutlined, UserOutlined, FileTextOutlined, PlayCircleOutlined, GithubOutlined, EyeOutlined, StarOutlined, LikeOutlined, MessageOutlined } from '@ant-design/icons';
 import { rankingApi } from '@/lib/api/ranking';
+import { getLevelByPoints } from '@/lib/utils/levelUtils';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './page.module.css';
 
 dayjs.extend(relativeTime);
 
@@ -141,7 +143,7 @@ export default function RankingPage() {
                 <Space size="large" style={{ fontSize: 13 }}>
                   <Space>
                     <TrophyOutlined style={{ color: '#faad14' }} />
-                    <span>LV{user.level}</span>
+                    <span>LV{getLevelByPoints(user.points || 0).level}</span>
                   </Space>
                   <Space>
                     <StarOutlined style={{ color: '#faad14' }} />
@@ -454,13 +456,12 @@ export default function RankingPage() {
   ];
 
   return (
-    <div style={{ background: '#fafafa', minHeight: '100%', padding: '0' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
+    <div className={styles.pageWrapper}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <Card
+          className={styles.rankingCard}
           style={{
             marginBottom: 24,
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           }}
         >
           <Title level={2} style={{ textAlign: 'center', margin: 0 }}>
@@ -470,10 +471,7 @@ export default function RankingPage() {
         </Card>
 
         <Card
-          style={{
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          }}
+          className={styles.rankingCard}
           tabList={tabItems}
           activeTabKey={activeTab}
           onTabChange={setActiveTab}

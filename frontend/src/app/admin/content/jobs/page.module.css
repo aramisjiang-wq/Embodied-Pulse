@@ -1,0 +1,233 @@
+/* 科技极简风：招聘与求职管理 */
+
+.wrapper {
+  padding: 24px 32px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--admin-bg, #fafafa);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--admin-border, #e8e8e8);
+}
+
+.headerLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--admin-text, #1a1a1a);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--admin-text-secondary, #666);
+}
+
+.headerRight {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btnPrimary {
+  font-weight: 500;
+}
+
+.btnSecondary {
+  color: var(--admin-text-secondary, #666);
+  border-color: var(--admin-border, #e0e0e0);
+}
+
+.tip {
+  font-size: 12px;
+  color: var(--admin-text-secondary, #666);
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: var(--admin-tip-bg, #f5f5f5);
+  border-radius: 6px;
+  border-left: 3px solid var(--admin-border, #d9d9d9);
+}
+
+.tip a {
+  color: var(--admin-link, #1890ff);
+  margin: 0 2px;
+}
+
+.tip a:hover {
+  text-decoration: underline;
+}
+
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--admin-border, #e8e8e8);
+}
+
+.tabs :global(.ant-tabs-tab) {
+  padding: 10px 0;
+  margin-right: 24px;
+  font-size: 14px;
+}
+
+.tabs :global(.ant-tabs-ink-bar) {
+  height: 2px;
+  background: var(--admin-primary, #1890ff);
+}
+
+.tabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: var(--admin-text, #1a1a1a);
+  font-weight: 500;
+}
+
+.tabIcon {
+  margin-right: 6px;
+  opacity: 0.85;
+}
+
+.tabCount {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--admin-text-secondary, #888);
+}
+
+.panel {
+  background: var(--admin-card-bg, #fff);
+  border: 1px solid var(--admin-border, #e8e8e8);
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 320px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.select {
+  width: 140px;
+}
+
+.searchInput {
+  width: 240px;
+  max-width: 100%;
+}
+
+.searchInput :global(.ant-input-prefix) {
+  color: var(--admin-text-tertiary, #999);
+}
+
+.empty {
+  padding: 48px 0;
+  color: var(--admin-text-secondary, #666);
+}
+
+.table {
+  font-size: 13px;
+}
+
+.table :global(.ant-table-thead > tr > th) {
+  background: var(--admin-table-header, #fafafa);
+  color: var(--admin-text-secondary, #666);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: none;
+  border-bottom: 1px solid var(--admin-border, #e8e8e8);
+  padding: 10px 12px;
+}
+
+.table :global(.ant-table-tbody > tr > td) {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--admin-border-light, #f0f0f0);
+  color: var(--admin-text, #1a1a1a);
+}
+
+.table :global(.ant-table-tbody > tr:hover > td) {
+  background: var(--admin-row-hover, #fafafa);
+}
+
+.cellTitle {
+  font-weight: 500;
+  color: var(--admin-text, #1a1a1a);
+}
+
+.tag {
+  font-size: 12px;
+  border-radius: 4px;
+  margin: 0 2px 2px 0;
+  border-color: var(--admin-border, #e0e0e0);
+  background: var(--admin-tag-bg, #f5f5f5);
+  color: var(--admin-text-secondary, #666);
+}
+
+.tagOpen {
+  background: #e6f7ed;
+  border-color: #b7ebc9;
+  color: #389e52;
+}
+
+.tagClosed {
+  background: #fff1f0;
+  border-color: #ffccc7;
+  color: #cf1322;
+}
+
+.modal :global(.ant-modal-header) {
+  border-bottom: 1px solid var(--admin-border, #e8e8e8);
+  padding: 14px 20px;
+}
+
+.modal :global(.ant-modal-body) {
+  padding: 20px 20px 24px;
+}
+
+.form :global(.ant-form-item) {
+  margin-bottom: 16px;
+}
+
+.form :global(.ant-form-item-label > label) {
+  font-size: 13px;
+  color: var(--admin-text-secondary, #666);
+}
+
+.inputFull {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .headerRight {
+    justify-content: flex-start;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .select,
+  .searchInput {
+    width: 100%;
+  }
+}

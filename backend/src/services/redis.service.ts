@@ -315,3 +315,32 @@ export async function flushAll(): Promise<boolean> {
 
 export { CACHE_TTL };
 export type { RedisClientType };
+
+export const RedisService = {
+  ping: async (): Promise<boolean> => {
+    try {
+      if (!isRedisConnected()) {
+        return false;
+      }
+      const client = await getRedisClient();
+      const result = await client.ping();
+      return result === 'PONG';
+    } catch (error) {
+      logger.error('Redis ping失败:', error);
+      return false;
+    }
+  },
+  get,
+  set,
+  del,
+  delPattern,
+  exists,
+  expire,
+  getOrSet,
+  incr,
+  decr,
+  incrBy,
+  getCacheStats,
+  flushAll,
+  isRedisConnected,
+};

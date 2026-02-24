@@ -41,6 +41,7 @@ import { useAuthStore } from '@/store/authStore';
 import { adminApi } from '@/lib/api/admin';
 import { subscriptionApi } from '@/lib/api/subscription';
 import dayjs from 'dayjs';
+import styles from './page.module.css';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -72,7 +73,8 @@ export default function AdminSubscriptionsPage() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const defaultStats = { total: 0, active: 0, syncEnabled: 0, last24h: { syncCount: 0, matchedCount: 0, successRate: '0' } };
+  const [stats, setStats] = useState<typeof defaultStats | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,28 +102,20 @@ export default function AdminSubscriptionsPage() {
   const loadSubscriptions = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
-      const params: any = { page, size: pageSize };
+      const params: Record<string, number | string> = { page, size: pageSize };
       if (contentTypeFilter) params.contentType = contentTypeFilter;
 
-      const result = await adminApi.getSubscriptions(params);
-      
-      if (!result || !result.items || !Array.isArray(result.items)) {
-        console.error('Invalid data structure:', result);
-        setSubscriptions([]);
-        setPagination(prev => ({ ...prev, total: 0 }));
-        return;
-      }
-      
-      setSubscriptions(result.items);
-      setPagination({
-        current: page,
-        pageSize,
-        total: result.pagination?.total || 0,
-      });
-    } catch (error: any) {
+      const result = await adminApi.getSubscriptions(params) as { items?: Subscription[]; pagination?: { total?: number } };
+      const items = Array.isArray(result?.items) ? result.items : [];
+      const total = result?.pagination?.total ?? 0;
+
+      setSubscriptions(items);
+      setPagination({ current: page, pageSize, total });
+    } catch (error: unknown) {
       console.error('Load subscriptions error:', error);
       setSubscriptions([]);
       setPagination(prev => ({ ...prev, total: 0 }));
+      message.error('加载订阅列表失败');
     } finally {
       setLoading(false);
     }
@@ -130,9 +124,10 @@ export default function AdminSubscriptionsPage() {
   const loadStats = async () => {
     try {
       const data = await adminApi.getSubscriptionStats();
-      setStats(data);
+      setStats((data && typeof data === 'object') ? { ...defaultStats, ...data } : defaultStats);
     } catch (error) {
       console.error('加载统计失败:', error);
+      setStats(defaultStats);
     }
   };
 
@@ -162,15 +157,18 @@ export default function AdminSubscriptionsPage() {
   const handleViewTrend = async (subscription: Subscription) => {
     setSelectedSubscription(subscription);
     setTrendDrawerVisible(true);
+    setTrendData([]);
+    setHistoryData([]);
 
     try {
       const [trendRes, historyRes] = await Promise.all([
-        adminApi.getSubscriptionTrends(subscription.id, 7),
-        adminApi.getSubscriptionHistory(subscription.id, { page: 1, size: 10 }),
+        adminApi.getSubscriptionTrends(subscription.id, 7) as { code?: number; data?: { trends?: unknown[] } },
+        adminApi.getSubscriptionHistory(subscription.id, { page: 1, size: 10 }) as { code?: number; data?: { items?: unknown[] } },
       ]);
-
-      setTrendData(trendRes.trends);
-      setHistoryData(historyRes.items);
+      const trendDataRaw = trendRes?.code === 0 ? trendRes.data?.trends : [];
+      const historyItems = historyRes?.code === 0 ? historyRes.data?.items : [];
+      setTrendData(Array.isArray(trendDataRaw) ? trendDataRaw : []);
+      setHistoryData(Array.isArray(historyItems) ? historyItems : []);
     } catch (error) {
       message.error('加载趋势数据失败');
     }
@@ -189,10 +187,11 @@ export default function AdminSubscriptionsPage() {
 
   const handleViewMonitor = async () => {
     setMonitorDrawerVisible(true);
+    setMonitorData(null);
 
     try {
       const data = await adminApi.getDataFlowMonitor();
-      setMonitorData(data);
+      setMonitorData(data && typeof data === 'object' ? data : null);
     } catch (error) {
       message.error('加载监控数据失败');
     }
@@ -323,37 +322,6 @@ export default function AdminSubscriptionsPage() {
       ),
     },
     {
-      title: '订阅配置',
-      key: 'config',
-      render: (_: any, record: Subscription) => {
-        const items = [];
-        if (record.keywords) {
-          const kws = JSON.parse(record.keywords);
-          items.push(`关键词: ${kws.slice(0, 3).join(', ')}${kws.length > 3 ? '...' : ''}`);
-        }
-        if (record.uploaders) {
-          const ups = JSON.parse(record.uploaders);
-          items.push(`UP主: ${ups.slice(0, 2).join(', ')}${ups.length > 2 ? '...' : ''}`);
-        }
-        if (record.tags) {
-          const tags = JSON.parse(record.tags);
-          items.push(`标签: ${tags.slice(0, 2).join(', ')}${tags.length > 2 ? '...' : ''}`);
-        }
-        return items.map((item, idx) => <div key={idx} style={{ fontSize: 12, color: '#666' }}>{item}</div>);
-      },
-    },
-    {
-      title: '状态',
-      key: 'status',
-      render: (_: any, record: Subscription) => (
-        <Space direction="vertical" size="small">
-          {record.isPublic && <Tag color="gold">公共</Tag>}
-          {record.isActive && <Tag color="green">激活</Tag>}
-          {record.notifyEnabled && <Tag icon={<BellOutlined />}>通知</Tag>}
-        </Space>
-      ),
-    },
-    {
       title: '匹配数/新增数',
       key: 'counts',
       width: 130,
@@ -434,53 +402,56 @@ export default function AdminSubscriptionsPage() {
     },
   ];
 
-  return (
-    <div>
-      {/* 统计卡片 */}
-      {stats && (
-        <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col span={4}>
-            <Card>
-              <Statistic title="订阅总数" value={stats.total} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card>
-              <Statistic title="活跃订阅" value={stats.active} valueStyle={{ color: '#3f8600' }} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card>
-              <Statistic title="同步启用" value={stats.syncEnabled} valueStyle={{ color: '#1890ff' }} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card>
-              <Statistic title="24h同步" value={stats.last24h?.syncCount || 0} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card>
-              <Statistic title="24h匹配" value={stats.last24h?.matchedCount || 0} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card>
-              <Statistic
-                title="成功率"
-                value={parseFloat(stats.last24h?.successRate || '0')}
-                precision={1}
-                suffix="%"
-                valueStyle={{ color: parseFloat(stats.last24h?.successRate || '0') > 90 ? '#3f8600' : '#cf1322' }}
-              />
-            </Card>
-          </Col>
-        </Row>
-      )}
+  const displayStats = stats ?? defaultStats;
 
-      {/* 主表格 */}
+  return (
+    <div className={styles.pageWrapper}>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>订阅管理</h1>
+      </div>
+
+      <Row gutter={[16, 16]} className={styles.statsRow}>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic title="订阅总数" value={displayStats.total} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic title="活跃订阅" value={displayStats.active} valueStyle={{ color: '#3f8600' }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic title="同步启用" value={displayStats.syncEnabled} valueStyle={{ color: '#1890ff' }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic title="24h 同步" value={displayStats.last24h?.syncCount ?? 0} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic title="24h 匹配" value={displayStats.last24h?.matchedCount ?? 0} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4}>
+          <Card size="small" className={styles.statCard}>
+            <Statistic
+              title="成功率"
+              value={parseFloat(String(displayStats.last24h?.successRate ?? 0))}
+              precision={1}
+              suffix="%"
+              valueStyle={{ color: parseFloat(String(displayStats.last24h?.successRate ?? 0)) > 90 ? '#3f8600' : '#cf1322' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
       <Card
         title="订阅列表"
+        className={styles.tableCard}
         extra={
           <Space>
             <Select
@@ -541,15 +512,38 @@ export default function AdminSubscriptionsPage() {
             ...pagination,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`,
+            pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={(newPagination) => {
-            loadSubscriptions(newPagination.current, newPagination.pageSize);
+            loadSubscriptions(newPagination?.current ?? 1, newPagination?.pageSize ?? 10);
           }}
           rowSelection={{
             selectedRowKeys: selectedRows,
             onChange: (keys) => setSelectedRows(keys as string[]),
           }}
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1200 }}
+          locale={{
+            emptyText: (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>
+                  <BellOutlined style={{ fontSize: 48, color: 'var(--color-text-tertiary, #bfbfbf)' }} />
+                </div>
+                <p className={styles.emptyTitle}>暂无订阅数据</p>
+                <p className={styles.emptyDesc}>用户创建的订阅会出现在这里，您也可以新建一条订阅。</p>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setSelectedSubscription(null);
+                    form.resetFields();
+                    setModalOpen(true);
+                  }}
+                >
+                  新建订阅
+                </Button>
+              </div>
+            ),
+          }}
         />
       </Card>
 

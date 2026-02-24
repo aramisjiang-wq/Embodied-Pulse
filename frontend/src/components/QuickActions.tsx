@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Dropdown, Space, App, Modal, Input, Tooltip, Tag, Divider } from 'antd';
-import { StarOutlined, StarFilled, BellOutlined, BellFilled, ShareAltOutlined, BookOutlined, FolderAddOutlined, LinkOutlined, CopyOutlined, FileTextOutlined, CompareOutlined, DownloadOutlined, ExportOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { StarOutlined, StarFilled, BellOutlined, BellFilled, ShareAltOutlined, BookOutlined, FolderAddOutlined, LinkOutlined, CopyOutlined, FileTextOutlined, SwapOutlined, DownloadOutlined, ExportOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
-import { communityApi, subscriptionApi } from '@/lib/api';
-import type { Subscription } from '@/lib/api/subscription';
+import { communityApi, contentSubscriptionApi } from '@/lib/api';
 
 interface QuickActionsProps {
   contentType: 'paper' | 'repo' | 'video' | 'job' | 'post';
@@ -15,6 +14,8 @@ interface QuickActionsProps {
   onShare?: () => void;
   onFavoriteChange?: (isFavorited: boolean) => void;
   onSubscribeChange?: (isSubscribed: boolean) => void;
+  /** 是否显示「订阅」按钮。论文为静态内容，无更新可订阅，默认仅在 repo/video/job 等展示 */
+  showSubscribe?: boolean;
   showCompare?: boolean;
   showCite?: boolean;
   showDownload?: boolean;
@@ -28,6 +29,7 @@ export default function QuickActions({
   onShare,
   onFavoriteChange,
   onSubscribeChange,
+  showSubscribe = true,
   showCompare = false,
   showCite = false,
   showDownload = false,
@@ -49,11 +51,7 @@ export default function QuickActions({
 
   const loadStates = useCallback(async () => {
     try {
-      const [favoriteData, subscriptionData] = await Promise.all([
-        communityApi.getFavorites({ page: 1, size: 200, contentType }),
-        subscriptionApi.getSubscriptions({ page: 1, size: 200, contentType }),
-      ]);
-
+      const favoriteData = await communityApi.getFavorites({ page: 1, size: 200, contentType });
       const favoriteIds = new Set(
         (favoriteData.items || []).flatMap((fav) => {
           if (fav && typeof fav === 'object' && 'contentId' in fav) {
@@ -63,19 +61,18 @@ export default function QuickActions({
           return [];
         })
       );
-      const subscriptionIds = new Set(
-        (subscriptionData.items || []).flatMap((sub: Subscription) => {
-          const contentValue = (sub as { contentId?: unknown }).contentId;
-          return typeof contentValue === 'string' ? [contentValue] : [];
-        })
-      );
-
       setIsFavorited(favoriteIds.has(contentId));
-      setIsSubscribed(subscriptionIds.has(contentId));
+
+      if (showSubscribe) {
+        const checkResult = await contentSubscriptionApi.checkSubscription(contentType, contentId);
+        setIsSubscribed(checkResult.isSubscribed);
+      } else {
+        setIsSubscribed(false);
+      }
     } catch (error) {
       console.error('加载状态失败:', error);
     }
-  }, [contentId, contentType]);
+  }, [contentId, contentType, showSubscribe]);
 
   useEffect(() => {
     if (user) {
@@ -120,13 +117,13 @@ export default function QuickActions({
     setLoading(prev => ({ ...prev, subscribe: true }));
     try {
       if (isSubscribed) {
-        await subscriptionApi.deleteSubscription(contentId);
+        await contentSubscriptionApi.deleteSubscription(contentType, contentId);
         message.success('已取消订阅');
         setIsSubscribed(false);
       } else {
-        await subscriptionApi.createSubscription({
+        await contentSubscriptionApi.createSubscription({
           contentType,
-          name: title || '未命名',
+          contentId,
         });
         message.success('订阅成功！将为您推送相关更新');
         setIsSubscribed(true);
@@ -243,13 +240,17 @@ export default function QuickActions({
       icon: <FolderAddOutlined />,
       onClick: handleAddToFolder,
     },
-    { type: 'divider' as const },
-    {
-      key: 'subscribe',
-      label: isSubscribed ? '取消订阅' : '订阅更新',
-      icon: isSubscribed ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />,
-      onClick: handleSubscribe,
-    },
+    ...(showSubscribe
+      ? [
+          { type: 'divider' as const },
+          {
+            key: 'subscribe',
+            label: isSubscribed ? '取消订阅' : '订阅更新',
+            icon: isSubscribed ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />,
+            onClick: handleSubscribe,
+          },
+        ]
+      : []),
   ];
 
   const shareDropdownItems = [
@@ -275,7 +276,7 @@ export default function QuickActions({
             items: favoriteDropdownItems,
             onClick: ({ key }) => {
               const item = favoriteDropdownItems.find(i => 'key' in i && i.key === key);
-              if (item && 'onClick' in item) {
+              if (item && 'onClick' in item && typeof item.onClick === 'function') {
                 item.onClick();
               }
             },
@@ -292,16 +293,18 @@ export default function QuickActions({
           </Button>
         </Dropdown>
 
-        <Button
-          icon={isSubscribed ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />}
-          onClick={handleSubscribe}
-          loading={loading.subscribe}
-          type={isSubscribed ? 'primary' : 'default'}
-          size="small"
-          style={{ borderRadius: 6 }}
-        >
-          {isSubscribed ? '已订阅' : '订阅'}
-        </Button>
+        {showSubscribe && (
+          <Button
+            icon={isSubscribed ? <BellFilled style={{ color: '#1890ff' }} /> : <BellOutlined />}
+            onClick={handleSubscribe}
+            loading={loading.subscribe}
+            type={isSubscribed ? 'primary' : 'default'}
+            size="small"
+            style={{ borderRadius: 6 }}
+          >
+            {isSubscribed ? '已订阅' : '订阅'}
+          </Button>
+        )}
 
         <Dropdown
           menu={{
@@ -340,7 +343,7 @@ export default function QuickActions({
         {showCompare && (
           <Tooltip title="添加到对比列表">
             <Button
-              icon={<CompareOutlined />}
+              icon={<SwapOutlined />}
               onClick={handleCompare}
               size="small"
               style={{ borderRadius: 6 }}
@@ -375,7 +378,7 @@ export default function QuickActions({
                 <Tag color="blue">BibTeX</Tag>
               </div>
               <code style={{ fontSize: 12, color: '#666' }}>
-                @article{'{' + contentId}, title={'{' + (title || 'Untitled') + '}'}, ...}
+                @article{'{'}{contentId}{'}'}, title={'{'}{title || 'Untitled'}{'}'}, ...
               </code>
             </div>
             <div 

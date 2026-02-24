@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import userPrisma from '../config/database.user';
 import { ApiError } from '../utils/errors';
 import { sendSuccess, sendError } from '../utils/response';
+import { calculateLevel } from '../services/user.service';
 import bcrypt from 'bcryptjs';
 
 const prisma = userPrisma;
@@ -76,6 +77,9 @@ export const getProfile = async (req: Request, res: Response) => {
         level: true,
         points: true,
         isVip: true,
+        identityType: true,
+        organizationName: true,
+        region: true,
         createdAt: true,
       },
     });
@@ -100,7 +104,10 @@ export const getProfile = async (req: Request, res: Response) => {
 export const updateProfile = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { username, email, bio, avatarUrl, githubUrl, linkedinUrl, twitterUrl, websiteUrl, location, skills, interests } = req.body;
+    const {
+      username, email, bio, avatarUrl, githubUrl, linkedinUrl, twitterUrl, websiteUrl,
+      location, skills, interests, identityType, organizationName, region,
+    } = req.body;
 
     // 验证数据
     const updateData: any = {};
@@ -115,6 +122,37 @@ export const updateProfile = async (req: Request, res: Response) => {
     if (location !== undefined) updateData.location = location;
     if (skills !== undefined) updateData.skills = skills;
     if (interests !== undefined) updateData.interests = interests;
+    if (identityType !== undefined) updateData.identityType = identityType || null;
+    if (organizationName !== undefined) updateData.organizationName = organizationName || null;
+    if (region !== undefined) updateData.region = region || null;
+
+    // 填写组织名称后（高校/企业场景），奖励 300 积分，达到 L3 要求
+    // 等级由积分自动计算
+    if (organizationName && String(organizationName).trim()) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { points: true, organizationName: true },
+      });
+      
+      // 只有首次填写组织名称时才奖励积分
+      if (currentUser && !currentUser.organizationName) {
+        const newPoints = (currentUser.points || 0) + 300;
+        updateData.points = newPoints;
+        
+        // 计算新等级
+        updateData.level = calculateLevel(newPoints);
+        
+        // 创建积分记录
+        await prisma.pointRecord.create({
+          data: {
+            userId,
+            points: 300,
+            actionType: 'profile_complete',
+            description: '完善资料奖励：填写组织名称',
+          },
+        });
+      }
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
@@ -135,6 +173,9 @@ export const updateProfile = async (req: Request, res: Response) => {
         level: true,
         points: true,
         isVip: true,
+        identityType: true,
+        organizationName: true,
+        region: true,
         createdAt: true,
       },
     });
