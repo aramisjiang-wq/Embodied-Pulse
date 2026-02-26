@@ -337,7 +337,7 @@ ss -tlnp | grep python
 | Google API | - | 已配置 |
 | GitHub Token | 抓取数据 | 已配置，详见 `.env` 文件 |
 
-**GitHub Token 管理地址：** https://github.com/settings/tokens/2791253780
+**GitHub Token 管理地址：** https://github.com/settings/tokens/
 
 ### SSH密钥
 

@@ -16,7 +16,7 @@ import {
   RiseOutlined,
   TeamOutlined,
   HomeOutlined,
-  NewsOutlined
+  BellOutlined as NewsOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
