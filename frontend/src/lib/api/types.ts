@@ -205,6 +205,9 @@ export interface HomeModule {
   config?: string; // JSON格式配置，解析后为 HomeModuleConfig
   isActive: boolean;
   order: number;
+  sortOrder: number;
+  content?: string;
+  moduleType?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -334,6 +337,7 @@ export interface Comment {
     username: string;
     avatarUrl?: string;
     level: number;
+    points?: number;
   };
   postId: string;
   parentId?: string;

@@ -24,7 +24,7 @@ async function main() {
     if (existing) { skipped++; continue; }
     const [author, name] = r.fullName.split('/');
     await userPrisma.huggingFaceModel.create({
-      data: { fullName: r.fullName, name, author, description: r.description, task: 'robotics', downloads: 0, likes: 0, lastModified: new Date(), hfId: r.fullName, license: null, tags: null, contentType: r.contentType, category: r.category }
+      data: { fullName: r.fullName, name, author, description: r.description, task: 'robotics', downloads: 0, likes: 0, lastModified: new Date(), hf_id: r.fullName, license: null, tags: null, contentType: r.contentType, category: r.category }
     });
     imported++;
     console.log(`✓ ${r.fullName}`);

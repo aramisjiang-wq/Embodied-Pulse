@@ -109,27 +109,35 @@ export function NotificationCenter({ visible, onClose }: NotificationCenterProps
   };
 
   const getNotificationTypeLabel = (type: NotificationType) => {
-    const labels: Record<NotificationType, string> = {
+    const labels: Record<string, string> = {
       subscription_update: '订阅更新',
       new_content: '新内容',
       comment_reply: '评论回复',
       like: '收到点赞',
       favorite: '被收藏',
       system: '系统通知',
+      repo_update: '项目更新',
+      paper_new: '新论文',
+      video_new: '新视频',
+      job_new: '新职位',
     };
-    return labels[type];
+    return labels[type] || type;
   };
 
   const getNotificationTypeColor = (type: NotificationType) => {
-    const colors: Record<NotificationType, string> = {
+    const colors: Record<string, string> = {
       subscription_update: 'success',
       new_content: 'processing',
       comment_reply: 'purple',
       like: 'orange',
       favorite: 'gold',
       system: 'error',
+      repo_update: 'default',
+      paper_new: 'default',
+      video_new: 'default',
+      job_new: 'default',
     };
-    return colors[type];
+    return colors[type] || 'default';
   };
 
   const getNotificationActions = (notification: Notification) => [

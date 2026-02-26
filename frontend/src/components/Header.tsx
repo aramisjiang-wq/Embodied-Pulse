@@ -15,7 +15,8 @@ import {
   RobotOutlined,
   RiseOutlined,
   TeamOutlined,
-  HomeOutlined
+  HomeOutlined,
+  NewsOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
@@ -293,6 +294,27 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
               >
                 <RiseOutlined style={{ fontSize: 16, color: '#F59E0B' }} />
                 <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>招聘</span>
+              </div>
+            </Link>
+            <Link href="/news" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#FEF2F2';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+              >
+                <NewsOutlined style={{ fontSize: 16, color: '#EF4444' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>新闻</span>
               </div>
             </Link>
             <Link href="/community" style={{ textDecoration: 'none' }}>

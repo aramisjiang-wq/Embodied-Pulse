@@ -25,6 +25,7 @@ export interface SearchResult {
   tags?: string[];
   createdAt?: string;
   metadata?: Record<string, unknown>;
+  contentType?: string;
 }
 
 export const searchApi = {

@@ -5,6 +5,7 @@
 
 import { logger } from '../utils/logger';
 import userPrisma from '../config/database.user';
+import crypto from 'crypto';
 
 interface BilibiliCookie {
   id: string;
@@ -59,24 +60,24 @@ export class BilibiliCookieManager {
     }
 
     try {
-      const dbCookies = await userPrisma.bilibiliCookie.findMany({
+      const dbCookies = await userPrisma.bilibili_cookies.findMany({
         orderBy: { priority: 'asc' },
       });
 
-      cookiePool.cookies = dbCookies.map(c => ({
+      cookiePool.cookies = dbCookies.map((c: any) => ({
         id: c.id,
         name: c.name,
         cookie: c.cookie,
-        isActive: c.isActive,
-        lastUsed: c.lastUsedAt || new Date(),
-        errorCount: c.errorCount,
-        lastError: c.lastError || undefined,
-        createdAt: c.createdAt,
+        isActive: c.is_active,
+        lastUsed: c.last_used_at || new Date(),
+        errorCount: c.error_count,
+        lastError: c.last_error || undefined,
+        createdAt: c.created_at,
         priority: c.priority,
-        lastCheckAt: c.lastCheckAt || undefined,
-        checkResult: c.checkResult || undefined,
-        userMid: c.userMid || undefined,
-        userName: c.userName || undefined,
+        lastCheckAt: c.last_check_at || undefined,
+        checkResult: c.check_result || undefined,
+        userMid: c.user_mid || undefined,
+        userName: c.user_name || undefined,
         source: c.source || undefined,
       }));
 
@@ -121,17 +122,18 @@ export class BilibiliCookieManager {
   static async addCookie(cookie: BilibiliCookie): Promise<BilibiliCookie> {
     if (cookie.id !== 'env') {
       try {
-        const dbCookie = await userPrisma.bilibiliCookie.create({
+        const dbCookie = await userPrisma.bilibili_cookies.create({
           data: {
             id: cookie.id,
             name: cookie.name,
             cookie: cookie.cookie,
             priority: cookie.priority || cookiePool.cookies.length,
-            isActive: cookie.isActive,
-            errorCount: cookie.errorCount,
-            lastError: cookie.lastError,
-            lastUsedAt: cookie.lastUsed,
+            is_active: cookie.isActive,
+            error_count: cookie.errorCount,
+            last_error: cookie.lastError,
+            last_used_at: cookie.lastUsed,
             source: cookie.source || 'manual',
+            updated_at: new Date(),
           },
         });
         cookie.id = dbCookie.id;
@@ -160,7 +162,7 @@ export class BilibiliCookieManager {
   static async removeCookie(id: string): Promise<void> {
     if (id !== 'env') {
       try {
-        await userPrisma.bilibiliCookie.delete({
+        await userPrisma.bilibili_cookies.delete({
           where: { id },
         });
       } catch (error: any) {
@@ -213,18 +215,18 @@ export class BilibiliCookieManager {
 
     if (id !== 'env') {
       try {
-        await userPrisma.bilibiliCookie.update({
+        await userPrisma.bilibili_cookies.update({
           where: { id },
           data: {
-            isActive: data.isActive,
-            errorCount: data.errorCount,
-            lastError: data.lastError,
-            lastUsedAt: data.lastUsed,
-            lastCheckAt: data.lastCheckAt,
-            checkResult: data.checkResult,
-            userMid: data.userMid,
-            userName: data.userName,
-            updatedAt: new Date(),
+            is_active: data.isActive,
+            error_count: data.errorCount,
+            last_error: data.lastError,
+            last_used_at: data.lastUsed,
+            last_check_at: data.lastCheckAt,
+            check_result: data.checkResult,
+            user_mid: data.userMid,
+            user_name: data.userName,
+            updated_at: new Date(),
           },
         });
       } catch (error: any) {
@@ -456,13 +458,13 @@ export class BilibiliCookieManager {
    */
   static async getSettings(): Promise<CookieSettings> {
     try {
-      const dbSettings = await userPrisma.bilibiliCookieSetting.findFirst();
+      const dbSettings = await userPrisma.bilibili_cookie_settings.findFirst();
       if (dbSettings) {
         return {
-          autoRotateEnabled: dbSettings.autoRotateEnabled,
-          healthCheckInterval: dbSettings.healthCheckInterval,
-          maxErrorCount: dbSettings.maxErrorCount,
-          alertEnabled: dbSettings.alertEnabled,
+          autoRotateEnabled: dbSettings.auto_rotate_enabled,
+          healthCheckInterval: dbSettings.health_check_interval,
+          maxErrorCount: dbSettings.max_error_count,
+          alertEnabled: dbSettings.alert_enabled,
         };
       }
     } catch (error: any) {
@@ -473,25 +475,27 @@ export class BilibiliCookieManager {
 
   static async updateSettings(settings: Partial<CookieSettings>): Promise<CookieSettings> {
     try {
-      const existing = await userPrisma.bilibiliCookieSetting.findFirst();
+      const existing = await userPrisma.bilibili_cookie_settings.findFirst();
 
       if (existing) {
-        await userPrisma.bilibiliCookieSetting.update({
+        await userPrisma.bilibili_cookie_settings.update({
           where: { id: existing.id },
           data: {
-            autoRotateEnabled: settings.autoRotateEnabled,
-            healthCheckInterval: settings.healthCheckInterval,
-            maxErrorCount: settings.maxErrorCount,
-            alertEnabled: settings.alertEnabled,
+            auto_rotate_enabled: settings.autoRotateEnabled,
+            health_check_interval: settings.healthCheckInterval,
+            max_error_count: settings.maxErrorCount,
+            alert_enabled: settings.alertEnabled,
           },
         });
       } else {
-        await userPrisma.bilibiliCookieSetting.create({
+        await userPrisma.bilibili_cookie_settings.create({
           data: {
-            autoRotateEnabled: settings.autoRotateEnabled ?? DEFAULT_SETTINGS.autoRotateEnabled,
-            healthCheckInterval: settings.healthCheckInterval ?? DEFAULT_SETTINGS.healthCheckInterval,
-            maxErrorCount: settings.maxErrorCount ?? DEFAULT_SETTINGS.maxErrorCount,
-            alertEnabled: settings.alertEnabled ?? DEFAULT_SETTINGS.alertEnabled,
+            id: crypto.randomUUID(),
+            auto_rotate_enabled: settings.autoRotateEnabled ?? DEFAULT_SETTINGS.autoRotateEnabled,
+            health_check_interval: settings.healthCheckInterval ?? DEFAULT_SETTINGS.healthCheckInterval,
+            max_error_count: settings.maxErrorCount ?? DEFAULT_SETTINGS.maxErrorCount,
+            alert_enabled: settings.alertEnabled ?? DEFAULT_SETTINGS.alertEnabled,
+            updated_at: new Date(),
           },
         });
       }

@@ -54,6 +54,7 @@ interface FavoriteDetail {
   htmlUrl?: string;
   applyUrl?: string;
   hfId?: string;
+  contentType?: string;
 }
 
 interface FavoriteItem {

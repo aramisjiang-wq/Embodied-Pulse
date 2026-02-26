@@ -162,9 +162,9 @@ export default function SystemHealthPage() {
                           status={(item.metadata.usedPercent as number) > 90 ? 'exception' : 'normal'}
                         />
                       )}
-                      {item.metadata.heapUsedMB && item.metadata.heapTotalMB && (
+                      {Boolean(item.metadata.heapUsedMB) && Boolean(item.metadata.heapTotalMB) && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          {item.metadata.heapUsedMB}MB / {item.metadata.heapTotalMB}MB
+                          {`${item.metadata.heapUsedMB}MB / ${item.metadata.heapTotalMB}MB`}
                         </Text>
                       )}
                     </div>

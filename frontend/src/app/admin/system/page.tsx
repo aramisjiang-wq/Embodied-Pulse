@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, Row, Col, Typography, Space, Button } from 'antd';
-import { Link } from 'next/link';
+import Link from 'next/link';
 import {
   WarningOutlined, HeartOutlined, FileTextOutlined, ApiOutlined,
   SettingOutlined

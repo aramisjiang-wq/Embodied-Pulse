@@ -35,8 +35,8 @@ export async function getCommunityStats(): Promise<CommunityStats> {
     userPrisma.post.count(),
     userPrisma.post.count({ where: { status: 'active' } }),
     userPrisma.post.count({ where: { status: 'deleted' } }),
-    userPrisma.post.count({ where: { isTop: true, status: 'active' } }),
-    userPrisma.post.count({ where: { isFeatured: true, status: 'active' } }),
+    userPrisma.post.count({ where: { is_top: true, status: 'active' } }),
+    userPrisma.post.count({ where: { is_featured: true, status: 'active' } }),
     userPrisma.post.count({ where: { createdAt: { gte: todayStart }, status: 'active' } }),
     userPrisma.comment.count(),
   ]);

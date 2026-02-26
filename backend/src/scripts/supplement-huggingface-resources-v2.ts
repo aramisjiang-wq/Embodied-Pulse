@@ -382,11 +382,10 @@ async function importSupplementaryResourcesV2(): Promise<void> {
   const stats = await userPrisma.huggingFaceModel.groupBy({
     by: ['category'],
     _count: true,
-    orderBy: { _count: 'asc' },
   });
 
   console.log('\n=== 按分类统计(升序) ===');
-  stats.forEach(stat => {
+  stats.sort((a: any, b: any) => a._count - b._count).forEach((stat: any) => {
     console.log(`  - ${stat.category}: ${stat._count}`);
   });
 }

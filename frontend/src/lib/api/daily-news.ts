@@ -27,7 +27,7 @@ export const dailyNewsApi = {
     if (response && typeof response === 'object' && 'items' in response) {
       return response;
     }
-    return { items: [], total: 0 };
+    return { items: [], total: 0, page: params?.page || 1, size: params?.size || 20, totalPages: 0 };
   },
 
   async getNewsById(id: string): Promise<DailyNews | null> {

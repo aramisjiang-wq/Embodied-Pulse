@@ -34,6 +34,7 @@ export const huggingfaceApi = {
     keyword?: string;
     contentType?: 'model' | 'dataset' | 'space';
     author?: string;
+    category?: string;
   }): Promise<PaginatedResponse<HuggingFaceModel>> => {
     const response = await cachedGet<PaginatedResponse<HuggingFaceModel>>('/huggingface', { params });
     if (response && typeof response === 'object' && 'items' in response) {

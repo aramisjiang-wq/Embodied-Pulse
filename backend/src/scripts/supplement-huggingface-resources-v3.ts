@@ -207,7 +207,7 @@ async function importSupplementaryResourcesV3(): Promise<void> {
           downloads: 0,
           likes: 0,
           lastModified: new Date(),
-          hfId: resource.fullName,
+          hf_id: resource.fullName,
           license: null,
           tags: null,
           contentType: resource.contentType,

@@ -419,7 +419,7 @@ export async function addReposToCategory(
 
       await userPrisma.githubRepo.create({
         data: {
-          repoId: BigInt(repo.id),
+          repoId: String(repo.id),
           name: repo.name,
           fullName: repo.full_name,
           owner: repo.owner.login,

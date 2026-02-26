@@ -51,7 +51,7 @@ export const cookieApi = {
 
   getCookieStatus: async (): Promise<CookieStatus> => {
     const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/status');
-    return response.data;
+    return response.data as any;
   },
 
   rotateCookie: async () => {
@@ -60,7 +60,7 @@ export const cookieApi = {
 
   getSettings: async (): Promise<CookieSettings> => {
     const response = await apiClient.get<CookieSettings>('/api/admin/bilibili-cookies/settings');
-    return response.data;
+    return response.data as any;
   },
 
   updateSettings: async (settings: Partial<CookieSettings>) => {
@@ -69,7 +69,7 @@ export const cookieApi = {
 
   checkHealth: async (): Promise<CookieStatus> => {
     const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/health');
-    return response.data;
+    return response.data as any;
   },
 
   checkAllCookies: async (): Promise<{
@@ -79,12 +79,12 @@ export const cookieApi = {
     cookies: HealthCheckResult[];
   }> => {
     const response = await apiClient.get('/api/admin/bilibili-cookies/check');
-    return response.data;
+    return response.data as any;
   },
 
   checkSingleCookie: async (id: string): Promise<HealthCheckResult> => {
     const response = await apiClient.get(`/api/admin/bilibili-cookies/${id}/check`);
-    return response.data;
+    return response.data as any;
   },
 
   toggleCookieStatus: async (id: string) => {
@@ -97,6 +97,6 @@ export const cookieApi = {
 
   getStats: async () => {
     const response = await apiClient.get('/api/admin/bilibili-cookies/stats');
-    return response.data;
+    return response.data as any;
   },
 };

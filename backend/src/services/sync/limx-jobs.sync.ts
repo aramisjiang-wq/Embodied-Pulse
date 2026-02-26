@@ -107,7 +107,7 @@ export async function syncLimXJobs(): Promise<SyncLimXJobsResult> {
               experience: row.experience ?? undefined,
               status: 'open',
               updatedAt: new Date(),
-              applyUrl: LIMX_CAREER_URL,
+              apply_url: LIMX_CAREER_URL,
             },
           });
         } else {
@@ -124,7 +124,7 @@ export async function syncLimXJobs(): Promise<SyncLimXJobsResult> {
               viewCount: 0,
               favoriteCount: 0,
               experience: row.experience ?? undefined,
-              applyUrl: LIMX_CAREER_URL,
+              apply_url: LIMX_CAREER_URL,
             },
           });
         }

@@ -223,7 +223,7 @@ export async function syncHuggingFaceModels(task?: string, maxResults: number = 
           fullName: model.id,
           name: model.modelId || model.id.split('/').pop() || 'unknown',
           author: model.author || 'unknown',
-          hfId: model.id,
+          hf_id: model.id,
           license: (model as any).license || null,
           tags: (model as any).tags ? JSON.stringify((model as any).tags) : null,
           description: (model as any).description || '',
