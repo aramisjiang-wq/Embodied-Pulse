@@ -69,7 +69,7 @@ axiosInstance.interceptors.request.use(
       console.log(`[API Request] isAuthEndpoint=${isAuthEndpoint}, isPublicApi=${isPublicApi}`);
       
       if (requestUrl.includes('/auth/refresh')) {
-        const isAdmin = window.location.pathname.startsWith('/admin');
+        const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
         const tokenKey = isAdmin ? 'admin_refresh_token' : 'user_refresh_token';
         token = localStorage.getItem(tokenKey);
         if (!token) console.warn('[API Request] No refresh token for /auth/refresh');
@@ -187,7 +187,7 @@ axiosInstance.interceptors.response.use(
           const isAdminLogin = requestUrl.includes('/auth/admin/login');
           const isUserLogin = requestUrl.includes('/auth/login') && !isAdminLogin;
           const isLoginRequest = isUserLogin || isAdminLogin;
-          const isAdminPage = window.location.pathname.startsWith('/admin');
+          const isAdminPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
           const isRefreshRequest = requestUrl.includes('/auth/refresh');
 
           // 登录接口返回 401：直接返回后端文案（如「邮箱或密码错误」），不要改成「请先登录」
@@ -208,7 +208,7 @@ axiosInstance.interceptors.response.use(
             localStorage.removeItem(refreshKey);
             localStorage.removeItem(userKey);
             if (!isAdminPage) useAuthStore.getState().logout();
-            if (isAdminPage && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
+            if (isAdminPage && typeof window !== 'undefined' && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
             return Promise.reject({
               code: 'UNAUTHORIZED',
               message: '登录已过期，请重新登录',
@@ -264,7 +264,7 @@ axiosInstance.interceptors.response.use(
               localStorage.removeItem(refreshKey);
               localStorage.removeItem(userKey);
               if (!isAdminPage) useAuthStore.getState().logout();
-              if (isAdminPage && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
+              if (isAdminPage && typeof window !== 'undefined' && window.location.pathname !== '/admin/login') window.location.href = '/admin/login';
               return Promise.reject({
                 code: 'UNAUTHORIZED',
                 message: '登录已过期，请重新登录',
@@ -281,7 +281,7 @@ axiosInstance.interceptors.response.use(
             if (!isAdminPage) useAuthStore.getState().logout();
           }
 
-          if (isAdminPage && window.location.pathname !== '/admin/login') {
+          if (isAdminPage && typeof window !== 'undefined' && window.location.pathname !== '/admin/login') {
             window.location.href = '/admin/login';
             return Promise.reject({
               code: 'UNAUTHORIZED',

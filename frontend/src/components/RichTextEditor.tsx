@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Editor, Toolbar } from '@wangeditor/editor-for-react';
-import '@wangeditor/editor/dist/css/style.css';
+import { useEffect, useState, useMemo } from 'react';
+import { Spin } from 'antd';
 
 interface RichTextEditorProps {
   value?: string;
@@ -19,9 +18,17 @@ export default function RichTextEditor({
   height = 400,
   disabled = false,
 }: RichTextEditorProps) {
-  const [editor, setEditor] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+  const [EditorComponent, setEditorComponent] = useState<any>(null);
 
-  const toolbarConfig: any = {
+  useEffect(() => {
+    setMounted(true);
+    import('@wangeditor/editor-for-react').then((mod) => {
+      setEditorComponent(() => mod.default);
+    });
+  }, []);
+
+  const toolbarConfig = useMemo(() => ({
     toolbarKeys: [
       'headerSelect',
       '|',
@@ -57,9 +64,9 @@ export default function RichTextEditor({
       '|',
       'fullScreen',
     ],
-  };
+  }), []);
 
-  const editorConfig: any = {
+  const editorConfig = useMemo(() => ({
     placeholder,
     MENU_CONF: {
       uploadImage: {
@@ -72,7 +79,57 @@ export default function RichTextEditor({
         },
       },
     },
-  };
+  }), [placeholder]);
+
+  if (!mounted || !EditorComponent) {
+    return (
+      <div style={{ 
+        border: '1px solid #d9d9d9', 
+        borderRadius: 6, 
+        height, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
+        <Spin tip="加载编辑器..." />
+      </div>
+    );
+  }
+
+  return (
+    <RichTextEditorInner
+      EditorComponent={EditorComponent}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      height={height}
+      disabled={disabled}
+      toolbarConfig={toolbarConfig}
+      editorConfig={editorConfig}
+    />
+  );
+}
+
+function RichTextEditorInner({
+  EditorComponent,
+  value,
+  onChange,
+  placeholder,
+  height,
+  disabled,
+  toolbarConfig,
+  editorConfig,
+}: {
+  EditorComponent: any;
+  value?: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  height?: number;
+  disabled?: boolean;
+  toolbarConfig: any;
+  editorConfig: any;
+}) {
+  const [editor, setEditor] = useState<any>(null);
 
   useEffect(() => {
     return () => {
@@ -86,6 +143,8 @@ export default function RichTextEditor({
     const html = editor.getHtml();
     onChange?.(html);
   };
+
+  const { Editor, Toolbar } = EditorComponent;
 
   return (
     <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, overflow: 'hidden' }}>

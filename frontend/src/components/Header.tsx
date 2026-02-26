@@ -16,7 +16,7 @@ import {
   RiseOutlined,
   TeamOutlined,
   HomeOutlined,
-  NewsOutlined
+  SendOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
@@ -313,7 +313,7 @@ export default function Header({ sidebarCollapsed = false, onSidebarCollapse }: 
                 e.currentTarget.style.background = 'transparent';
               }}
               >
-                <NewsOutlined style={{ fontSize: 16, color: '#EF4444' }} />
+                <SendOutlined style={{ fontSize: 16, color: '#EF4444' }} />
                 <span style={{ fontSize: 14, fontWeight: 500, color: token.colorText }}>新闻</span>
               </div>
             </Link>
