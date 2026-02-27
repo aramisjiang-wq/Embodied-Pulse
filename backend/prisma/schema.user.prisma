@@ -536,10 +536,10 @@ model DailyNews {
   title     String
   content   String
   isPinned  Boolean  @default(false) @map("is_pinned")
-  pinnedAt  DateTime? @map("pinned_at")
+  pinnedAt  String?  @map("pinned_at")
   viewCount Int      @default(0) @map("view_count")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt String   @map("created_at")
+  updatedAt String   @map("updated_at")
 
   @@index([date(sort: Desc)])
   @@index([isPinned, pinnedAt(sort: Desc)])

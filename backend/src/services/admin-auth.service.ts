@@ -6,7 +6,8 @@
 import { hashPassword, verifyPassword } from '../utils/password';
 import { logger } from '../utils/logger';
 import { generateAdminNumber } from '../utils/user-number';
-import adminPrisma from '../config/database.admin';
+import { v4 as uuidv4 } from 'uuid';
+import adminPrisma, { ensureAdminDatabaseConnected } from '../config/database.admin';
 
 export interface CreateAdminData {
   username: string;
@@ -20,6 +21,9 @@ export interface CreateAdminData {
  */
 export async function getAdminById(adminId: string): Promise<any | null> {
   try {
+    // 确保数据库连接已建立
+    await ensureAdminDatabaseConnected();
+    
     logger.info(`getAdminById called with adminId: ${adminId}`);
     
     // 验证adminId格式，防止SQL注入
@@ -107,6 +111,9 @@ export async function getAdminById(adminId: string): Promise<any | null> {
  */
 export async function getAdminByEmail(email: string): Promise<any | null> {
   try {
+    // 确保数据库连接已建立
+    await ensureAdminDatabaseConnected();
+    
     logger.debug(`Getting admin by email: ${email}`);
     const admin = await adminPrisma.admins.findUnique({
       where: { email },
@@ -248,6 +255,9 @@ export async function authenticateAdmin(email: string, password: string): Promis
  */
 export async function createAdmin(data: CreateAdminData): Promise<any> {
   try {
+    // 确保数据库连接已建立
+    await ensureAdminDatabaseConnected();
+    
     // 检查邮箱是否已存在
     const existing = await getAdminByEmail(data.email);
     if (existing) {
@@ -263,11 +273,13 @@ export async function createAdmin(data: CreateAdminData): Promise<any> {
     // 创建管理员
     const admin = await adminPrisma.admins.create({
       data: {
+        id: uuidv4(),
         admin_number: adminNumber,
         username: data.username,
         email: data.email,
         password_hash: passwordHash,
         role: data.role || 'admin',
+        updated_at: new Date(),
       } as any,
     });
 
@@ -278,6 +290,6 @@ export async function createAdmin(data: CreateAdminData): Promise<any> {
       throw error;
     }
     logger.error('Create admin error:', error);
-    throw new Error('ADMIN_CREATION_FAILED');
+    throw error;
   }
 }
