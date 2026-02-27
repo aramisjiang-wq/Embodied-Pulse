@@ -239,6 +239,8 @@ export async function updateAdminTagsHandler(req: Request, res: Response, next: 
 export async function createAdminHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const { username, email, password, role } = req.body;
+    
+    logger.info('Create admin request received:', { username, email, role });
 
     // 验证必填字段
     if (!username || !email || !password) {
@@ -268,19 +270,25 @@ export async function createAdminHandler(req: Request, res: Response, next: Next
     });
 
     logger.info(`Admin created: ${admin.id} (${admin.username})`);
-    sendSuccess(res, {
+    const responseData = {
       id: admin.id,
       username: admin.username,
       email: admin.email,
       role: admin.role,
-      adminNumber: admin.adminNumber,
-      createdAt: admin.createdAt,
-    });
+      adminNumber: admin.admin_number,
+      createdAt: admin.created_at,
+    };
+    logger.info('Sending response data:', responseData);
+    sendSuccess(res, responseData);
   } catch (error: any) {
+    logger.error('Create admin error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     if (error.message === 'EMAIL_EXISTS') {
       return sendError(res, 1002, '该邮箱已被使用', 400);
     }
-    logger.error('Create admin error:', error);
     next(error);
   }
 }

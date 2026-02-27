@@ -47,7 +47,6 @@ import robotsRoutes from './robots.routes';
 import cacheRoutes from './cache.routes';
 import metricsRoutes from './metrics.routes';
 import queueRoutes from './queue.routes';
-import customPageRoutes from './custom-page.routes';
 import discoveryRoutes from './discovery.routes';
 import dailyNewsRoutes from './daily-news.routes';
 import githubRepoInfoRoutes from './github-repo-info.routes';
@@ -161,10 +160,6 @@ router.use('/admin/cache', cacheRoutes);
 
 // 队列管理路由（管理员专用，放在 /admin 下）
 router.use('/admin/queues', queueRoutes);
-
-router.use('/pages', customPageRoutes);
-
-router.use('/admin/pages', customPageRoutes);
 
 router.use('/discovery', discoveryRoutes);
 router.use('/news', dailyNewsRoutes);

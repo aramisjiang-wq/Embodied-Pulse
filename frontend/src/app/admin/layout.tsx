@@ -25,7 +25,6 @@ import {
   ToolOutlined,
   PictureOutlined,
   AppstoreOutlined,
-  FileOutlined,
   ThunderboltOutlined,
   HeartOutlined,
   WarningOutlined,
@@ -390,12 +389,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           icon: <AppstoreOutlined />,
           label: '首页模块管理',
           onClick: () => router.push('/admin/home-modules'),
-        },
-        {
-          key: '/admin/pages',
-          icon: <FileOutlined />,
-          label: '自定义页面',
-          onClick: () => router.push('/admin/pages'),
         },
         {
           key: '/admin/admins',
