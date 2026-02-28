@@ -9,7 +9,14 @@ const nextConfig = {
   },
   // 性能优化配置
   experimental: {
-    optimizePackageImports: ['antd', '@ant-design/icons', 'antd/es', 'antd/lib'],
+    optimizePackageImports: [
+      'antd', 
+      '@ant-design/icons', 
+      'antd/es', 
+      'antd/lib',
+      '@tanstack/react-query',
+      '@tanstack/react-query-devtools',
+    ],
     optimizeCss: true,
     scrollRestoration: true,
   },

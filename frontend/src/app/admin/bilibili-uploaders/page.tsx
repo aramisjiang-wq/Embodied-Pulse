@@ -193,14 +193,50 @@ export default function BilibiliUploadersPage() {
   };
 
   const handleSync = async (mid: string) => {
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    const attemptSync = async (): Promise<{ success: boolean; message: string }> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        
+        const result = await bilibiliUploaderApi.syncUploader(mid, 100);
+        clearTimeout(timeoutId);
+        
+        return { 
+          success: true, 
+          message: `同步完成：成功 ${result.synced} 个，失败 ${result.errors} 个` 
+        };
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            message.loading({ content: `请求超时，正在重试 (${retryCount}/${maxRetries})...`, key: 'sync' });
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return attemptSync();
+          }
+          return { success: false, message: '同步失败：请求超时' };
+        }
+        if (retryCount < maxRetries) {
+          retryCount++;
+          message.loading({ content: `网络错误，正在重试 (${retryCount}/${maxRetries})...`, key: 'sync' });
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return attemptSync();
+        }
+        return { success: false, message: error.message || '同步失败' };
+      }
+    };
+    
     try {
       message.loading({ content: '同步中...', key: 'sync' });
-      const result = await bilibiliUploaderApi.syncUploader(mid, 100);
-      message.success({
-        content: `同步完成：成功 ${result.synced} 个，失败 ${result.errors} 个`,
-        key: 'sync',
-      });
-      loadUploaders();
+      const result = await attemptSync();
+      if (result.success) {
+        message.success({ content: result.message, key: 'sync' });
+        loadUploaders();
+      } else {
+        message.error({ content: result.message, key: 'sync' });
+      }
     } catch (error: any) {
       message.error({ content: error.message || '同步失败', key: 'sync' });
     }
@@ -290,24 +326,46 @@ export default function BilibiliUploadersPage() {
   };
 
   const handleSyncAll = async (maxResults: number = 100, smart: boolean = true) => {
-    try {
-      setSyncModalVisible(true);
-      setSyncPolling(true);
-      
-      // 启动同步任务（异步执行）
-      await bilibiliUploaderApi.syncAll(maxResults, smart);
-      
-      message.info({
-        content: '同步任务已启动，正在后台执行...',
-        duration: 3,
-      });
-      
-      // 立即获取初始状态
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    const attemptSyncAll = async (): Promise<{ success: boolean; message: string }> => {
       try {
-        const status = await bilibiliUploaderApi.getSyncStatus();
-        setSyncStatus(status);
-      } catch (error) {
-        console.error('获取初始同步状态失败:', error);
+        setSyncModalVisible(true);
+        setSyncPolling(true);
+        
+        await bilibiliUploaderApi.syncAll(maxResults, smart);
+        
+        return { success: true, message: '同步任务已启动' };
+      } catch (error: any) {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          message.loading({ content: `启动失败，正在重试 (${retryCount}/${maxRetries})...`, key: 'syncAll' });
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return attemptSyncAll();
+        }
+        return { success: false, message: error.message || '启动同步任务失败' };
+      }
+    };
+    
+    try {
+      const result = await attemptSyncAll();
+      if (result.success) {
+        message.info({
+          content: '同步任务已启动，正在后台执行...',
+          duration: 3,
+        });
+        
+        try {
+          const status = await bilibiliUploaderApi.getSyncStatus();
+          setSyncStatus(status);
+        } catch (error) {
+          console.error('获取初始同步状态失败:', error);
+        }
+      } else {
+        message.error(result.message);
+        setSyncPolling(false);
+        setSyncModalVisible(false);
       }
     } catch (error: any) {
       message.error(error.message || '启动同步任务失败');

@@ -8,6 +8,7 @@ import { createVideo } from '../video.service';
 import { logger } from '../../utils/logger';
 import { getActiveKeywordsArray } from '../bilibili-search-keyword.service';
 import { cleanVideoTitle, cleanDescription } from '../../utils/html-cleaner';
+import adminPrisma, { ensureAdminDatabaseConnected } from '../../config/database.admin';
 
 const bilibiliAPI = BilibiliAPI.fromEnv({
   timeout: 15000,
@@ -140,6 +141,20 @@ export async function syncVideosByKeywords(days: number = 7, maxResultsPerKeywor
         }
         
         logger.info(`关键词 ${keyword} 同步完成: 成功 ${recentVideos.length} 个视频`);
+        
+        try {
+          await ensureAdminDatabaseConnected();
+          const adminDb = adminPrisma as any;
+          if (adminDb?.bilibili_search_keywords) {
+            await adminDb.bilibili_search_keywords.updateMany({
+              where: { keyword },
+              data: { last_synced_at: new Date() },
+            });
+            logger.info(`已更新关键词 ${keyword} 的最后同步时间`);
+          }
+        } catch (updateError) {
+          logger.warn(`更新关键词 ${keyword} 的最后同步时间失败:`, updateError);
+        }
       } catch (error: any) {
         logger.error(`同步关键词 ${keyword} 失败:`, error.message);
         totalErrors++;

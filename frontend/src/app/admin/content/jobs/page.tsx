@@ -53,6 +53,8 @@ interface JobItem {
   favoriteCount?: number;
   createdAt?: string;
   applyUrl?: string;
+  isExpired?: boolean;
+  remainingDays?: number | null;
 }
 
 interface SeekerItem {
@@ -394,11 +396,18 @@ export default function JobsManagementPage() {
                       {
                         title: '状态',
                         dataIndex: 'status',
-                        width: 88,
-                        render: (v: string) => (
-                          <Tag className={v === 'open' ? styles.tagOpen : styles.tagClosed}>
-                            {v === 'open' ? '招聘中' : '已关闭'}
-                          </Tag>
+                        width: 120,
+                        render: (v: string, r: JobItem) => (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Tag className={v === 'open' ? styles.tagOpen : styles.tagClosed}>
+                              {v === 'open' ? '招聘中' : '已关闭'}
+                            </Tag>
+                            {r.isExpired ? (
+                              <Tag color="red" style={{ fontSize: 10, padding: '0 4px' }}>已过期</Tag>
+                            ) : r.remainingDays !== null && r.remainingDays !== undefined ? (
+                              <Tag color="green" style={{ fontSize: 10, padding: '0 4px' }}>剩{r.remainingDays}天</Tag>
+                            ) : null}
+                          </div>
                         ),
                       },
                       {

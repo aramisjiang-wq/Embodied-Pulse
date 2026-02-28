@@ -258,3 +258,89 @@ export const changePassword = async (req: Request, res: Response) => {
     }
   }
 };
+
+/**
+ * 获取用户设置
+ */
+export const getSettings = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        emailNotification: true,
+        pushNotification: true,
+        weeklyDigest: true,
+        language: true,
+        pushSubscription: true,
+      },
+    });
+
+    if (!user) {
+      throw new ApiError(404, 'USER_NOT_FOUND', '用户不存在');
+    }
+
+    sendSuccess(res, user, '获取成功');
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.statusCode, error.message, error.statusCode);
+    } else {
+      sendError(res, 500, '获取失败', 500);
+    }
+  }
+};
+
+/**
+ * 更新用户设置
+ */
+export const updateSettings = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const {
+      emailNotification,
+      pushNotification,
+      weeklyDigest,
+      language,
+      pushSubscription,
+    } = req.body;
+
+    const updateData: any = {};
+
+    if (emailNotification !== undefined) {
+      updateData.emailNotification = Boolean(emailNotification);
+    }
+    if (pushNotification !== undefined) {
+      updateData.pushNotification = Boolean(pushNotification);
+    }
+    if (weeklyDigest !== undefined) {
+      updateData.weeklyDigest = Boolean(weeklyDigest);
+    }
+    if (language !== undefined) {
+      updateData.language = language;
+    }
+    if (pushSubscription !== undefined) {
+      updateData.pushSubscription = pushSubscription;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        emailNotification: true,
+        pushNotification: true,
+        weeklyDigest: true,
+        language: true,
+        pushSubscription: true,
+      },
+    });
+
+    sendSuccess(res, user, '设置已更新');
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.statusCode, error.message, error.statusCode);
+    } else {
+      sendError(res, 500, '更新失败', 500);
+    }
+  }
+};

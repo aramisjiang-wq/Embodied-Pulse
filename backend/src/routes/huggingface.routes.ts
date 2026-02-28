@@ -10,6 +10,9 @@ import {
   submitHuggingFaceModel,
   getTaskTypeStats,
   getAuthorStats,
+  validateHuggingFaceLinksController,
+  getInvalidLinksController,
+  deleteInvalidLinksController,
 } from '../controllers/huggingface.controller';
 import { optionalAuthenticate, authenticate } from '../middleware/auth.middleware';
 
@@ -21,6 +24,10 @@ router.get('/info/from-url', getHuggingFaceInfoFromUrl);
 router.get('/stats/task-types', getTaskTypeStats);
 router.get('/author/:author/stats', optionalAuthenticate, getAuthorStats);
 router.post('/', authenticate, submitHuggingFaceModel);
+// 链接验证相关路由
+router.post('/admin/validate-links', authenticate, validateHuggingFaceLinksController);
+router.get('/admin/invalid-links', authenticate, getInvalidLinksController);
+router.delete('/admin/invalid-links', authenticate, deleteInvalidLinksController);
 router.get('/:modelId', optionalAuthenticate, getHuggingFaceDetail);
 
 export default router;

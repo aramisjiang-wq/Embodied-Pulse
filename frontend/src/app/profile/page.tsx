@@ -178,8 +178,23 @@ export default function ProfilePage() {
     if (user) {
       setAvatarUrl(user.avatar || user.avatarUrl || '');
       loadUserData();
+      loadUserSettings();
     }
   }, [user, loadUserData]);
+
+  const loadUserSettings = useCallback(async () => {
+    try {
+      const settings = await userApi.getSettings();
+      settingsForm.setFieldsValue({
+        emailNotification: settings.emailNotification,
+        pushNotification: settings.pushNotification,
+        weeklyDigest: settings.weeklyDigest,
+        language: settings.language || 'zh-CN',
+      });
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+    }
+  }, [settingsForm]);
 
   const handleOpenEdit = () => {
     profileForm.setFieldsValue({

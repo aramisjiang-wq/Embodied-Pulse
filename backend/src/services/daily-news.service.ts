@@ -50,8 +50,27 @@ export const dailyNewsService = {
       prisma.dailyNews.count({ where }).catch(() => 0),
     ]);
 
+    const formattedItems = items.map((item) => {
+      const parseDate = (value: any): string | null => {
+        if (!value) return null;
+        let timestamp = value;
+        if (typeof value === 'string' && /^\d+$/.test(value)) {
+          timestamp = parseInt(value, 10);
+        }
+        const date = new Date(timestamp);
+        return isNaN(date.getTime()) ? null : date.toISOString();
+      };
+      
+      return {
+        ...item,
+        createdAt: parseDate(item.createdAt),
+        updatedAt: parseDate(item.updatedAt),
+        pinnedAt: parseDate(item.pinnedAt),
+      };
+    });
+
     return {
-      items,
+      items: formattedItems,
       total,
       page,
       size,

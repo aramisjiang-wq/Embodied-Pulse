@@ -22,6 +22,7 @@ import {
   Select,
   Collapse,
   Typography,
+  Progress,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -112,6 +113,8 @@ export default function DataSourceManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<'tags' | 'enabled' | 'none'>('none');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [syncStatus, setSyncStatus] = useState<any>(null);
+  const [syncPolling, setSyncPolling] = useState(false);
 
   // 加载数据源列表
   const loadDataSources = async () => {
@@ -461,6 +464,27 @@ export default function DataSourceManagementPage() {
     loadDataSources();
   }, []);
 
+  // 加载同步任务状态
+  const loadSyncStatus = async () => {
+    try {
+      const status = await syncApi.getSyncStatus();
+      setSyncStatus(status);
+    } catch (error: any) {
+      console.error('获取同步状态失败:', error);
+    }
+  };
+
+  // 启动轮询获取任务状态
+  useEffect(() => {
+    loadSyncStatus();
+    
+    const interval = setInterval(() => {
+      loadSyncStatus();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const columns = [
     {
       title: '数据源',
@@ -599,6 +623,69 @@ export default function DataSourceManagementPage() {
     <PageContainer loading={loading && dataSources.length === 0}>
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>数据源管理</h1>
+        
+        {/* 同步任务状态显示 */}
+        {syncStatus && (syncStatus.isRunning || syncStatus.currentTask) && (
+          <div style={{ 
+            marginTop: 16, 
+            padding: 12, 
+            background: '#f6f8fa', 
+            borderRadius: 8,
+            border: '1px solid #d9d9d9'
+          }}>
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {syncStatus.isRunning ? (
+                  <Spin size="small" />
+                ) : (
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                )}
+                <Text strong>
+                  {syncStatus.isRunning ? '任务执行中' : '任务已完成'}
+                </Text>
+                {syncStatus.currentTask?.name && (
+                  <Tag color="blue">{syncStatus.currentTask.name}</Tag>
+                )}
+              </div>
+              
+              {syncStatus.currentTask && syncStatus.isRunning && (
+                <div>
+                  <Progress 
+                    percent={syncStatus.currentTask.progress || 0} 
+                    size="small" 
+                    status="active"
+                    format={() => `${syncStatus.currentTask.syncedCount || 0} / ${(syncStatus.currentTask.syncedCount || 0) + (syncStatus.currentTask.errorCount || 0)}`}
+                  />
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    成功: {syncStatus.currentTask.syncedCount || 0} | 
+                    失败: {syncStatus.currentTask.errorCount || 0}
+                  </Text>
+                </div>
+              )}
+              
+              {syncStatus.lastTask && !syncStatus.isRunning && (
+                <div style={{ fontSize: 12 }}>
+                  <Text type="secondary">
+                    上次任务: {syncStatus.lastTask.name} - 
+                    {syncStatus.lastTask.status === 'completed' ? (
+                      <span style={{ color: '#52c41a' }}> 成功</span>
+                    ) : (
+                      <span style={{ color: '#ff4d4f' }}> 失败</span>
+                    )}
+                    {' '}成功: {syncStatus.lastTask.syncedCount || 0} | 
+                    失败: {syncStatus.lastTask.errorCount || 0}
+                    {syncStatus.lastTask.error && (
+                      <span style={{ color: '#ff4d4f', marginLeft: 8 }}>
+                        错误: {syncStatus.lastTask.error}
+                      </span>
+                    )}
+                  </Text>
+                </div>
+              )}
+            </Space>
+          </div>
+        )}
+        
         <Space>
           <Space>
             <span>排序：</span>

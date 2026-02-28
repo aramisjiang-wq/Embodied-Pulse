@@ -5,6 +5,14 @@
 import apiClient from './client';
 import { User, Favorite, PointRecord } from './types';
 
+export interface UserSettings {
+  emailNotification: boolean;
+  pushNotification: boolean;
+  weeklyDigest: boolean;
+  language: string;
+  pushSubscription?: string;
+}
+
 export const userApi = {
   getProfile: async (): Promise<User> => {
     const response = await apiClient.get<User>('/user/profile');
@@ -52,10 +60,13 @@ export const userApi = {
     await apiClient.put('/user/password', data);
   },
 
-  updateSettings: async (data: {
-    emailNotification?: boolean;
-    pushNotification?: boolean;
-  }): Promise<void> => {
-    await apiClient.put('/user/settings', data);
+  getSettings: async (): Promise<UserSettings> => {
+    const response = await apiClient.get<UserSettings>('/user/settings');
+    return response.data;
+  },
+
+  updateSettings: async (data: Partial<UserSettings>): Promise<UserSettings> => {
+    const response = await apiClient.put<UserSettings>('/user/settings', data);
+    return response.data;
   },
 };

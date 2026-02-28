@@ -144,4 +144,43 @@ export const syncApi = {
       throw new Error(response.message || '删除失败');
     }
   },
+
+  /**
+   * 获取同步任务状态
+   */
+  getSyncStatus: async (): Promise<{
+    isRunning: boolean;
+    currentTask?: {
+      name: string;
+      status: string;
+      progress?: number;
+      startTime?: string;
+      syncedCount?: number;
+      errorCount?: number;
+    };
+    lastTask?: {
+      name: string;
+      status: string;
+      endTime?: string;
+      syncedCount?: number;
+      errorCount?: number;
+      error?: string;
+    };
+  }> => {
+    const response = await apiClient.get<any>('/admin/sync-queue/status');
+    if (response.code === 0) {
+      return response.data;
+    }
+    return { isRunning: false };
+  },
+
+  /**
+   * 取消同步任务
+   */
+  cancelSync: async (): Promise<void> => {
+    const response = await apiClient.post<void>('/admin/sync-queue/cancel');
+    if (response.code !== 0) {
+      throw new Error(response.message || '取消失败');
+    }
+  },
 };

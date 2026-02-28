@@ -352,9 +352,9 @@ export default function JobsPage() {
                   </span>
                 </Tooltip>
               ) : (
-                <Tooltip title="发布后 30 天内有效，可正常投递">
+                <Tooltip title={`发布后 30 天内有效，还剩 ${job.remainingDays ?? '?'} 天过期`}>
                   <span style={{ fontSize: 10, padding: '1px 5px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, color: '#52c41a', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                    招聘中
+                    招聘中 {job.remainingDays !== null && job.remainingDays !== undefined && <span style={{ marginLeft: 2 }}>· {job.remainingDays}天</span>}
                   </span>
                 </Tooltip>
               )}
@@ -468,8 +468,10 @@ export default function JobsPage() {
                   </span>
                 </Tooltip>
               ) : (
-                <Tooltip title="发布后 30 天内有效，可正常投递">
-                  <span style={{ fontSize: 10, padding: '1px 5px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, color: '#52c41a', fontWeight: 600 }}>招聘中</span>
+                <Tooltip title={`发布后 30 天内有效，还剩 ${job.remainingDays ?? '?'} 天过期`}>
+                  <span style={{ fontSize: 10, padding: '1px 5px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, color: '#52c41a', fontWeight: 600 }}>
+                    招聘中 {job.remainingDays !== null && job.remainingDays !== undefined && <span style={{ marginLeft: 2 }}>· {job.remainingDays}天</span>}
+                  </span>
                 </Tooltip>
               )}
               {(job.salaryMin || job.salaryMax) && (

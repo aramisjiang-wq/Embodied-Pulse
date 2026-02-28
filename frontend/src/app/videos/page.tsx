@@ -208,7 +208,7 @@ export default function VideosPage() {
     const isFavorite = favoriteIds.has(video.id);
     const playCount = video.playCount || video.viewCount || 0;
     const bvid = video.videoId || video.bvid || '';
-    const url = `https://www.bilibili.com/video/${bvid}`;
+    const url = bvid ? `https://www.bilibili.com/video/${bvid}` : 'https://www.bilibili.com';
     const title = cleanText(video.title);
     const desc = video.description ? cleanText(video.description) : '';
     const formattedDate = video.publishedDate
@@ -312,7 +312,7 @@ export default function VideosPage() {
         const isFavorite = favoriteIds.has(video.id);
         const playCount = video.playCount || video.viewCount || 0;
         const bvid = video.videoId || video.bvid || '';
-        const url = `https://www.bilibili.com/video/${bvid}`;
+        const url = bvid ? `https://www.bilibili.com/video/${bvid}` : 'https://www.bilibili.com';
         const title = cleanText(video.title);
         const desc = video.description ? cleanText(video.description) : '';
         // 解析 tags

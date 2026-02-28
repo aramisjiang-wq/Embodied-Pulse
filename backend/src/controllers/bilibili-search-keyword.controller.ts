@@ -11,6 +11,8 @@ import {
   deleteKeyword,
   getActiveKeywordsString,
   batchCreateKeywords,
+  getKeywordStats,
+  getVideosByKeyword,
 } from '../services/bilibili-search-keyword.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
@@ -41,6 +43,7 @@ export async function getKeywordsHandler(req: Request, res: Response, next: Next
       description: k.description,
       createdAt: k.created_at,
       updatedAt: k.updated_at,
+      lastSyncedAt: k.last_synced_at,
       videoCount: k.videoCount,
     }));
 
@@ -208,5 +211,57 @@ export async function batchCreateKeywordsHandler(req: Request, res: Response, ne
   } catch (error: any) {
     logger.error('批量创建关键词失败:', error);
     sendError(res, 5011, error.message || '批量创建关键词失败', 500);
+  }
+}
+
+/**
+ * 获取关键词统计数据
+ */
+export async function getKeywordStatsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const stats = await getKeywordStats();
+    sendSuccess(res, stats);
+  } catch (error: any) {
+    logger.error('获取关键词统计数据失败:', error);
+    sendError(res, 5012, error.message || '获取关键词统计数据失败', 500);
+  }
+}
+
+/**
+ * 获取关键词相关视频
+ */
+export async function getKeywordVideosHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const { skip, take, page, size } = parsePaginationParams(req.query);
+
+    const result = await getVideosByKeyword({
+      keywordId: id,
+      skip,
+      take,
+    });
+
+    const items = result.videos.map(v => ({
+      id: v.id,
+      videoId: v.videoId,
+      bvid: v.bvid,
+      title: v.title,
+      description: v.description,
+      coverUrl: v.coverUrl,
+      duration: v.duration,
+      uploader: v.uploader,
+      publishedDate: v.publishedDate,
+      viewCount: v.viewCount,
+      playCount: v.playCount,
+      likeCount: v.likeCount,
+    }));
+
+    sendSuccess(res, {
+      items,
+      pagination: buildPaginationResponse(page, size, result.total),
+    });
+  } catch (error: any) {
+    logger.error('获取关键词相关视频失败:', error);
+    sendError(res, 5013, error.message || '获取关键词相关视频失败', 500);
   }
 }

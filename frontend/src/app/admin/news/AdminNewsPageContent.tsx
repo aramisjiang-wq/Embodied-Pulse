@@ -338,7 +338,7 @@ export default function AdminNewsPageContent() {
           </Form.Item>
           <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}>
             <RichTextEditor
-              height={400}
+              height={500}
               placeholder="支持富文本编辑，可插入图片、链接、表格等"
             />
           </Form.Item>

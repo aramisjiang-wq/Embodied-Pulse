@@ -13,11 +13,32 @@ import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import styles from './SubscriptionModule.module.css';
 
 dayjs.extend(relativeTime);
 
 interface SubscriptionModuleProps {
   limit?: number;
+}
+
+function getSubscriptionDisplay(sub: Subscription): string {
+  try {
+    if (sub.keywords) {
+      const keywords = JSON.parse(sub.keywords);
+      return `关键词: ${keywords.slice(0, 2).join(', ')}${keywords.length > 2 ? '...' : ''}`;
+    }
+    if (sub.authors) {
+      const authors = JSON.parse(sub.authors);
+      return `作者: ${authors.slice(0, 2).join(', ')}${authors.length > 2 ? '...' : ''}`;
+    }
+    if (sub.uploaders) {
+      const uploaders = JSON.parse(sub.uploaders);
+      return `UP主: ${uploaders.slice(0, 2).join(', ')}${uploaders.length > 2 ? '...' : ''}`;
+    }
+    return '订阅内容';
+  } catch {
+    return '订阅内容';
+  }
 }
 
 export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
@@ -29,7 +50,7 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
 
   const loadSubscriptions = useCallback(async () => {
     if (!user || !user.id) return;
-    
+
     setLoading(true);
     try {
       const data = await subscriptionApi.getSubscriptions({
@@ -54,7 +75,6 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
     }
   }, [hydrated, user, loadSubscriptions]);
 
-  // 按类型分组订阅
   const groupedSubscriptions = subscriptions.reduce((acc, sub) => {
     if (!acc[sub.contentType]) {
       acc[sub.contentType] = [];
@@ -63,7 +83,6 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
     return acc;
   }, {} as Record<string, Subscription[]>);
 
-  // 获取订阅统计
   const getSubscriptionStats = () => {
     return {
       github: groupedSubscriptions.repo?.length || 0,
@@ -78,10 +97,9 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
 
   const stats = getSubscriptionStats();
 
-  // 渲染订阅内容
   const renderSubscriptionContent = (type: string) => {
     const subs = groupedSubscriptions[type] || [];
-    
+
     if (subs.length === 0) {
       return (
         <Empty
@@ -104,11 +122,12 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
 
     return (
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        {subs.slice(0, limit || 10).map((sub) => (
+        {subs.slice(0, limit || 10).map((sub, index) => (
           <Card
             key={sub.id}
             size="small"
             hoverable
+            className={styles.subscriptionCardItem}
             style={{ borderRadius: 12 }}
             onClick={() => router.push(`/subscriptions/${sub.id}`)}
           >
@@ -132,29 +151,11 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
                     <Badge count={sub.newCount} size="small" />
                   )}
                 </div>
-                
+
                 <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
-                  {(() => {
-                    try {
-                      if (sub.authors) {
-                        const authors = JSON.parse(sub.authors);
-                        return `作者: ${authors.slice(0, 2).join(', ')}${authors.length > 2 ? '...' : ''}`;
-                      }
-                      if (sub.uploaders) {
-                        const uploaders = JSON.parse(sub.uploaders);
-                        return `UP主: ${uploaders.slice(0, 2).join(', ')}${uploaders.length > 2 ? '...' : ''}`;
-                      }
-                      if (sub.keywords) {
-                        const keywords = JSON.parse(sub.keywords);
-                        return `关键词: ${keywords.slice(0, 2).join(', ')}${keywords.length > 2 ? '...' : ''}`;
-                      }
-                      return '订阅内容';
-                    } catch (e) {
-                      return '订阅内容';
-                    }
-                  })()}
+                  {getSubscriptionDisplay(sub)}
                 </div>
-                
+
                 <div style={{ fontSize: 12, color: '#8c8c8c' }}>
                   匹配 {sub.totalMatched || 0} 条内容
                   {sub.lastSyncAt && ` · ${dayjs(sub.lastSyncAt).fromNow()}更新`}
@@ -163,7 +164,7 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
             </div>
           </Card>
         ))}
-        
+
         {subs.length > (limit || 10) && (
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <Button type="link" onClick={() => router.push('/subscriptions')}>
@@ -253,6 +254,7 @@ export default function SubscriptionModule({ limit }: SubscriptionModuleProps) {
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
+          className={styles.subscriptionTabs}
           items={[
             {
               key: 'all',

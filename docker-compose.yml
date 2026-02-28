@@ -58,7 +58,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: embodied-pulse-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@embodiedpulse.com
+      PGADMIN_DEFAULT_EMAIL: admin@embodied.gradmotion.com
       PGADMIN_DEFAULT_PASSWORD: admin_password
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:

@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Table,
   Button,
@@ -31,6 +31,8 @@ import {
   Avatar,
   Typography,
   Divider,
+  Progress,
+  Badge,
 } from 'antd';
 import {
   PlusOutlined,
@@ -48,8 +50,15 @@ import {
   CloudDownloadOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  SettingOutlined,
+  ChromeOutlined,
+  LoadingOutlined,
+  CheckCircleFilled,
+  CloseCircleFilled,
+  WarningFilled,
 } from '@ant-design/icons';
-import { bilibiliSearchKeywordApi, BilibiliSearchKeyword, CreateKeywordData } from '@/lib/api/bilibili-search-keyword';
+import { bilibiliSearchKeywordApi, BilibiliSearchKeyword, CreateKeywordData, KeywordStats } from '@/lib/api/bilibili-search-keyword';
+import { cookieApi, CookieStatus } from '@/lib/api/cookie';
 import { getProxyImageUrl } from '@/utils/image-proxy';
 import dayjs from 'dayjs';
 import styles from './page.module.css';
@@ -65,11 +74,29 @@ const CATEGORIES = [
   { value: '任务类型', label: '任务类型' },
 ];
 
+interface SyncProgress {
+  isRunning: boolean;
+  currentKeyword: string;
+  currentIndex: number;
+  totalKeywords: number;
+  syncedVideos: number;
+  errors: number;
+  stages: { keyword: string; status: 'pending' | 'running' | 'success' | 'error'; videos: number }[];
+  logs: { time: string; type: 'info' | 'success' | 'error'; message: string }[];
+}
+
+interface LogEntry {
+  time: string;
+  type: 'info' | 'success' | 'error';
+  message: string;
+}
+
 export default function BilibiliSearchKeywordsPage() {
   const { message: messageApi } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [keywords, setKeywords] = useState<BilibiliSearchKeyword[]>([]);
   const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<KeywordStats | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -87,9 +114,68 @@ export default function BilibiliSearchKeywordsPage() {
   const [videos, setVideos] = useState<any[]>([]);
   const [syncLoading, setSyncLoading] = useState(false);
 
+  const [cookieStatus, setCookieStatus] = useState<CookieStatus | null>(null);
+  const [cookieLoading, setCookieLoading] = useState(false);
+  const [manualCookieModalVisible, setManualCookieModalVisible] = useState(false);
+  const [cookieForm] = Form.useForm();
+
+  const [showProgressPanel, setShowProgressPanel] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress>({
+    isRunning: false,
+    currentKeyword: '',
+    currentIndex: 0,
+    totalKeywords: 0,
+    syncedVideos: 0,
+    errors: 0,
+    stages: [],
+    logs: [],
+  });
+
   useEffect(() => {
     loadKeywords();
+    loadStats();
+    loadCookieStatus();
   }, [page, pageSize, categoryFilter, statusFilter, searchKeyword]);
+
+  useEffect(() => {
+    if (syncProgress.isRunning) {
+      const interval = setInterval(() => {
+        pollSyncProgress();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [syncProgress.isRunning]);
+
+  const addLog = (type: LogEntry['type'], message: string) => {
+    setSyncProgress(prev => ({
+      ...prev,
+      logs: [
+        { time: dayjs().format('HH:mm:ss'), type, message },
+        ...prev.logs.slice(0, 99),
+      ],
+    }));
+  };
+
+  const loadStats = async () => {
+    try {
+      const statsData = await bilibiliSearchKeywordApi.getStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Load stats error:', error);
+    }
+  };
+
+  const loadCookieStatus = async () => {
+    setCookieLoading(true);
+    try {
+      const status = await cookieApi.getCookieStatus();
+      setCookieStatus(status);
+    } catch (error: any) {
+      console.error('Load cookie status error:', error);
+    } finally {
+      setCookieLoading(false);
+    }
+  };
 
   const loadKeywords = async () => {
     setLoading(true);
@@ -241,6 +327,7 @@ export default function BilibiliSearchKeywordsPage() {
         setImportModalVisible(false);
         setImportFileList([]);
         loadKeywords();
+        loadStats();
       } catch (error: any) {
         console.error('Import error:', error);
         messageApi.error(error.response?.data?.message || error.message || '导入失败');
@@ -275,6 +362,7 @@ export default function BilibiliSearchKeywordsPage() {
       setModalVisible(false);
       form.resetFields();
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Create keyword error:', error);
       if (error.response?.data?.code === 5005) {
@@ -301,6 +389,7 @@ export default function BilibiliSearchKeywordsPage() {
       setEditingKeyword(null);
       form.resetFields();
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Update keyword error:', error);
       if (error.response?.data?.code === 5005) {
@@ -316,6 +405,7 @@ export default function BilibiliSearchKeywordsPage() {
       await bilibiliSearchKeywordApi.deleteKeyword(id);
       messageApi.success('删除成功');
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Delete keyword error:', error);
       messageApi.error(error.response?.data?.message || error.message || '删除失败');
@@ -329,83 +419,251 @@ export default function BilibiliSearchKeywordsPage() {
       });
       messageApi.success(currentStatus ? '已禁用' : '已启用');
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Toggle status error:', error);
       messageApi.error(error.response?.data?.message || error.message || '操作失败');
       loadKeywords();
+      loadStats();
     }
+  };
+
+  const pollSyncProgress = async () => {
+    return;
   };
 
   const handleSyncVideos = async () => {
     setSyncLoading(true);
+    setShowProgressPanel(true);
+    setSyncProgress({
+      isRunning: true,
+      currentKeyword: '准备中...',
+      currentIndex: 0,
+      totalKeywords: 0,
+      syncedVideos: 0,
+      errors: 0,
+      stages: [],
+      logs: [{ time: dayjs().format('HH:mm:ss'), type: 'info', message: '正在启动视频同步任务...' }],
+    });
+
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    const attemptSync = async (): Promise<{ success: boolean; message: string }> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        
+        const response = await fetch('http://localhost:3001/api/v1/admin/sync/videos-by-keywords', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          },
+          body: JSON.stringify({
+            days: 7,
+            maxResultsPerKeyword: 20,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (data.code === 0) {
+          addLog('success', `同步成功：${data.data.synced} 个视频，${data.data.keywords} 个关键词`);
+          return { success: true, message: `同步成功：${data.data.synced} 个视频，${data.data.keywords} 个关键词` };
+        } else if (data.code === 429 || data.message?.includes('限流') || data.message?.includes('too many requests')) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            addLog('error', `请求受限，${retryCount}秒后重试...`);
+            messageApi.warning(`请求受限，${retryCount}秒后重试...`, 3);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return attemptSync();
+          }
+          addLog('error', data.message || '同步失败：请求过于频繁，请稍后再试');
+          return { success: false, message: data.message || '同步失败：请求过于频繁，请稍后再试' };
+        } else {
+          addLog('error', data.message || '同步失败');
+          return { success: false, message: data.message || '同步失败' };
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            addLog('error', `请求超时，${retryCount}秒后重试...`);
+            messageApi.warning(`请求超时，${retryCount}秒后重试...`, 3);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return attemptSync();
+          }
+          addLog('error', '同步失败：请求超时，请稍后再试');
+          return { success: false, message: '同步失败：请求超时，请稍后再试' };
+        }
+        if (retryCount < maxRetries) {
+          retryCount++;
+          addLog('error', `网络错误，${retryCount}秒后重试...`);
+          messageApi.warning(`网络错误，${retryCount}秒后重试...`, 3);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return attemptSync();
+        }
+        addLog('error', error.message || '同步失败：网络错误');
+        return { success: false, message: error.message || '同步失败：网络错误' };
+      }
+    };
+    
     try {
-      const response = await fetch('http://localhost:3001/api/admin/sync/videos-by-keywords', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-        },
-        body: JSON.stringify({
-          days: 7,
-          maxResultsPerKeyword: 20,
-        }),
-      });
-      const data = await response.json();
+      const result = await attemptSync();
+      setSyncLoading(false);
       
-      if (data.code === 0) {
-        messageApi.success(`同步成功：${data.data.synced} 个视频，${data.data.keywords} 个关键词`);
+      if (result.success) {
+        messageApi.success(result.message);
         loadKeywords();
+        loadStats();
+        
+        setSyncProgress(prev => ({
+          ...prev,
+          isRunning: false,
+        }));
       } else {
-        messageApi.error(data.message || '同步失败');
+        messageApi.error(result.message);
+        
+        setSyncProgress(prev => ({
+          ...prev,
+          isRunning: false,
+        }));
       }
     } catch (error: any) {
-      console.error('Sync videos error:', error);
-      messageApi.error(error.message || '同步失败');
-    } finally {
       setSyncLoading(false);
+      addLog('error', error.message || '同步失败');
+      messageApi.error(error.message || '同步失败');
+      
+      setSyncProgress(prev => ({
+        ...prev,
+        isRunning: false,
+      }));
     }
   };
 
   const handleSyncAllKeywords = async () => {
     setSyncLoading(true);
+    setShowProgressPanel(true);
+    setSyncProgress({
+      isRunning: true,
+      currentKeyword: '准备中...',
+      currentIndex: 0,
+      totalKeywords: 0,
+      syncedVideos: 0,
+      errors: 0,
+      stages: [],
+      logs: [{ time: dayjs().format('HH:mm:ss'), type: 'info', message: '正在启动全量视频同步任务...' }],
+    });
+
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    const attemptSync = async (): Promise<{ success: boolean; message: string }> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        
+        const response = await fetch('http://localhost:3001/api/admin/sync/videos-by-keywords', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          },
+          body: JSON.stringify({
+            days: 30,
+            maxResultsPerKeyword: 50,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (data.code === 0) {
+          addLog('success', `成功从 ${data.data.keywords} 个关键词同步 ${data.data.synced} 个视频`);
+          return { success: true, message: `成功从 ${data.data.keywords} 个关键词同步 ${data.data.synced} 个视频` };
+        } else if (data.code === 429 || data.message?.includes('限流') || data.message?.includes('too many requests')) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            addLog('error', `请求受限，${retryCount * 3}秒后重试...`);
+            messageApi.warning(`请求受限，${retryCount * 3}秒后重试...`, 3);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 3000));
+            return attemptSync();
+          }
+          addLog('error', data.message || '同步失败：请求过于频繁，请稍后再试');
+          return { success: false, message: data.message || '同步失败：请求过于频繁，请稍后再试' };
+        } else {
+          addLog('error', data.message || '同步失败');
+          return { success: false, message: data.message || '同步失败' };
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            addLog('error', `请求超时，${retryCount * 3}秒后重试...`);
+            messageApi.warning(`请求超时，${retryCount * 3}秒后重试...`, 3);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 3000));
+            return attemptSync();
+          }
+          addLog('error', '同步失败：请求超时，请稍后再试');
+          return { success: false, message: '同步失败：请求超时，请稍后再试' };
+        }
+        if (retryCount < maxRetries) {
+          retryCount++;
+          addLog('error', `网络错误，${retryCount * 3}秒后重试...`);
+          messageApi.warning(`网络错误，${retryCount * 3}秒后重试...`, 3);
+          await new Promise(resolve => setTimeout(resolve, retryCount * 3000));
+          return attemptSync();
+        }
+        addLog('error', error.message || '同步失败：网络错误');
+        return { success: false, message: error.message || '同步失败：网络错误' };
+      }
+    };
+    
     const hideLoading = messageApi.loading('正在根据所有启用的关键词搜索视频，这可能需要一些时间...', 0);
     
     try {
-      const response = await fetch('http://localhost:3001/api/admin/sync/videos-by-keywords', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-        },
-        body: JSON.stringify({
-          days: 30,
-          maxResultsPerKeyword: 50,
-        }),
-      });
-      const data = await response.json();
-      
+      const result = await attemptSync();
       hideLoading();
+      setSyncLoading(false);
       
-      if (data.code === 0) {
-        messageApi.success(`成功从 ${data.data.keywords} 个关键词同步 ${data.data.synced} 个视频`);
+      if (result.success) {
+        messageApi.success(result.message);
         loadKeywords();
+        loadStats();
+        
+        setSyncProgress(prev => ({
+          ...prev,
+          isRunning: false,
+        }));
       } else {
-        messageApi.error(data.message || '同步失败');
+        messageApi.error(result.message);
+        
+        setSyncProgress(prev => ({
+          ...prev,
+          isRunning: false,
+        }));
       }
     } catch (error: any) {
       hideLoading();
-      console.error('Sync all keywords error:', error);
-      messageApi.error(error.message || '同步失败');
-    } finally {
       setSyncLoading(false);
+      console.error('Sync all keywords error:', error);
+      addLog('error', error.message || '同步失败');
+      messageApi.error(error.message || '同步失败');
+      
+      setSyncProgress(prev => ({
+        ...prev,
+        isRunning: false,
+      }));
     }
   };
 
   const handleEnableAllKeywords = async () => {
     try {
-      console.log('启用所有关键词，当前关键词列表:', keywords);
       const inactiveKeywords = keywords.filter(k => !k.isActive);
-      console.log('未启用的关键词:', inactiveKeywords);
       
       if (inactiveKeywords.length === 0) {
         messageApi.info('所有关键词已启用');
@@ -415,7 +673,6 @@ export default function BilibiliSearchKeywordsPage() {
       const hideLoading = messageApi.loading(`正在启用 ${inactiveKeywords.length} 个关键词...`, 0);
       
       for (const keyword of inactiveKeywords) {
-        console.log('启用关键词:', keyword.id, keyword.keyword);
         await bilibiliSearchKeywordApi.updateKeyword(keyword.id, {
           isActive: true,
         });
@@ -424,6 +681,7 @@ export default function BilibiliSearchKeywordsPage() {
       hideLoading();
       messageApi.success(`成功启用 ${inactiveKeywords.length} 个关键词`);
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Enable all keywords error:', error);
       messageApi.error(error.message || '启用失败');
@@ -450,10 +708,74 @@ export default function BilibiliSearchKeywordsPage() {
       hideLoading();
       messageApi.success(`成功禁用 ${activeKeywords.length} 个关键词`);
       loadKeywords();
+      loadStats();
     } catch (error: any) {
       console.error('Disable all keywords error:', error);
       messageApi.error(error.message || '禁用失败');
     }
+  };
+
+  const handleManualCookieSubmit = async (values: { name: string; cookie: string }) => {
+    try {
+      await cookieApi.addCookie(values.name, values.cookie);
+      messageApi.success('Cookie添加成功');
+      setManualCookieModalVisible(false);
+      cookieForm.resetFields();
+      loadCookieStatus();
+    } catch (error: any) {
+      console.error('Add cookie error:', error);
+      messageApi.error(error.response?.data?.message || error.message || '添加失败');
+    }
+  };
+
+  const handleCaptureCookie = async () => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '自动捕获Cookie（开发中）',
+        icon: <ChromeOutlined />,
+        content: (
+          <div>
+            <p>自动捕获功能正在开发中，敬请期待！</p>
+            <p style={{ color: '#666', fontSize: 13, marginTop: 8 }}>
+              目前请使用「手动输入」功能添加Cookie。
+            </p>
+          </div>
+        ),
+        okText: '使用手动输入',
+        cancelText: '关闭',
+        onOk: () => {
+          resolve(true);
+          setManualCookieModalVisible(true);
+        },
+        onCancel: () => resolve(false),
+      });
+    });
+
+    if (confirmed) {
+      setManualCookieModalVisible(true);
+    }
+  };
+
+  const getCookieHealthStatus = () => {
+    if (!cookieStatus || cookieStatus.totalCount === 0) {
+      return { status: 'error', text: '未配置', icon: <CloseCircleFilled /> };
+    }
+    
+    if (cookieStatus.activeCount === 0) {
+      return { status: 'error', text: '全部失效', icon: <CloseCircleFilled /> };
+    }
+    
+    const hasError = cookieStatus.cookies?.some(c => c.errorCount >= 3);
+    if (hasError) {
+      return { status: 'warning', text: '部分失效', icon: <WarningFilled /> };
+    }
+    
+    const hasWarning = cookieStatus.cookies?.some(c => c.errorCount > 0);
+    if (hasWarning) {
+      return { status: 'warning', text: '不稳定', icon: <WarningFilled /> };
+    }
+    
+    return { status: 'normal', text: '健康', icon: <CheckCircleFilled /> };
   };
 
   const handleAdd = () => {
@@ -564,6 +886,28 @@ export default function BilibiliSearchKeywordsPage() {
       ),
     },
     {
+      title: '最近同步',
+      dataIndex: 'lastSyncedAt',
+      key: 'lastSyncedAt',
+      width: 120,
+      sorter: (a: BilibiliSearchKeyword, b: BilibiliSearchKeyword) => {
+        const aTime = a.lastSyncedAt ? new Date(a.lastSyncedAt).getTime() : 0;
+        const bTime = b.lastSyncedAt ? new Date(b.lastSyncedAt).getTime() : 0;
+        return aTime - bTime;
+      },
+      render: (date: string | undefined) => (
+        date ? (
+          <Tooltip title={dayjs(date).format('YYYY-MM-DD HH:mm:ss')}>
+            <span style={{ fontSize: 14, color: date ? '#52c41a' : undefined }}>
+              {dayjs(date).format('MM-DD HH:mm')}
+            </span>
+          </Tooltip>
+        ) : (
+          <span style={{ fontSize: 14, color: '#9ca3af' }}>从未同步</span>
+        )
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       width: 150,
@@ -601,6 +945,11 @@ export default function BilibiliSearchKeywordsPage() {
       ),
     },
   ];
+
+  const cookieHealth = getCookieHealthStatus();
+  const progressPercent = syncProgress.totalKeywords > 0 
+    ? Math.round((syncProgress.currentIndex / syncProgress.totalKeywords) * 100) 
+    : 0;
 
   return (
     <div className={styles.pageWrapper}>
@@ -648,11 +997,133 @@ export default function BilibiliSearchKeywordsPage() {
                 <Select.Option value="true">启用</Select.Option>
                 <Select.Option value="false">禁用</Select.Option>
               </Select>
-              <Button icon={<ReloadOutlined />} onClick={loadKeywords} size="middle">
+              <Button icon={<ReloadOutlined />} onClick={() => { loadKeywords(); loadStats(); }} size="middle">
                 刷新
               </Button>
             </div>
           </div>
+
+          <div className={styles.cookieStatusBar}>
+            <div className={styles.cookieStatusLeft}>
+              <div className={styles.cookieStatusItem}>
+                <ChromeOutlined style={{ fontSize: 18 }} />
+                <span className={styles.cookieStatusLabel}>Cookie状态:</span>
+                <Tag 
+                  color={cookieHealth.status === 'normal' ? 'success' : cookieHealth.status === 'warning' ? 'warning' : 'error'}
+                  icon={cookieLoading ? <LoadingOutlined /> : cookieHealth.icon}
+                >
+                  {cookieLoading ? '加载中...' : cookieHealth.text}
+                </Tag>
+              </div>
+              <div className={styles.cookieStatusItem}>
+                <span className={styles.cookieStatusLabel}>活跃:</span>
+                <span className={styles.cookieStatusValue}>
+                  {cookieStatus?.activeCount || 0} / {cookieStatus?.totalCount || 0}
+                </span>
+              </div>
+              {cookieStatus?.cookies?.[0]?.lastUsed && (
+                <div className={styles.cookieStatusItem}>
+                  <span className={styles.cookieStatusLabel}>最后使用:</span>
+                  <span className={styles.cookieStatusValue}>
+                    {dayjs(cookieStatus.cookies[0].lastUsed).format('HH:mm:ss')}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className={styles.cookieStatusRight}>
+              <Button 
+                size="small" 
+                icon={<ReloadOutlined />} 
+                onClick={loadCookieStatus}
+                loading={cookieLoading}
+              >
+                刷新
+              </Button>
+              <Button 
+                size="small" 
+                icon={<ChromeOutlined />} 
+                onClick={handleCaptureCookie}
+              >
+                自动捕获
+              </Button>
+              <Button 
+                size="small" 
+                icon={<PlusOutlined />} 
+                onClick={() => setManualCookieModalVisible(true)}
+              >
+                手动输入
+              </Button>
+            </div>
+          </div>
+
+          {showProgressPanel && (
+            <div className={styles.progressPanel}>
+              <div className={styles.progressPanelHeader}>
+                <div className={styles.progressTitle}>
+                  <VideoCameraOutlined />
+                  <span>视频抓取进度</span>
+                  {syncLoading && <LoadingOutlined spin />}
+                </div>
+                <Button size="small" onClick={() => setShowProgressPanel(false)}>
+                  {syncProgress.isRunning ? '隐藏' : '关闭'}
+                </Button>
+              </div>
+              <div className={styles.progressBody}>
+                <div className={styles.progressInfo}>
+                  <div className={styles.progressInfoLeft}>
+                    <span className={styles.progressStage}>
+                      状态: {syncProgress.isRunning ? '进行中' : '已完成'}
+                    </span>
+                    <span className={styles.progressPercent}>
+                      {progressPercent}%
+                    </span>
+                    <span className={styles.progressCurrentKeyword}>
+                      {syncProgress.currentKeyword}
+                    </span>
+                  </div>
+                  <div>
+                    {syncProgress.currentIndex} / {syncProgress.totalKeywords || stats?.active || 0} 个关键词
+                  </div>
+                </div>
+                
+                <div className={styles.progressBar}>
+                  <div 
+                    className={styles.progressBarInner} 
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+
+                <div className={styles.resultSummary}>
+                  <div className={`${styles.resultItem} ${styles.resultSuccess}`}>
+                    <CheckCircleOutlined />
+                    <span>成功: {syncProgress.syncedVideos} 个视频</span>
+                  </div>
+                  <div className={`${styles.resultItem} ${styles.resultError}`}>
+                    <CloseCircleOutlined />
+                    <span>失败: {syncProgress.errors} 个</span>
+                  </div>
+                </div>
+
+                <div className={styles.logSection}>
+                  <div className={styles.logTitle}>操作日志</div>
+                  <div className={styles.logList}>
+                    {syncProgress.logs.slice(0, 20).map((log, index) => (
+                      <div 
+                        key={index} 
+                        className={`${styles.logItem} ${
+                          log.type === 'success' ? styles.logItemSuccess : 
+                          log.type === 'error' ? styles.logItemError : 
+                          styles.logItemInfo
+                        }`}
+                      >
+                        [{log.time}] {log.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className={styles.actionRow}>
             <Space size="middle" wrap>
@@ -705,7 +1176,7 @@ export default function BilibiliSearchKeywordsPage() {
               <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="总关键词数"
-                  value={total}
+                  value={stats?.total || total}
                   prefix={<InfoCircleOutlined />}
                   valueStyle={{ color: '#1890ff', fontSize: 22 }}
                   suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
@@ -716,7 +1187,7 @@ export default function BilibiliSearchKeywordsPage() {
               <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="启用关键词"
-                  value={keywords.filter(k => k.isActive).length}
+                  value={stats?.active || keywords.filter(k => k.isActive).length}
                   valueStyle={{ color: '#52c41a', fontSize: 22 }}
                   suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
@@ -726,7 +1197,7 @@ export default function BilibiliSearchKeywordsPage() {
               <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="禁用关键词"
-                  value={keywords.filter(k => !k.isActive).length}
+                  value={stats?.inactive || keywords.filter(k => !k.isActive).length}
                   valueStyle={{ color: '#ef4444', fontSize: 22 }}
                   suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
                 />
@@ -736,7 +1207,7 @@ export default function BilibiliSearchKeywordsPage() {
               <Card size="small" className={styles.statCard}>
                 <Statistic
                   title="关联视频"
-                  value={keywords.reduce((sum, k) => sum + (k.videoCount || 0), 0)}
+                  value={stats?.totalVideos || keywords.reduce((sum, k) => sum + (k.videoCount || 0), 0)}
                   prefix={<VideoCameraOutlined />}
                   valueStyle={{ color: '#7c3aed', fontSize: 22 }}
                   suffix={<span style={{ fontSize: 13, color: '#9ca3af' }}>个</span>}
@@ -883,6 +1354,67 @@ export default function BilibiliSearchKeywordsPage() {
           <p className="ant-upload-text">点击或拖拽CSV文件到此区域上传</p>
           <p className="ant-upload-hint">支持单个CSV文件上传</p>
         </Upload.Dragger>
+      </Modal>
+
+      <Modal
+        title="手动输入Cookie"
+        open={manualCookieModalVisible}
+        onCancel={() => {
+          setManualCookieModalVisible(false);
+          cookieForm.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        <Alert
+          message="获取Cookie步骤"
+          description={
+            <div>
+              <ol style={{ marginTop: 8, paddingLeft: 20 }}>
+                <li>打开浏览器，登录 <a href="https://www.bilibili.com" target="_blank" rel="noopener noreferrer">bilibili.com</a></li>
+                <li>按 <kbd>F12</kbd> 打开开发者工具</li>
+                <li>切换到 <strong>Network</strong> 标签页</li>
+                <li>刷新页面，点击任意请求</li>
+                <li>在 <strong>Headers</strong> 中找到 <code>Cookie</code>，复制整个值</li>
+              </ol>
+            </div>
+          }
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={cookieForm} layout="vertical" onFinish={handleManualCookieSubmit}>
+          <Form.Item
+            name="name"
+            label="Cookie名称"
+            rules={[{ required: true, message: '请输入Cookie名称' }]}
+          >
+            <Input placeholder="例如：主账号Cookie" />
+          </Form.Item>
+          <Form.Item
+            name="cookie"
+            label="Cookie内容"
+            rules={[{ required: true, message: '请输入Cookie内容' }]}
+          >
+            <TextArea
+              placeholder="粘贴完整的Cookie字符串"
+              rows={6}
+              className={styles.cookieInputArea}
+            />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => {
+                setManualCookieModalVisible(false);
+                cookieForm.resetFields();
+              }}>
+                取消
+              </Button>
+              <Button type="primary" htmlType="submit">
+                添加
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

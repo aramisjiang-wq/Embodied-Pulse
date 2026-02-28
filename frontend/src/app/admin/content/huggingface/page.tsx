@@ -177,6 +177,18 @@ export default function HuggingFaceAuthorSubscriptionPage() {
   const [editingModel, setEditingModel] = useState<HuggingFaceModel | null>(null);
   const [viewingModel, setViewingModel] = useState<HuggingFaceModel | null>(null);
 
+  // 链接验证管理
+  const [invalidLinks, setInvalidLinks] = useState<Array<{
+    id: string;
+    fullName: string;
+    contentType: string | null;
+    linkCheckedAt: Date | null;
+  }>>([]);
+  const [invalidLinksLoading, setInvalidLinksLoading] = useState(false);
+  const [invalidLinksPagination, setInvalidLinksPagination] = useState({ page: 1, size: 100, total: 0 });
+  const [selectedInvalidLinkIds, setSelectedInvalidLinkIds] = useState<string[]>([]);
+  const [validatingLinks, setValidatingLinks] = useState(false);
+
   useEffect(() => {
     loadSubscriptions();
   }, []);
@@ -184,8 +196,84 @@ export default function HuggingFaceAuthorSubscriptionPage() {
   useEffect(() => {
     if (activeTab === 'models') {
       loadModels();
+    } else if (activeTab === 'link-validation') {
+      loadInvalidLinks();
     }
-  }, [activeTab, modelsPagination.page, modelsPagination.size, taskFilter, contentTypeFilter, sortBy]);
+  }, [activeTab, modelsPagination.page, modelsPagination.size, taskFilter, contentTypeFilter, sortBy, invalidLinksPagination.page, invalidLinksPagination.size]);
+
+  // 加载无效链接列表
+  const loadInvalidLinks = useCallback(async (pageNum = invalidLinksPagination.page) => {
+    setInvalidLinksLoading(true);
+    try {
+      const response: any = await apiClient.get('/huggingface/admin/invalid-links', {
+        params: {
+          skip: (pageNum - 1) * invalidLinksPagination.size,
+          take: invalidLinksPagination.size,
+        },
+      });
+      if (response.code === 0 && response.data) {
+        setInvalidLinks(Array.isArray(response.data.items) ? response.data.items : []);
+        setInvalidLinksPagination(prev => ({
+          ...prev,
+          page: pageNum,
+          total: response.data.total ?? prev.total,
+        }));
+      } else {
+        setInvalidLinks([]);
+      }
+    } catch (error: any) {
+      console.error('Load invalid links error:', error);
+      setInvalidLinks([]);
+    } finally {
+      setInvalidLinksLoading(false);
+    }
+  }, [invalidLinksPagination.page, invalidLinksPagination.size]);
+
+  // 验证链接
+  const handleValidateLinks = async (limit = 50) => {
+    setValidatingLinks(true);
+    try {
+      const response: any = await apiClient.post('/huggingface/admin/validate-links', null, {
+        params: { limit },
+      });
+      if (response.code === 0 && response.data) {
+        messageApi.success(
+          `验证完成：共验证 ${response.data.validated} 个，有效 ${response.data.valid} 个，无效 ${response.data.invalid} 个`
+        );
+        loadInvalidLinks(1);
+      } else {
+        messageApi.error(response.message || '验证失败');
+      }
+    } catch (error: any) {
+      console.error('Validate links error:', error);
+      messageApi.error(error.response?.data?.message || error.message || '验证失败');
+    } finally {
+      setValidatingLinks(false);
+    }
+  };
+
+  // 删除无效链接
+  const handleDeleteInvalidLinks = async () => {
+    if (selectedInvalidLinkIds.length === 0) {
+      messageApi.warning('请选择要删除的链接');
+      return;
+    }
+    try {
+      const response: any = await apiClient.delete('/huggingface/admin/invalid-links', {
+        data: { linkIds: selectedInvalidLinkIds },
+      });
+      if (response.code === 0 && response.data) {
+        messageApi.success(`成功删除 ${response.data.deleted} 个无效链接`);
+        setSelectedInvalidLinkIds([]);
+        loadInvalidLinks(1);
+      } else {
+        messageApi.error(response.message || '删除失败');
+      }
+    } catch (error: any) {
+      console.error('Delete invalid links error:', error);
+      messageApi.error(error.response?.data?.message || error.message || '删除失败');
+    }
+  };
 
   // 当keyword变化时重新加载
   useEffect(() => {
@@ -998,6 +1086,113 @@ export default function HuggingFaceAuthorSubscriptionPage() {
           columns={authorColumns}
         />
       )}
+              </>
+            ),
+          },
+          {
+            key: 'link-validation',
+            label: '链接验证',
+            children: (
+              <>
+                <div className={styles.toolbar}>
+                  <Space size={8} wrap>
+                    <Button
+                      type="primary"
+                      icon={<ReloadOutlined />}
+                      onClick={() => handleValidateLinks(50)}
+                      loading={validatingLinks}
+                    >
+                      验证50个链接
+                    </Button>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => handleValidateLinks(100)}
+                      loading={validatingLinks}
+                    >
+                      验证100个链接
+                    </Button>
+                    {selectedInvalidLinkIds.length > 0 && (
+                      <Popconfirm
+                        title={`确认删除选中的 ${selectedInvalidLinkIds.length} 个无效链接?`}
+                        description="删除后数据将无法恢复"
+                        onConfirm={handleDeleteInvalidLinks}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <Button type="primary" danger icon={<DeleteOutlined />}>
+                          删除选中 ({selectedInvalidLinkIds.length})
+                        </Button>
+                      </Popconfirm>
+                    )}
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => loadInvalidLinks(1)}
+                    >
+                      刷新
+                    </Button>
+                  </Space>
+                </div>
+
+                {invalidLinks.length === 0 && !invalidLinksLoading ? (
+                  <Empty description="暂无无效链接" style={{ padding: '40px 0' }} />
+                ) : (
+                  <Table
+                    rowKey="id"
+                    loading={invalidLinksLoading}
+                    dataSource={invalidLinks}
+                    scroll={{ x: 800 }}
+                    pagination={{
+                      current: invalidLinksPagination.page,
+                      pageSize: invalidLinksPagination.size,
+                      total: invalidLinksPagination.total,
+                      showTotal: (total) => `共 ${total} 条无效链接`,
+                      showSizeChanger: true,
+                      pageSizeOptions: ['50', '100', '200'],
+                      onChange: (page, size) => setInvalidLinksPagination(prev => ({ ...prev, page, size: size || prev.size })),
+                    }}
+                    size="middle"
+                    rowSelection={{
+                      selectedRowKeys: selectedInvalidLinkIds,
+                      onChange: (selectedRowKeys) => setSelectedInvalidLinkIds(selectedRowKeys as string[]),
+                    }}
+                    columns={[
+                      {
+                        title: '模型/数据集',
+                        dataIndex: 'fullName',
+                        key: 'fullName',
+                        render: (fullName: string, record: any) => {
+                          const contentType = record.contentType || 'model';
+                          let url = `https://huggingface.co/${fullName}`;
+                          if (contentType === 'dataset') {
+                            url = `https://huggingface.co/datasets/${fullName}`;
+                          } else if (contentType === 'space') {
+                            url = `https://huggingface.co/spaces/${fullName}`;
+                          }
+                          return (
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              {fullName}
+                            </a>
+                          );
+                        },
+                      },
+                      {
+                        title: '类型',
+                        dataIndex: 'contentType',
+                        key: 'contentType',
+                        width: 100,
+                        render: (type: string) => getContentTypeTag(type),
+                      },
+                      {
+                        title: '验证时间',
+                        dataIndex: 'linkCheckedAt',
+                        key: 'linkCheckedAt',
+                        width: 160,
+                        render: (date: string | Date | null) => formatDate(date),
+                      },
+                    ]}
+                  />
+                )}
               </>
             ),
           },

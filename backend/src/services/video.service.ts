@@ -19,6 +19,59 @@ export interface GetVideosParams {
   uploaderId?: string;
 }
 
+export interface VideoValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export function validateVideoData(video: Partial<Video>): VideoValidationResult {
+  const errors: string[] = [];
+
+  if (!video.videoId && !video.bvid) {
+    errors.push('缺少videoId或bvid');
+  }
+
+  if (!video.title) {
+    errors.push('缺少标题');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+export async function getInvalidVideos(): Promise<Video[]> {
+  try {
+    return await prisma.video.findMany({
+      where: {
+        OR: [
+          { videoId: null },
+          { videoId: '' },
+        ],
+      },
+    });
+  } catch (error) {
+    logger.error('Get invalid videos error:', error);
+    return [];
+  }
+}
+
+export async function deleteInvalidVideos(): Promise<number> {
+  try {
+    const invalidVideos = await getInvalidVideos();
+    const deletePromises = invalidVideos.map((video) =>
+      prisma.video.delete({ where: { id: video.id } })
+    );
+    await Promise.all(deletePromises);
+    logger.info(`Deleted ${invalidVideos.length} invalid videos`);
+    return invalidVideos.length;
+  } catch (error) {
+    logger.error('Delete invalid videos error:', error);
+    return 0;
+  }
+}
+
 export async function getVideos(params: GetVideosParams): Promise<{ videos: Video[]; total: number }> {
   const cacheKey = queryCache.generateKey('videos', params);
 
@@ -26,7 +79,20 @@ export async function getVideos(params: GetVideosParams): Promise<{ videos: Vide
     cacheKey,
     async () => {
       try {
-        const where: Prisma.VideoWhereInput = {};
+        const where: Prisma.VideoWhereInput = {
+          AND: [
+            {
+              videoId: {
+                not: null,
+              },
+            },
+            {
+              videoId: {
+                not: '',
+              },
+            },
+          ],
+        };
 
         if (params.platform) {
           where.platform = params.platform;

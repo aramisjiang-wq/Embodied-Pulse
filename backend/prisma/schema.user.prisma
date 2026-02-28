@@ -36,13 +36,19 @@ model User {
   identityType     String?        @map("identity_type")
   organizationName String?        @map("organization_name")
   region           String?        @map("region")
-  comments         Comment[]
-  favorites        Favorite[]
-  notifications    Notification[] @ignore
-  pointRecords     PointRecord[]
-  posts            Post[]
-  subscriptions    Subscription[]
-  userActions      UserAction[]
+  emailNotification Boolean       @default(true) @map("email_notification")
+  pushNotification  Boolean       @default(false) @map("push_notification")
+  weeklyDigest     Boolean       @default(true) @map("weekly_digest")
+  language         String?        @default("zh-CN") @map("language")
+  pushSubscription String?        @map("push_subscription")
+  comments                    Comment[]
+  favorites                   Favorite[]
+  notifications               Notification[] @ignore
+  pointRecords                PointRecord[]
+  posts                       Post[]
+  subscriptions               Subscription[]
+  userActions                 UserAction[]
+  huggingFaceSubscriptions    UserHuggingFaceSubscription[]
 
   @@map("users")
 }
@@ -222,12 +228,15 @@ model HuggingFaceModel {
   tags          String?
   contentType   String?   @map("content_type")
   category      String?
+  linkValid     Boolean?  @map("link_valid")
+  linkCheckedAt DateTime? @map("link_checked_at")
 
   @@index([downloads(sort: Desc)])
   @@index([lastModified(sort: Desc)])
   @@index([contentType])
   @@index([category])
   @@index([isPinned, pinnedAt(sort: Desc)])
+  @@index([linkValid])
   @@map("huggingface_models")
 }
 
@@ -255,6 +264,7 @@ model Job {
   benefits      String?
   apply_url     String?
   apply_count   Int?      @default(0)
+  expiresAt     DateTime? @map("expires_at")
 
   @@index([status])
   @@index([createdAt(sort: Desc)])
@@ -531,19 +541,37 @@ model custom_pages {
 }
 
 model DailyNews {
-  id        String   @id @default(uuid())
-  date      String
-  title     String
-  content   String
-  isPinned  Boolean  @default(false) @map("is_pinned")
-  pinnedAt  String?  @map("pinned_at")
-  viewCount Int      @default(0) @map("view_count")
-  createdAt String   @map("created_at")
-  updatedAt String   @map("updated_at")
+  id          String    @id @default(uuid())
+  date        String
+  title       String
+  content     String
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  pinnedAt    String?   @map("pinned_at")
+  viewCount   Int       @default(0) @map("view_count")
+  createdAt   String    @map("created_at")
+  updatedAt   String    @map("updated_at")
 
   @@index([date(sort: Desc)])
   @@index([isPinned, pinnedAt(sort: Desc)])
   @@map("daily_news")
+}
+
+model UserHuggingFaceSubscription {
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")
+  subscriptionType String    @map("subscription_type") // 'papers' or 'author'
+  author           String?
+  authorUrl        String?   @map("author_url")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subscriptionType])
+  @@index([isActive])
+  @@map("user_huggingface_subscriptions")
 }
 
 model admin_audit_logs {

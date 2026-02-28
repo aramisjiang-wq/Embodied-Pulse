@@ -208,18 +208,20 @@ model jobs {
 }
 
 model bilibili_search_keywords {
-  id          String   @id @default(cuid())
-  keyword     String   @unique
-  category    String?
-  is_active   Boolean  @default(true)
-  priority    Int      @default(0)
-  description String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id            String    @id @default(cuid())
+  keyword       String    @unique
+  category      String?
+  is_active     Boolean   @default(true)
+  priority      Int       @default(0)
+  description   String?
+  last_synced_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
 
   @@index([priority(sort: Desc)])
   @@index([is_active])
   @@index([category])
+  @@index([last_synced_at(sort: Desc)])
 }
 
 model paper_search_keywords {

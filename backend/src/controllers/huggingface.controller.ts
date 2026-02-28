@@ -10,6 +10,11 @@ import {
   getTaskTypeStats as getTaskTypeStatsService,
 } from '../services/huggingface.service';
 import { getModelFromUrl, parseHuggingFaceUrl } from '../services/huggingface-api.service';
+import {
+  validateHuggingFaceLinks,
+  getInvalidLinks,
+  deleteInvalidLinks,
+} from '../services/huggingface-link-validation.service';
 import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
 import { sendSuccess, sendError } from '../utils/response';
 import { createUserAction } from '../services/user-action.service';
@@ -219,6 +224,60 @@ export async function getAuthorStats(req: Request, res: Response, next: NextFunc
       datasetCount,
       totalCount: modelCount + datasetCount,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 批量验证HuggingFace链接
+ */
+export async function validateHuggingFaceLinksController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { limit = 50 } = req.query;
+    const result = await validateHuggingFaceLinks(Number(limit));
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 获取无效链接列表
+ */
+export async function getInvalidLinksController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { skip = 0, take = 100 } = req.query;
+    const result = await getInvalidLinks(Number(skip), Number(take));
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 删除无效链接
+ */
+export async function deleteInvalidLinksController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { linkIds } = req.body;
+    if (!linkIds || !Array.isArray(linkIds)) {
+      return sendError(res, 1021, '请提供有效的linkIds数组', 400);
+    }
+    const result = await deleteInvalidLinks(linkIds);
+    sendSuccess(res, result);
   } catch (error) {
     next(error);
   }

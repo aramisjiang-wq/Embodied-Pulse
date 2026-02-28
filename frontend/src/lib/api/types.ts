@@ -143,6 +143,8 @@ export interface HuggingFaceModel {
   lastModified?: string;
   createdAt: string;
   updatedAt: string;
+  linkValid?: boolean | null;
+  linkCheckedAt?: string | null;
 }
 
 // Banner相关类型
@@ -235,6 +237,7 @@ export interface Job {
   applyUrl?: string;
   expiresAt?: string;
   isExpired?: boolean;
+  remainingDays?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

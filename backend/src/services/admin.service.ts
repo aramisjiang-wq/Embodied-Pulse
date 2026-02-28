@@ -1334,11 +1334,22 @@ export async function getAdminJobsList(params: {
     }),
     userPrisma.job.count({ where }),
   ]);
+  const now = new Date();
   return {
-    items: items.map((j: any) => ({
-      ...j,
-      applyUrl: j.apply_url ?? j.applyUrl,
-    })),
+    items: items.map((j: any) => {
+      const expiresAt = j.expiresAt ? new Date(j.expiresAt) : null;
+      let remainingDays: number | null = null;
+      if (expiresAt && expiresAt > now) {
+        const diffTime = expiresAt.getTime() - now.getTime();
+        remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+      return {
+        ...j,
+        applyUrl: j.apply_url ?? j.applyUrl,
+        isExpired: j.expiresAt ? new Date(j.expiresAt) <= now : false,
+        remainingDays,
+      };
+    }),
     total,
   };
 }

@@ -11,9 +11,17 @@ export interface BilibiliSearchKeyword {
   isActive: boolean;
   priority: number;
   description?: string;
+  lastSyncedAt?: string;
   createdAt: string;
   updatedAt: string;
   videoCount?: number;
+}
+
+export interface KeywordStats {
+  total: number;
+  active: number;
+  inactive: number;
+  totalVideos: number;
 }
 
 export interface CreateKeywordData {
@@ -60,6 +68,14 @@ export const bilibiliSearchKeywordApi = {
       },
     });
     return response;
+  },
+
+  /**
+   * 获取关键词统计数据
+   */
+  async getStats(): Promise<KeywordStats> {
+    const response = await apiClient.get<KeywordStats>('/admin/bilibili-search-keywords/stats');
+    return response.data as any;
   },
 
   /**

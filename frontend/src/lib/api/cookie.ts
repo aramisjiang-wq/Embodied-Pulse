@@ -42,33 +42,33 @@ export interface HealthCheckResult {
 
 export const cookieApi = {
   addCookie: async (name: string, cookie: string, priority?: number) => {
-    return apiClient.post('/api/admin/bilibili-cookies', { name, cookie, priority });
+    return apiClient.post('/admin/bilibili-cookies', { name, cookie, priority });
   },
 
   removeCookie: async (id: string) => {
-    return apiClient.delete(`/api/admin/bilibili-cookies/${id}`);
+    return apiClient.delete(`/admin/bilibili-cookies/${id}`);
   },
 
   getCookieStatus: async (): Promise<CookieStatus> => {
-    const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/status');
+    const response = await apiClient.get<CookieStatus>('/admin/bilibili-cookies/status');
     return response.data as any;
   },
 
   rotateCookie: async () => {
-    return apiClient.post('/api/admin/bilibili-cookies/rotate');
+    return apiClient.post('/admin/bilibili-cookies/rotate');
   },
 
   getSettings: async (): Promise<CookieSettings> => {
-    const response = await apiClient.get<CookieSettings>('/api/admin/bilibili-cookies/settings');
+    const response = await apiClient.get<CookieSettings>('/admin/bilibili-cookies/settings');
     return response.data as any;
   },
 
   updateSettings: async (settings: Partial<CookieSettings>) => {
-    return apiClient.put('/api/admin/bilibili-cookies/settings', settings);
+    return apiClient.put('/admin/bilibili-cookies/settings', settings);
   },
 
   checkHealth: async (): Promise<CookieStatus> => {
-    const response = await apiClient.get<CookieStatus>('/api/admin/bilibili-cookies/health');
+    const response = await apiClient.get<CookieStatus>('/admin/bilibili-cookies/health');
     return response.data as any;
   },
 
@@ -78,25 +78,25 @@ export const cookieApi = {
     invalid: number;
     cookies: HealthCheckResult[];
   }> => {
-    const response = await apiClient.get('/api/admin/bilibili-cookies/check');
+    const response = await apiClient.get('/admin/bilibili-cookies/check');
     return response.data as any;
   },
 
   checkSingleCookie: async (id: string): Promise<HealthCheckResult> => {
-    const response = await apiClient.get(`/api/admin/bilibili-cookies/${id}/check`);
+    const response = await apiClient.get(`/admin/bilibili-cookies/${id}/check`);
     return response.data as any;
   },
 
   toggleCookieStatus: async (id: string) => {
-    return apiClient.put(`/api/admin/bilibili-cookies/${id}/toggle`);
+    return apiClient.put(`/admin/bilibili-cookies/${id}/toggle`);
   },
 
   resetCookieErrorCount: async (id: string) => {
-    return apiClient.put(`/api/admin/bilibili-cookies/${id}/reset`);
+    return apiClient.put(`/admin/bilibili-cookies/${id}/reset`);
   },
 
   getStats: async () => {
-    const response = await apiClient.get('/api/admin/bilibili-cookies/stats');
+    const response = await apiClient.get('/admin/bilibili-cookies/stats');
     return response.data as any;
   },
 };

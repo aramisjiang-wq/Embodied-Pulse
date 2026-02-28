@@ -345,3 +345,82 @@ export async function batchCreateKeywords(keywords: CreateKeywordData[]) {
     throw error;
   }
 }
+
+/**
+ * 获取关键词统计数据
+ */
+export async function getKeywordStats() {
+  try {
+    const model = await ensurePrismaModel();
+    
+    const [total, active, inactive] = await Promise.all([
+      model.count(),
+      model.count({ where: { is_active: true } }),
+      model.count({ where: { is_active: false } }),
+    ]);
+
+    let totalVideos = 0;
+    try {
+      totalVideos = await userPrisma.video.count({
+        where: { platform: 'bilibili' },
+      });
+    } catch (error) {
+      logger.warn('统计视频数量失败:', error);
+    }
+
+    return {
+      total,
+      active,
+      inactive,
+      totalVideos,
+    };
+  } catch (error: any) {
+    logger.error('获取关键词统计数据失败:', error);
+    throw error;
+  }
+}
+
+export interface GetKeywordVideosParams {
+  keywordId: string;
+  skip?: number;
+  take?: number;
+}
+
+export async function getVideosByKeyword(params: GetKeywordVideosParams) {
+  try {
+    const { keywordId, skip = 0, take = 20 } = params;
+
+    const keyword = await adminPrisma.bilibili_search_keywords.findUnique({
+      where: { id: keywordId },
+    });
+
+    if (!keyword) {
+      throw new Error('关键词不存在');
+    }
+
+    const keywordStr = keyword.keyword;
+
+    const where: any = {
+      platform: 'bilibili',
+      OR: [
+        { title: { contains: keywordStr } },
+        { description: { contains: keywordStr } },
+      ],
+    };
+
+    const [videos, total] = await Promise.all([
+      userPrisma.video.findMany({
+        where,
+        orderBy: { publishedDate: 'desc' },
+        skip,
+        take,
+      }),
+      userPrisma.video.count({ where }),
+    ]);
+
+    return { videos, total };
+  } catch (error: any) {
+    logger.error('获取关键词相关视频失败:', error);
+    throw error;
+  }
+}

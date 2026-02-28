@@ -116,6 +116,246 @@
   font-size: 0.9375rem;
 }
 
+/* Cookie状态栏 */
+.cookieStatusBar {
+  background: linear-gradient(135deg, #f6f8fc 0%, #f0f4f8 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cookieStatusLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cookieStatusItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cookieStatusLabel {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.cookieStatusValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cookieStatusRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusNormal {
+  color: #52c41a;
+}
+
+.statusWarning {
+  color: #faad14;
+}
+
+.statusError {
+  color: #ff4d4f;
+}
+
+/* 进度面板 */
+.progressPanel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+
+.progressPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f0f5ff 0%, #f5f0ff 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.progressTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressBody {
+  padding: 16px 20px;
+}
+
+.progressInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.progressInfoLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progressStage {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.progressPercent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.progressCurrentKeyword {
+  font-size: 13px;
+  color: #1890ff;
+  background: #e6f7ff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressBar {
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progressBarInner {
+  height: 100%;
+  background: linear-gradient(90deg, #1890ff 0%, #52c41a 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.stageList {
+  margin-bottom: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.stageItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.stageItemActive {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.stageItemSuccess {
+  color: #52c41a;
+}
+
+.stageItemPending {
+  color: #d9d9d9;
+}
+
+.logSection {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
+}
+
+.logTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.logList {
+  background: #1f1f1f;
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+}
+
+.logItem {
+  color: #a0a0a0;
+  line-height: 1.6;
+}
+
+.logItemSuccess {
+  color: #52c41a;
+}
+
+.logItemError {
+  color: #ff4d4f;
+}
+
+.logItemInfo {
+  color: #1890ff;
+}
+
+.resultSummary {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.resultSuccess {
+  color: #52c41a;
+}
+
+.resultError {
+  color: #ff4d4f;
+}
+
+/* 手动Cookie输入弹窗 */
+.cookieInputArea {
+  margin-top: 12px;
+}
+
+.cookieInputArea textarea {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+}
+
 @media (max-width: 768px) {
   .pageWrapper {
     padding: 1rem;
@@ -129,5 +369,19 @@
   .actionRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .cookieStatusBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cookieStatusLeft {
+    flex-wrap: wrap;
+  }
+
+  .progressInfo {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { getVideos, getVideoById } from '../services/video.service';
+import { getVideos, getVideoById, deleteVideo } from '../services/video.service';
 import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
 import { sendSuccess, sendError } from '../utils/response';
 import { getAllActiveUploaders } from '../services/bilibili-uploader.service';
@@ -82,5 +82,25 @@ export async function getUploaders(req: Request, res: Response, next: NextFuncti
   } catch (error) {
     logger.error('getUploaders 异常，返回空列表:', error);
     sendSuccess(res, []);
+  }
+}
+
+export async function deleteVideoHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { videoId } = req.params;
+    const video = await getVideoById(videoId);
+
+    if (!video) {
+      return sendError(res, 1005, '视频不存在', 404);
+    }
+
+    await deleteVideo(videoId);
+    sendSuccess(res, { message: '删除成功' });
+  } catch (error: any) {
+    logger.error('删除视频失败:', error);
+    if (error.message === 'VIDEO_DELETION_FAILED') {
+      return sendError(res, 500, '删除视频失败');
+    }
+    next(error);
   }
 }

@@ -209,4 +209,54 @@ export const huggingfaceApi = {
     }
     return { authors: [] };
   },
+
+  validateLinks: async (limit: number = 50): Promise<{
+    validated: number;
+    valid: number;
+    invalid: number;
+    errors: Array<{ fullName: string; error: string }>;
+  }> => {
+    const response = await apiClient.post<ApiResponse<{
+      validated: number;
+      valid: number;
+      invalid: number;
+      errors: Array<{ fullName: string; error: string }>;
+    }>>('/huggingface/admin/validate-links', null, { params: { limit } });
+    if (response && response.code === 0 && response.data) {
+      return response.data;
+    }
+    throw new Error(response?.message || '验证链接失败');
+  },
+
+  getInvalidLinks: async (skip: number = 0, take: number = 100): Promise<{
+    items: Array<{
+      id: string;
+      fullName: string;
+      contentType: string | null;
+      linkCheckedAt: Date | null;
+    }>;
+    total: number;
+  }> => {
+    const response = await apiClient.get<ApiResponse<{
+      items: Array<{
+        id: string;
+        fullName: string;
+        contentType: string | null;
+        linkCheckedAt: Date | null;
+      }>;
+      total: number;
+    }>>('/huggingface/admin/invalid-links', { params: { skip, take } });
+    if (response && response.code === 0 && response.data) {
+      return response.data;
+    }
+    return { items: [], total: 0 };
+  },
+
+  deleteInvalidLinks: async (linkIds: string[]): Promise<{ deleted: number }> => {
+    const response = await apiClient.delete<ApiResponse<{ deleted: number }>>('/huggingface/admin/invalid-links', { data: { linkIds } });
+    if (response && response.code === 0 && response.data) {
+      return response.data;
+    }
+    throw new Error(response?.message || '删除无效链接失败');
+  },
 };

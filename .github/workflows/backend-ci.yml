@@ -225,7 +225,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://api.embodiedpulse.com
+      url: https://api.embodied.gradmotion.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

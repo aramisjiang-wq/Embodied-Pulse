@@ -36,13 +36,14 @@ model User {
   identityType    String?         @map("identity_type")
   organizationName String?        @map("organization_name")
   region          String?
-  comments        Comment[]
-  favorites       Favorite[]
-  notifications   notifications[] @ignore
-  pointRecords    PointRecord[]
-  posts           Post[]
-  subscriptions   Subscription[]
-  userActions     UserAction[]
+  comments                    Comment[]
+  favorites                   Favorite[]
+  notifications               notifications[] @ignore
+  pointRecords                PointRecord[]
+  posts                       Post[]
+  subscriptions               Subscription[]
+  userActions                 UserAction[]
+  huggingFaceSubscriptions    UserHuggingFaceSubscription[]
 
   @@map("users")
 }
@@ -206,12 +207,15 @@ model HuggingFaceModel {
   tags          String?
   contentType   String?   @map("content_type")
   category      String?
+  linkValid     Boolean?  @map("link_valid")
+  linkCheckedAt DateTime? @map("link_checked_at")
 
   @@index([downloads(sort: Desc)])
   @@index([lastModified(sort: Desc)])
   @@index([isPinned, pinnedAt(sort: Desc)])
   @@index([contentType])
   @@index([category])
+  @@index([linkValid])
   @@map("huggingface_models")
 }
 
@@ -237,8 +241,9 @@ model Job {
   experience    String?
   education     String?
   benefits      String?
-  applyUrl      String?  @map("apply_url")
-  applyCount    Int?     @default(0) @map("apply_count")
+  applyUrl      String?   @map("apply_url")
+  applyCount    Int?      @default(0) @map("apply_count")
+  expiresAt     DateTime? @map("expires_at")
 
   @@index([status])
   @@index([createdAt(sort: Desc)])
@@ -558,6 +563,24 @@ model BilibiliCookieSetting {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("bilibili_cookie_settings")
+}
+
+model UserHuggingFaceSubscription {
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")
+  subscriptionType String    @map("subscription_type") // 'papers' or 'author'
+  author           String?
+  authorUrl        String?   @map("author_url")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subscriptionType])
+  @@index([isActive])
+  @@map("user_huggingface_subscriptions")
 }
 
 model DailyNews {

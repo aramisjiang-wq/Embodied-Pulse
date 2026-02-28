@@ -64,10 +64,18 @@ export async function getJobs(params: GetJobsParams): Promise<{ jobs: any[]; tot
 
     const jobs = sorted.slice(params.skip, params.skip + params.take).map((j: any) => {
       const { apply_url, ...rest } = j;
+      const expiresAt = j.expiresAt ? new Date(j.expiresAt) : null;
+      const now = new Date();
+      let remainingDays: number | null = null;
+      if (expiresAt && expiresAt > now) {
+        const diffTime = expiresAt.getTime() - now.getTime();
+        remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
       return {
         ...rest,
         applyUrl: apply_url ?? j.applyUrl,
         isExpired: j.expiresAt ? new Date(j.expiresAt) <= now : false,
+        remainingDays,
       };
     });
 
@@ -99,11 +107,18 @@ export async function getJobById(jobId: string): Promise<any | null> {
         data: { viewCount: { increment: 1 } },
       });
       const now = new Date();
+      const expiresAt = job.expiresAt ? new Date(job.expiresAt) : null;
+      let remainingDays: number | null = null;
+      if (expiresAt && expiresAt > now) {
+        const diffTime = expiresAt.getTime() - now.getTime();
+        remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
       const { apply_url, ...rest } = job;
       return {
         ...rest,
         applyUrl: apply_url ?? (job as any).applyUrl,
         isExpired: job.expiresAt ? new Date(job.expiresAt) <= now : false,
+        remainingDays,
       };
     }
     return job;
@@ -218,10 +233,20 @@ export async function getJobSeekingPosts(params: GetJobSeekingPostsParams): Prom
     const expired = allPosts.filter((p: any) => p.expiresAt && new Date(p.expiresAt) <= now);
     const sorted = [...active, ...expired];
 
-    const posts = sorted.slice(params.skip, params.skip + params.take).map((p: any) => ({
-      ...p,
-      isExpired: p.expiresAt ? new Date(p.expiresAt) <= now : false,
-    }));
+    const posts = sorted.slice(params.skip, params.skip + params.take).map((p: any) => {
+      const expiresAt = p.expiresAt ? new Date(p.expiresAt) : null;
+      const now = new Date();
+      let remainingDays: number | null = null;
+      if (expiresAt && expiresAt > now) {
+        const diffTime = expiresAt.getTime() - now.getTime();
+        remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+      return {
+        ...p,
+        isExpired: p.expiresAt ? new Date(p.expiresAt) <= now : false,
+        remainingDays,
+      };
+    });
 
     return { posts, total };
   } catch (error) {
